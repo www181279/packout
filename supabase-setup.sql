@@ -236,17 +236,23 @@ begin
 end;
 $$;
 
--- Delete a style and every item recorded under it.
+-- Delete a style and every item recorded under it. Boxes on its pallet
+-- that are left with nothing in them are removed too, which frees their numbers.
 create or replace function public.delete_style(p_style text)
 returns integer
 language plpgsql
 as $$
 declare
-  v_count integer;
+  v_count  integer;
+  v_pallet bigint;
 begin
+  select pallet_id into v_pallet from public.styles where style_number = p_style;
   delete from public.items where style_number = p_style;
   get diagnostics v_count = row_count;
   delete from public.styles where style_number = p_style;
+  delete from public.boxes b
+   where b.pallet_id = v_pallet
+     and not exists (select 1 from public.items i where i.box_id = b.id);
   return v_count;
 end;
 $$;
