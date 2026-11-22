@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Opening Packout</title>
+<meta name="theme-color" content="#13213A">
+<style>
+  body{margin:0;font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#13213A;color:#fff;display:grid;place-items:center;min-height:100vh;text-align:center}
+  main{padding:28px;max-width:340px}
+  img{width:96px;height:96px;border-radius:22px;margin-bottom:18px}
+  h1{font-size:24px;margin:0 0 8px}
+  p{margin:0 0 22px;color:#C9D2DE}
+  a{display:block;padding:15px;border-radius:10px;font-weight:600;text-decoration:none;margin-top:10px}
+  .main{background:#FFC629;color:#13213A}
+  .alt{border:1px solid #55627A;color:#fff}
+</style>
+</head>
+<body>
+<main>
+  <img src="icon-192.png" alt="">
+  <h1>Opening Packout in Chrome</h1>
+  <p id="msg">One moment.</p>
+  <a class="main" id="chrome" href="#">Open in Chrome</a>
+  <a class="alt" id="here" href="#">Continue in this browser</a>
+</main>
+<script>
+  // Sends the link (with its #join or #view part) to Chrome on iPhone; elsewhere opens the app directly.
+  var hash = location.hash || '';
+  var app = location.origin + location.pathname.replace(/chrome\.html$/, '') + hash;
+  var chromeUrl = 'googlechromes://' + app.replace(/^https:\/\//, '');
+  document.getElementById('chrome').href = chromeUrl;
+  document.getElementById('here').href = app;
+  var ua = navigator.userAgent;
+  var iOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var inChrome = /CriOS|Chrome/.test(ua);
+  if (!iOS || inChrome) location.replace(app);
+  else {
+    location.href = chromeUrl;
+    setTimeout(function(){ document.getElementById('msg').textContent = 'If Chrome did not open, tap Open in Chrome. No Chrome on this phone? Continue in this browser.'; }, 1200);
+  }
+</script>
+</body>
+</html>
