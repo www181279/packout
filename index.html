@@ -131,6 +131,12 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 @media (prefers-reduced-motion:reduce){.reading .dot{animation:none}}
 .boxnow{display:flex;justify-content:space-between;align-items:center;background:var(--ink);color:#fff;border-radius:10px;padding:10px 14px;margin-bottom:12px}
 .boxnow b{font:700 30px var(--sign);font-variant-numeric:tabular-nums}
+#zoom{position:fixed;inset:0;z-index:60;background:rgba(10,16,28,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 10px 20px}
+#zoom[hidden]{display:none}
+#zoom img{max-width:100%;max-height:calc(100vh - 120px);object-fit:contain;background:#fff;border-radius:6px;touch-action:pinch-zoom}
+#zoom p{color:#C9D2DE;margin:12px 0 0;font-size:15px;text-align:center}
+#zoom-x{position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;width:48px;height:48px;border-radius:50%;border:0;background:#fff;color:var(--ink);font-size:30px;line-height:1;cursor:pointer}
+.inv img[data-act=zoom-photo],#big-photo{cursor:zoom-in}
 .morebox{margin-top:4px}.morerow{display:flex;gap:8px}.morerow input{flex:1;text-align:center;font:700 24px/1 var(--sign)}.morerow .btn{width:auto;flex:none;min-height:50px}
 .addmore{display:block;margin-top:10px}
 .savedacts{margin-top:10px}.savedacts .btn{flex:1;font-size:15px}
@@ -332,6 +338,7 @@ dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
   <button data-tab="more"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Export</span></button>
 </nav>
 <div id="sheet"><div class="card" role="dialog" aria-modal="true"></div></div>
+<div id="zoom" hidden role="dialog" aria-modal="true" aria-label="Photo"><button id="zoom-x" data-act="zoom-close" aria-label="Close photo">&times;</button><img id="zoom-img" alt=""><p id="zoom-cap"></p></div>
 <div id="toast" role="status"></div>
 <div id="busy"><div><i></i><span></span></div></div>
 <div id="print-root"></div>
@@ -940,7 +947,7 @@ function renderInvList(){
     : !list.length ? `<div class="empty"><b>No items match</b>Change the search or remove a filter.</div>`
     : list.slice(0, invLimit).map(i => `
       <button class="irow" data-act="open-item" data-id="${i.id}">
-        ${i.photo_path ? `<img loading="lazy" alt="" src="${esc(thumbUrl(i))}">` : '<span class="noimg"></span>'}
+        ${i.photo_path ? `<img loading="lazy" alt="Enlarge photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(thumbUrl(i))}" data-act="zoom-photo" data-id="${i.id}">` : '<span class="noimg"></span>'}
         <span class="mid"><span class="st">${esc(i.style_number)}</span>${i.item_type || i.size ? `<span class="tp">${esc([i.item_type, i.size && 'Size ' + i.size].filter(Boolean).join(', '))}</span>` : ''}
           <span class="d">${esc(i.color)}, ${esc(i.brand)}</span><span class="d">${esc(i.gender)}, ${esc(i.season)}${i.tag_number ? ', tag ' + esc(i.tag_number) : ''}</span></span>
         <span class="wide">${esc(i.color)}</span><span class="wide">${esc(i.brand)}</span><span class="wide">${esc(i.gender)}</span><span class="wide">${esc(i.season)}</span><span class="wide">${esc(i.tag_number || '')}</span>
@@ -961,7 +968,7 @@ function filterSheet(){
 function itemSheet(id, edit){
   const i = joined().find(x => x.id === id); if (!i) return closeSheet();
   if (!edit) return openSheet(`
-    ${i.photo_path ? `<img class="big" id="big-photo" alt="Photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(fullUrl(i))}">
+    ${i.photo_path ? `<img class="big" id="big-photo" data-act="zoom-photo" data-id="${i.id}" alt=""Photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(fullUrl(i))}">
       ${i.photo_pro ? `<button class="linkbtn small" data-act="flip-photo" data-a="${esc(fullUrl(i))}" data-b="${esc(photoUrl(i.photo_path))}" style="margin:-6px 0 8px">Show the original photo</button>` : ''}` : ''}
     <h2>${esc(i.style_number)}</h2>
     <dl class="facts"><dt>Where</dt><dd>${pCode(i.pallet_id)}, ${bCode(i.box_id)}</dd>
@@ -1794,6 +1801,14 @@ const act = {
     try { if (navigator.share) return await navigator.share({ title: 'Packout, view only', text, url }); } catch (e) { if (e.name === 'AbortError') return; }
     try { await navigator.clipboard.writeText(url); toast('View-only link copied.', 'good'); } catch { openSheet(`<h2>View-only link</h2><p class="lead">Copy this link and send it.</p><textarea readonly style="width:100%;min-height:120px">${esc(url)}</textarea><button class="btn" data-act="close-sheet">Done</button>`); }
   },
+  'zoom-photo'(el){
+    const i = data.items.find(x => x.id === el.dataset.id); if (!i || !i.photo_path) return;
+    const z = $('#zoom'), img = $('#zoom-img');
+    img.src = el.id === 'big-photo' ? el.src : fullUrl(i); img.alt = `Photo of ${i.style_number} ${i.color}`;
+    $('#zoom-cap').textContent = `${i.style_number}  ${i.color}${i.size ? '  ' + i.size : ''}  ·  ${bCode(i.box_id)}`;
+    z.hidden = false; document.body.style.overflow = 'hidden'; $('#zoom-x').focus();
+  },
+  'zoom-close'(){ $('#zoom').hidden = true; $('#zoom-img').src = ''; document.body.style.overflow = ''; },
   'tag-ocr'(){ const f = (pack.lastTag || {}).file || pack.tagFile; pack.tagStatus = ''; if (f) runOcr(f); },
   'ocr-pick'(el){
     const v = normStyle(el.dataset.v); closeSheet();
@@ -1980,6 +1995,7 @@ document.addEventListener('click', e => {
   const a = e.target.closest('[data-act]');
   if (a && act[a.dataset.act]) return act[a.dataset.act](a);
   if (e.target.id === 'sheet') closeSheet();
+  if (e.target.id === 'zoom') act['zoom-close']();
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'k-itemfirst' && e.target.files[0]) {
@@ -2026,6 +2042,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'si-pin') { e.preventDefault(); act['sign-in'](); }
   if (e.key === 'Enter' && e.target.id === 'k-color') { e.preventDefault(); const q = $('.szq'); if (q) { q.focus(); q.select(); } else e.target.blur(); }
   if (e.key === 'Enter' && (['k-tag', 'k-brand'].includes(e.target.id) || e.target.classList.contains('szq') || e.target.classList.contains('szt'))) { e.preventDefault(); e.target.blur(); }
+  if (e.key === 'Escape' && !$('#zoom').hidden) { act['zoom-close'](); return; }
   if (e.key === 'Escape' && sheetOpen()) closeSheet();
 });
 window.addEventListener('afterprint', () => $('#print-root').innerHTML = '');
@@ -2064,7 +2081,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.6';
+const APP_VERSION = '2026-11-22.7';
 let newVersion = false;
 async function checkVersion(){
   try {
