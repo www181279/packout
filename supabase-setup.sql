@@ -362,5 +362,20 @@ drop policy if exists "packout photos delete" on storage.objects;
 create policy "packout photos delete" on storage.objects
   for delete to anon, authenticated using (bucket_id = 'item-photos');
 
+-- 5. Live updates: every phone hears about changes within a second.
+do $$
+declare t text;
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    foreach t in array array['pallets', 'boxes', 'styles', 'items'] loop
+      if not exists (select 1 from pg_publication_tables
+                      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
+        execute format('alter publication supabase_realtime add table public.%I', t);
+      end if;
+    end loop;
+  end if;
+end;
+$$;
+
 -- Tell the API about the new tables right away.
 notify pgrst, 'reload schema';

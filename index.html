@@ -343,10 +343,10 @@ function setBusy(label){ $('#busy span').textContent = label; }
 async function withBusy(label, fn){
   busyN++; setBusy(label); $('#busy').classList.add('on');
   try { return await fn(); }
-  finally { if (--busyN === 0) $('#busy').classList.remove('on'); }
+  finally { if (--busyN === 0) { $('#busy').classList.remove('on'); if (softPending) { softPending = false; setTimeout(softRender, 0); } } }
 }
 function openSheet(html){ $('#toast').className = ''; $('#sheet .card').innerHTML = html; $('#sheet').classList.add('on'); const f = $('#sheet [autofocus]'); if (f) f.focus(); }
-function closeSheet(){ stopScanner(); $('#sheet').classList.remove('on'); $('#sheet .card').innerHTML = ''; }
+function closeSheet(){ stopScanner(); $('#sheet').classList.remove('on'); $('#sheet .card').innerHTML = ''; if (softPending) { softPending = false; setTimeout(softRender, 0); } }
 const sheetOpen = () => $('#sheet').classList.contains('on');
 
 /* ---------- Supabase over plain HTTPS (no library needed) ---------- */
@@ -432,6 +432,14 @@ function validatePack(){
   if (!me || !cfg || !loaded) return false;      // nothing to check against until the data is in
   if (pack.keep && !idx.box.get(pack.keep.box)) pack.keep = null;
   if (pack.last && !idx.box.get(pack.last.box)) { pack.last = null; store.del('last'); }
+  const sr = (pack.stage === 'item' || pack.stage === 'box') && styleRow(pack.style);
+  if (sr && pack.pallet && sr.pallet_id !== pack.pallet) {               // the style was moved to another pallet
+    const b = pack.box && idx.box.get(pack.box);
+    if (b && b.pallet_id === sr.pallet_id) { pack.pallet = sr.pallet_id; return 'bar'; }   // this box went with it: only the top bar changes
+    Object.assign(pack, { stage: 'box', pallet: sr.pallet_id, box: null, known: true, owner: sr.created_by, form: null, photo: null, justSaved: false,
+      saved: `Style ${pack.style} was moved to ${pCode(sr.pallet_id)}. Pick a box there.` });
+    return true;
+  }
   const goneBox = (pack.stage === 'item' || pack.stage === 'box') && pack.box && !idx.box.get(pack.box);
   const goneStyle = (pack.stage === 'item' || pack.stage === 'box') && !styleRow(pack.style);
   if (!goneBox && !goneStyle) return false;
@@ -448,12 +456,51 @@ function applyKeep(){
 async function loadAll(){
   const [pallets, boxes, styles, items] = await Promise.all(['pallets','boxes','styles','items'].map(t => db.all(t)));
   data = { pallets, boxes, styles, items }; loaded = true;
-  idx = { pal: new Map(pallets.map(p => [p.id, p])), box: new Map(boxes.map(b => [b.id, b])), style: new Map(styles.map(s => [s.style_number, s])) };
+  rebuildIdx();
   setSync(true);
 }
+function rebuildIdx(){
+  idx = { pal: new Map(data.pallets.map(p => [p.id, p])), box: new Map(data.boxes.map(b => [b.id, b])), style: new Map(data.styles.map(s => [s.style_number, s])) };
+}
+
+/* ---------- live updates: every change by any phone arrives here within a second ---------- */
+const RT_LIB = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js';
+const PK = { pallets: 'id', boxes: 'id', styles: 'style_number', items: 'id' };
+let live = null, liveOn = false, liveTimer = 0, softPending = false;
+function applyChange(table, ch){
+  const key = PK[table], list = data[table];
+  if (!list) return;
+  if (ch.eventType === 'DELETE') {
+    const k = ch.old && ch.old[key]; if (k === undefined) return;
+    const i = list.findIndex(r => r[key] === k); if (i >= 0) list.splice(i, 1);
+  } else if (ch.new) {
+    const i = list.findIndex(r => r[key] === ch.new[key]);
+    if (i >= 0) list[i] = { ...list[i], ...ch.new }; else list.push(ch.new);
+  }
+  rebuildIdx();
+  clearTimeout(liveTimer); liveTimer = setTimeout(() => { if (!busyN) softRender(); else softPending = true; }, 120);
+}
+async function startLive(){
+  if (live || !cfg) return;
+  try {
+    if (!window.supabase || !window.supabase.createClient) await loadScript(RT_LIB);
+    const client = window.supabase.createClient(cfg.url, cfg.key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const ch = client.channel('packout-live');
+    Object.keys(PK).forEach(t => ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, c => applyChange(t, c)));
+    live = { client, ch };
+    let wasLive = false;
+    ch.subscribe(status => {
+      const on = status === 'SUBSCRIBED';
+      liveOn = on; setSync(true);
+      if (on && wasLive === false && loaded) refresh(true).then(ok => ok && softRender());   // catch anything missed while disconnected
+      wasLive = on;
+    });
+  } catch { live = null; liveOn = false; }
+}
+function stopLive(){ if (live) { try { live.client.removeChannel(live.ch); } catch {} live = null; liveOn = false; } }
 function setSync(ok){
   const s = $('#sync'); s.classList.toggle('off', !ok);
-  $('span', s).textContent = ok ? 'Synced ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Offline, retrying';
+  $('span', s).textContent = !ok ? 'Offline, retrying' : liveOn ? 'Live' : 'Synced ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 async function refresh(silent){
   try { await loadAll(); return true; }
@@ -1084,7 +1131,7 @@ const act = {
         if (e.status === 401 || e.status === 403) return fail('The database refused that key. Copy the anon (public) key again.');
         return fail('Connected, but the tables are missing. Run the setup script in the Supabase SQL editor first, then try again.');
       }
-      cfg = c; store.set('cfg', c); await refresh(); render();
+      cfg = c; store.set('cfg', c); await refresh(); render(); startLive();
     });
   },
   'save-who'(){
@@ -1098,7 +1145,7 @@ const act = {
     openSheet(`<h2>Disconnect this phone?</h2><p class="lead">Nothing is deleted from the database. This phone will need the invite link again.</p>
       <div class="row"><button class="btn alt" data-act="close-sheet">Cancel</button><button class="btn danger" data-act="disconnect-yes">Disconnect</button></div>`);
   },
-  'disconnect-yes'(){ store.del('cfg'); store.del('me'); cfg = null; me = null; closeSheet(); render(); },
+  'disconnect-yes'(){ stopLive(); store.del('cfg'); store.del('me'); cfg = null; me = null; closeSheet(); render(); },
   'close-sheet': closeSheet,
 
   /* pack */
@@ -1449,13 +1496,36 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && sheetOpen()) closeSheet();
 });
 window.addEventListener('afterprint', () => $('#print-root').innerHTML = '');
-function softRender(){            // refresh what's on screen without disturbing typing
-  if (tab === 'pack') { if (validatePack()) render(); return; }
-  if (tab === 'inventory') renderInvList();
-  else if (tab === 'pallets') render();
+function keepInputs(fn){                // re-draw the screen, keeping typed values, choices, focus and scroll
+  const vals = [...document.querySelectorAll('#view input, #view select')].filter(el => el.type !== 'file')
+    .map(el => [el.id ? '#' + el.id : `input[name="${el.name}"][value="${el.value}"]`, el.type === 'radio' || el.type === 'checkbox' ? el.checked : el.value, el.type]);
+  const act = document.activeElement && document.activeElement.id, y = scrollY;
+  fn();
+  vals.forEach(([sel, v, type]) => { const el = document.querySelector(sel); if (!el) return; if (type === 'radio' || type === 'checkbox') el.checked = v; else el.value = v; });
+  if (act && $('#' + act)) $('#' + act).focus({ preventScroll: true });
+  scrollTo(0, y);
 }
+function softRender(){            // show changes from other phones without disturbing the person using this one
+  if (!cfg || !me || !loaded) return;
+  if (sheetOpen()) { softPending = true; return; }
+  if (tab === 'inventory') return renderInvList();
+  if (tab === 'pallets') return keepInputs(render);
+  if (tab === 'more') return keepInputs(render);
+  // pack tab
+  const v = validatePack();
+  if (v === true) return render();
+  if (v !== 'bar' && pack.stage === 'pallet') { const row = styleRow(pack.style); return row ? blocked(row) : render(); }   // someone just started this style
+  if (v !== 'bar' && (pack.stage === 'box' || pack.stage === 'style')) return keepInputs(render);
+  if (pack.stage !== 'item') return render();
+  // item form: never redraw the form (the photo would be lost); refresh the bar at the top and the saved message
+  const t = $('.trail'); if (t) t.outerHTML = trailHTML();
+  const sv = $('.savedacts'); if (sv && idx.box.get(pack.box)?.status !== 'open') sv.remove();
+}
+let lastPoll = 0;
 setInterval(async () => {
   if (!cfg || !me || document.hidden || busyN || sheetOpen()) return;
+  if (liveOn && Date.now() - lastPoll < 60000) return;          // live updates on: only check once a minute
+  lastPoll = Date.now();
   if (await refresh(true) && !busyN && !sheetOpen()) softRender();
 }, 15000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
@@ -1465,7 +1535,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && cf
   const m = location.hash.match(/^#join=(.+)$/);
   if (m) { try { const j = JSON.parse(decodeURIComponent(escape(atob(m[1])))); if (j.u && j.k) { cfg = { url: j.u, key: j.k }; store.set('cfg', cfg); if (j.n && !me) { me = { name: j.n }; store.set('me', me); } } } catch {} if (!isStandalone()) history.replaceState(null, '', location.pathname); }
   render();
-  if (cfg) { await withBusy('Loading inventory', () => refresh()); render(); }
+  if (cfg) { await withBusy('Loading inventory', () => refresh()); render(); startLive(); }
 })();
 </script>
 </body>
