@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#13213A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Packout">
+<title>Packout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --floor:#E8ECEF; --paper:#fff; --ink:#13213A; --ink2:#55627A; --line:#D3DAE1;
+  --placard:#FFC629; --placard-deep:#D9A300; --stop:#C8322B; --stop-bg:#FCEBEA; --go:#1B8757; --go-bg:#E3F4EC;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --sign:"Barlow Condensed","Arial Narrow","Roboto Condensed",var(--body);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--floor);color:var(--ink);font:400 16px/1.45 var(--body);-webkit-tap-highlight-color:transparent}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid #2F6FED;outline-offset:2px}
+h1,h2,h3,p{margin:0}
+.sign{font-family:var(--sign);font-weight:700;letter-spacing:.01em;font-variant-numeric:tabular-nums}
+.muted{color:var(--ink2)}
+.small{font-size:14px}
+
+/* frame */
+#top{position:sticky;top:0;z-index:20;background:var(--ink);color:#fff;display:flex;align-items:center;gap:12px;
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
+#top .name{font:700 24px/1 var(--sign);letter-spacing:.02em}
+#top .who{margin-left:auto;text-align:right;font-size:13px;line-height:1.25}
+#top .who b{display:block;font-weight:600;font-size:15px}
+#sync{display:inline-flex;align-items:center;gap:6px;color:#B9C4D6}
+#sync i{width:8px;height:8px;border-radius:50%;background:#4CD19A}
+#sync.off i{background:#FF7A70}
+#view{max-width:720px;margin:0 auto;padding:16px 16px calc(96px + env(safe-area-inset-bottom))}
+#view.wide{max-width:1180px}
+#nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--paper);border-top:1px solid var(--line);
+  display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom)}
+#nav button{border:0;background:none;padding:9px 4px 8px;display:grid;justify-items:center;gap:2px;font-size:13px;font-weight:500;color:var(--ink2)}
+#nav svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#nav button[aria-current=page]{color:var(--ink);font-weight:600}
+#nav button[aria-current=page] span{box-shadow:0 3px 0 var(--placard)}
+
+/* building blocks */
+.h{font:700 30px/1.05 var(--sign);margin:4px 0 4px}
+.lead{color:var(--ink2);margin-bottom:16px}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:12px}
+.panel h2{font:600 17px/1.3 var(--body);margin-bottom:10px}
+label.f{display:block;font-weight:600;font-size:15px;margin:14px 0 6px}
+label.f:first-child{margin-top:0}
+label.f small{font-weight:400;color:var(--ink2)}
+input[type=text],input[type=url],input[type=number],input[type=search],select{
+  width:100%;height:50px;border:1.5px solid #AEB8C4;border-radius:8px;background:#fff;padding:0 14px;font-size:17px}
+input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,41,.7);outline-offset:0}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;border-radius:8px;border:1.5px solid var(--ink);
+  background:var(--ink);color:#fff;font-weight:600;font-size:17px;padding:8px 16px;text-align:center}
+.btn.alt{background:#fff;color:var(--ink)}
+.btn.quiet{border-color:var(--line);background:#fff;color:var(--ink);font-weight:500}
+.btn.danger{border-color:var(--stop);background:#fff;color:var(--stop)}
+.btn.sm{min-height:42px;font-size:15px;width:auto}
+.btn+.btn{margin-top:10px}
+.row{display:flex;gap:10px}.row>*{flex:1}.row .btn+.btn{margin-top:0}
+.err{background:var(--stop-bg);border-left:4px solid var(--stop);color:#7A1612;padding:10px 12px;border-radius:6px;margin:12px 0;font-size:15px}
+.note{background:#EEF2F6;border-radius:6px;padding:10px 12px;font-size:15px;color:var(--ink2);margin:12px 0}
+.linkbtn{border:0;background:none;padding:6px 0;color:var(--ink);text-decoration:underline;text-underline-offset:3px;font-weight:500}
+
+/* placard: the pallet's identity */
+.placard{background:var(--placard);color:var(--ink);border-radius:10px;overflow:hidden;margin-bottom:12px}
+.placard .stripes{height:14px;background:repeating-linear-gradient(-45deg,var(--ink) 0 14px,var(--placard) 14px 28px)}
+.placard .in{padding:14px 16px 16px}
+.placard .code{font:700 76px/.9 var(--sign);letter-spacing:.01em;margin:6px 0 8px}
+.placard p{font-weight:500}
+.placard.stop{background:var(--stop);color:#fff}
+.placard.stop .stripes{background:repeating-linear-gradient(-45deg,#fff 0 14px,var(--stop) 14px 28px)}
+
+/* pack trail */
+.trail{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center}
+.trail span{background:var(--ink);color:#fff;border-radius:6px;padding:4px 10px;font:700 18px/1.2 var(--sign)}
+.trail span.p{background:var(--placard);color:var(--ink)}
+.trail button{margin-left:auto}
+
+/* pick lists */
+.pick{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;min-height:64px}
+.pick:active{border-color:var(--ink)}
+.pick .tag{flex:none;min-width:86px;text-align:center;background:var(--placard);border-radius:6px;padding:8px 8px;font:700 26px/1 var(--sign)}
+.pick .tag.box{background:#E3E9EF}
+.pick b{display:block;font-weight:600}
+.pick small{color:var(--ink2);font-size:14px}
+.pick.new{border-style:dashed;border-color:#8793A3;justify-content:center;font-weight:600}
+.pick.mine{border-color:var(--ink)}
+.badge{display:inline-block;font-size:13px;font-weight:600;border-radius:20px;padding:1px 9px;background:#E3E9EF;color:var(--ink2);vertical-align:middle}
+.badge.closed{background:var(--ink);color:#fff}
+
+/* item form */
+.photo{position:relative;display:grid;place-items:center;aspect-ratio:4/3;border:2px dashed #8793A3;border-radius:10px;background:#F4F6F8;overflow:hidden;text-align:center;font-weight:600}
+.photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.photo input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.photo .again{position:absolute;right:8px;bottom:8px;background:var(--ink);color:#fff;border-radius:6px;padding:4px 10px;font-size:14px;font-weight:500;pointer-events:none}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips label{position:relative}
+.chips input{position:absolute;opacity:0;inset:0}
+.chips span{display:block;border:1.5px solid #AEB8C4;border-radius:8px;padding:10px 14px;background:#fff;font-weight:500}
+.chips input:checked+span{background:var(--ink);border-color:var(--ink);color:#fff}
+.chips input:focus-visible+span{outline:3px solid #2F6FED;outline-offset:2px}
+.qty{display:grid;grid-template-columns:56px 1fr 56px;gap:8px}
+.qty button{border:1.5px solid var(--ink);border-radius:8px;background:#fff;font-size:26px;font-weight:600;line-height:1}
+.qty input{text-align:center;font:700 26px/1 var(--sign)}
+.saved{background:var(--go-bg);border-left:4px solid var(--go);border-radius:6px;padding:10px 12px;margin-bottom:12px;font-weight:500}
+
+/* pallets */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:10px}
+.ptile{border:0;text-align:left;background:var(--placard);border-radius:10px;padding:12px 14px;color:var(--ink)}
+.ptile .code{font:700 44px/.95 var(--sign)}
+.ptile.closed{background:#fff;border:1.5px solid var(--ink)}
+.ptile p{font-size:14px;font-weight:500;margin-top:4px}
+.boxhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.boxhead .code{font:700 26px/1 var(--sign)}
+.lines{list-style:none;margin:10px 0 0;padding:0}
+.lines li{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--line);align-items:center}
+.lines li b{font-weight:600}
+.lines .n{margin-left:auto;font:700 20px/1 var(--sign)}
+.seg{display:flex;gap:8px;margin-bottom:12px}
+.seg button{border:1.5px solid var(--line);background:#fff;border-radius:20px;padding:6px 14px;font-weight:500}
+.seg button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+
+/* inventory */
+.totals{display:grid;grid-template-columns:repeat(4,1fr);background:var(--ink);color:#fff;border-radius:10px;margin-bottom:12px}
+.totals div{padding:12px 6px;text-align:center;font-size:13px}
+.totals b{display:block;font:700 30px/1 var(--sign)}
+.tools{display:flex;gap:8px;margin-bottom:8px}
+.tools input{flex:1}
+.tools .btn{width:auto;min-height:50px;flex:none}
+.fchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.fchips button{border:0;background:var(--ink);color:#fff;border-radius:20px;padding:5px 12px;font-size:14px}
+.irow{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px 8px 8px;margin-bottom:6px}
+.irow img,.irow .noimg{width:64px;height:64px;border-radius:6px;object-fit:cover;background:#E3E9EF}
+.irow .st{font:700 22px/1.1 var(--sign)}
+.irow .d{font-size:14px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.irow .mid{min-width:0}
+.irow .mid>span{display:block}
+.irow .lc{display:block;font-size:15px;white-space:nowrap}
+.irow .loc{text-align:right;font:700 17px/1.25 var(--sign)}
+.irow .loc em{display:block;font-style:normal;font-size:24px}
+.irow .wide{display:none}
+@media (min-width:980px){
+  .irow{grid-template-columns:64px 160px 1.2fr 1fr 1fr 1fr 1fr 110px 64px}
+  .irow .wide{display:block;font-size:15px}
+  .irow .mid>.d{display:none}
+  .irow .lc{display:none}
+  .irow .loc em{font-size:24px}
+}
+.empty{text-align:center;padding:36px 16px;color:var(--ink2)}
+.empty b{display:block;color:var(--ink);font-size:18px;margin-bottom:4px}
+
+/* sheets, toast, busy */
+#sheet{position:fixed;inset:0;z-index:40;background:rgba(19,33,58,.55);display:none;align-items:flex-end;justify-content:center}
+#sheet.on{display:flex}
+#sheet .card{background:var(--floor);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));animation:up .18s ease-out}
+@media (min-width:700px){#sheet{align-items:center}#sheet .card{border-radius:16px}}
+@keyframes up{from{transform:translateY(24px);opacity:.4}}
+@media (prefers-reduced-motion:reduce){#sheet .card{animation:none}}
+#sheet h2{font:700 26px/1.1 var(--sign);margin-bottom:12px}
+.big{width:100%;border-radius:10px;background:#E3E9EF;display:block;margin-bottom:12px;max-height:50vh;object-fit:contain}
+dl.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0 0 14px}
+dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
+#toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;margin:auto;max-width:520px;background:var(--ink);color:#fff;border-radius:8px;padding:12px 14px;font-weight:500;display:none}
+#toast.on{display:block}#toast.bad{background:var(--stop)}#toast.good{background:var(--go)}
+#busy{position:fixed;inset:0;z-index:70;background:rgba(232,236,239,.82);display:none;place-items:center;text-align:center;font-weight:600}
+#busy.on{display:grid}
+#busy i{display:block;width:38px;height:38px;margin:0 auto 12px;border:4px solid var(--line);border-top-color:var(--ink);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(1turn)}}
+#print-root{display:none}
+@media print{
+  body{background:#fff}
+  #top,#nav,#view,#sheet,#toast,#busy{display:none!important}
+  #print-root{display:block}
+}
+</style>
+<style id="mf-css">
+.mf{font-family:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#13213A;font-size:12px;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.mf *{box-sizing:border-box}
+.mf h1,.mf h2,.mf h3,.mf p{margin:0}
+.mf .sg{font-family:"Barlow Condensed","Arial Narrow",sans-serif;font-weight:700;font-variant-numeric:tabular-nums}
+.mf-head{border-bottom:4px solid #13213A;padding-bottom:14px;margin-bottom:18px}
+.mf-head h1{font:700 40px/1 "Barlow Condensed","Arial Narrow",sans-serif}
+.mf-head p{color:#55627A;font-size:13px;margin-top:4px}
+.mf-tot{display:flex;gap:28px;margin:14px 0 0}
+.mf-tot div{font-size:12px;color:#55627A}
+.mf-tot b{display:block;color:#13213A;font:700 30px/1 "Barlow Condensed","Arial Narrow",sans-serif}
+.mf-pal{margin-bottom:26px}
+.mf-plac{display:flex;align-items:center;gap:18px;background:#FFC629;border-radius:8px;padding:10px 16px;margin-bottom:10px;break-after:avoid}
+.mf-plac b{font:700 44px/1 "Barlow Condensed","Arial Narrow",sans-serif}
+.mf-plac span{font-size:13px;font-weight:500}
+.mf-plac .r{margin-left:auto;text-align:right}
+.mf-box{margin:0 0 14px}
+.mf-box h3{font:700 20px/1.2 "Barlow Condensed","Arial Narrow",sans-serif;border-bottom:2px solid #13213A;padding-bottom:3px;display:flex;justify-content:space-between;align-items:baseline;break-after:avoid}
+.mf-box h3 small{font:500 12px "Barlow",sans-serif;color:#55627A}
+.mf table{width:100%;border-collapse:collapse;table-layout:fixed}
+.mf th.ph{width:58px}.mf th.st{width:20%}.mf th.q{width:64px}
+.mf th{text-align:left;font-weight:600;font-size:11px;color:#55627A;padding:5px 8px 4px;border-bottom:1px solid #AEB8C4}
+.mf td{padding:5px 8px;border-bottom:1px solid #D3DAE1;vertical-align:middle}
+.mf tr{break-inside:avoid}
+.mf td.ph{width:58px;padding-left:0}
+.mf td.ph img{width:50px;height:50px;object-fit:cover;border-radius:4px;display:block;background:#E3E9EF}
+.mf td.st{font:700 16px/1.1 "Barlow Condensed","Arial Narrow",sans-serif;white-space:nowrap}
+.mf td.q,.mf th.q{text-align:right;font:700 16px/1.1 "Barlow Condensed","Arial Narrow",sans-serif}
+.mf th.q{font:600 11px "Barlow",sans-serif}
+.mf-index h2{font:700 28px/1 "Barlow Condensed","Arial Narrow",sans-serif;border-bottom:4px solid #13213A;padding-bottom:8px;margin-bottom:6px}
+.mf-index td.where{font:700 16px/1.1 "Barlow Condensed","Arial Narrow",sans-serif}
+@media print{
+  @page{size:A4;margin:12mm}
+  .mf-pal+.mf-pal,.mf-index{break-before:page}
+  .mf-find{display:none}
+}
+</style>
+</head>
+<body>
+<header id="top">
+  <div><div class="name">Packout</div><div id="sync" class="small"><i></i><span>Not connected</span></div></div>
+  <div class="who" id="who"></div>
+</header>
+<main id="view"></main>
+<nav id="nav" hidden>
+  <button data-tab="pack"><svg viewBox="0 0 24 24"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg><span>Pack</span></button>
+  <button data-tab="pallets"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="10" rx="1"/><path d="M3 17h18M5 17v3M12 17v3M19 17v3"/></svg><span>Pallets</span></button>
+  <button data-tab="inventory"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Inventory</span></button>
+  <button data-tab="more"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Export</span></button>
+</nav>
+<div id="sheet"><div class="card" role="dialog" aria-modal="true"></div></div>
+<div id="toast" role="status"></div>
+<div id="busy"><div><i></i><span></span></div></div>
+<div id="print-root"></div>
+
+<script>
+/* ============================================================
+   Packout: packing inventory for a store closing.
+   Data lives in Supabase. Optional: hardcode your project here
+   so employees never see the connection screen.
+   ============================================================ */
+const PRESET_URL = '';   // e.g. 'https://abcd1234.supabase.co'
+const PRESET_KEY = '';   // the anon / publishable key
+const BUCKET = 'item-photos';
+const GENDERS = ['Women','Men','Girls','Boys','Baby','Unisex'];
+const SEASONS = ['Spring','Summer','Fall','Winter','All year'];
+
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pCode = id => 'P-' + String(id).padStart(3, '0');
+const bCode = id => 'B-' + String(id).padStart(4, '0');
+const normStyle = s => String(s || '').trim().replace(/\s+/g, ' ').toUpperCase();
+const nf = n => Number(n || 0).toLocaleString();
+const unit = (n, w) => n === 1 ? w : w + (w.endsWith('x') ? 'es' : 's');
+const plural = (n, w) => `${nf(n)} ${w}${n === 1 ? '' : (w.endsWith('x') ? 'es' : 's')}`;
+const store = {
+  get(k){ try { return JSON.parse(localStorage.getItem('packout.' + k)); } catch { return null; } },
+  set(k, v){ try { localStorage.setItem('packout.' + k, JSON.stringify(v)); } catch {} },
+  del(k){ try { localStorage.removeItem('packout.' + k); } catch {} }
+};
+function uuid(){
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16)); b[6] = b[6] & 15 | 64; b[8] = b[8] & 63 | 128;
+  const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+}
+let toastT;
+function toast(msg, kind = ''){
+  const t = $('#toast'); t.textContent = msg; t.className = 'on ' + kind;
+  clearTimeout(toastT); toastT = setTimeout(() => t.className = '', kind === 'bad' ? 6000 : 2800);
+}
+let busyN = 0;
+function setBusy(label){ $('#busy span').textContent = label; }
+async function withBusy(label, fn){
+  busyN++; setBusy(label); $('#busy').classList.add('on');
+  try { return await fn(); }
+  finally { if (--busyN === 0) $('#busy').classList.remove('on'); }
+}
+function openSheet(html){ $('#sheet .card').innerHTML = html; $('#sheet').classList.add('on'); const f = $('#sheet [autofocus]'); if (f) f.focus(); }
+function closeSheet(){ $('#sheet').classList.remove('on'); $('#sheet .card').innerHTML = ''; }
+const sheetOpen = () => $('#sheet').classList.contains('on');
+
+/* ---------- Supabase over plain HTTPS (no library needed) ---------- */
+let cfg = store.get('cfg') || (PRESET_URL && PRESET_KEY ? { url: PRESET_URL, key: PRESET_KEY } : null);
+class ApiError extends Error { constructor(msg, status, code){ super(msg); this.status = status; this.code = code; } }
+async function call(path, { method = 'GET', body, headers = {}, timeout = 20000, c = cfg } = {}){
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), timeout);
+  let res;
+  try {
+    res = await fetch(c.url + path, { method, body, signal: ctrl.signal, cache: 'no-store',
+      headers: { apikey: c.key, Authorization: 'Bearer ' + c.key, ...headers } });
+  } catch (e) {
+    throw new ApiError('No connection to the database. Check the internet on this phone and try again. Nothing was lost.', 0, 'NETWORK');
+  } finally { clearTimeout(t); }
+  const text = await res.text(); let json = null;
+  try { json = text ? JSON.parse(text) : null; } catch {}
+  if (!res.ok) throw new ApiError((json && (json.message || json.error)) || text || res.statusText, res.status, json && (json.code || json.statusCode || json.error));
+  return json;
+}
+const JSONH = { 'Content-Type': 'application/json', Prefer: 'return=representation' };
+const db = {
+  get: (table, query) => call(`/rest/v1/${table}?${query}`),
+  async all(table){
+    const out = [];
+    for (let off = 0; ; off += 1000){
+      const page = await call(`/rest/v1/${table}?select=*&order=created_at.asc&limit=1000&offset=${off}`);
+      out.push(...page); if (page.length < 1000) return out;
+    }
+  },
+  insert: (table, row) => call(`/rest/v1/${table}`, { method: 'POST', body: JSON.stringify(row), headers: JSONH }).then(r => r[0]),
+  update: (table, query, patch) => call(`/rest/v1/${table}?${query}`, { method: 'PATCH', body: JSON.stringify(patch), headers: JSONH }).then(r => r[0]),
+  remove: (table, query) => call(`/rest/v1/${table}?${query}`, { method: 'DELETE', headers: JSONH })
+};
+const eq = v => 'eq.' + encodeURIComponent(v);
+const isDup = e => e.code === '23505' || e.status === 409;
+async function uploadPhoto(path, blob){
+  try {
+    await call(`/storage/v1/object/${BUCKET}/${path}`, { method: 'POST', body: blob, timeout: 60000,
+      headers: { 'Content-Type': 'image/jpeg', 'x-upsert': 'true', 'cache-control': '31536000' } });
+  } catch (e) {
+    if (/exist|duplicate/i.test(e.message + e.code)) return;      // already uploaded on an earlier try
+    if (e.code !== 'NETWORK') e.message = 'Photo upload failed: ' + e.message;
+    throw e;
+  }
+}
+const photoUrl = (path, c = cfg) => path ? `${c.url}/storage/v1/object/public/${BUCKET}/${path}` : '';
+const thumbUrl = it => it.photo_path ? photoUrl('thumb/' + it.photo_path) : '';
+
+function shrink(file, max, quality){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => b ? resolve(b) : reject(new Error('Could not read that photo. Take it again.')), 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that photo. Take it again.')); };
+    img.src = url;
+  });
+}
+
+/* ---------- state ---------- */
+let me = store.get('me');                         // { name, area }
+let data = { pallets: [], boxes: [], styles: [], items: [] };
+let idx = { pal: new Map(), box: new Map(), style: new Map() };
+let tab = 'pack';
+let pack = newPack();
+let palView = null, palMine = false;
+let filt = { q: '', pallet: '', box: '', brand: '', gender: '', season: '', color: '', by: '' }, invLimit = 150, invSort = 'new';
+function newPack(keep){ return { stage: 'style', style: '', pallet: null, box: null, known: false, owner: '', err: '', saved: null, photo: null, id: uuid(), last: keep || null }; }
+
+async function loadAll(){
+  const [pallets, boxes, styles, items] = await Promise.all(['pallets','boxes','styles','items'].map(t => db.all(t)));
+  data = { pallets, boxes, styles, items };
+  idx = { pal: new Map(pallets.map(p => [p.id, p])), box: new Map(boxes.map(b => [b.id, b])), style: new Map(styles.map(s => [s.style_number, s])) };
+  setSync(true);
+}
+function setSync(ok){
+  const s = $('#sync'); s.classList.toggle('off', !ok);
+  $('span', s).textContent = ok ? 'Synced ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Offline, retrying';
+}
+async function refresh(silent){
+  try { await loadAll(); return true; }
+  catch (e) { setSync(false); if (!silent) toast(e.message, 'bad'); return false; }
+}
+const itemsOf = (key, id) => data.items.filter(i => i[key] === id);
+const sumQty = list => list.reduce((n, i) => n + i.quantity, 0);
+const joined = () => data.items.map(i => ({ ...i, box: idx.box.get(i.box_id), pallet: idx.pal.get(i.pallet_id) }));
+
+/* ---------- screens: setup ---------- */
+function render(){
+  $('#who').innerHTML = me ? `<b>${esc(me.name)}</b>${esc(me.area || '')}` : '';
+  const v = $('#view'); v.classList.toggle('wide', tab === 'inventory' && !!cfg && !!me);
+  if (!cfg) { $('#nav').hidden = true; return v.innerHTML = connectHTML(); }
+  if (!me)  { $('#nav').hidden = true; return v.innerHTML = whoHTML(); }
+  $('#nav').hidden = false;
+  document.querySelectorAll('#nav button').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+  v.innerHTML = ({ pack: packHTML, pallets: palletsHTML, inventory: inventoryHTML, more: moreHTML })[tab]();
+  if (tab === 'inventory') renderInvList();
+}
+function connectHTML(err = ''){
+  return `<h1 class="h">Connect your database</h1>
+  <p class="lead">One time on this phone. Paste the two values from your Supabase project (Project Settings, then API).</p>
+  <div class="panel">
+    <label class="f" for="c-url">Project URL</label>
+    <input id="c-url" type="url" placeholder="https://xxxxxxxx.supabase.co" autocapitalize="off" autocomplete="off">
+    <label class="f" for="c-key">Public key <small>(anon or publishable)</small></label>
+    <input id="c-key" type="text" autocapitalize="off" autocomplete="off" spellcheck="false">
+    <div id="c-err">${err}</div>
+    <button class="btn" data-act="connect" style="margin-top:16px">Connect</button>
+  </div>
+  <p class="small muted">Employees don't need to do this. Send them the invite link from the Export tab after you connect.</p>`;
+}
+function whoHTML(){
+  const names = [...new Set([...data.pallets, ...data.items].map(r => r.created_by))].sort();
+  return `<h1 class="h">Who is packing on this phone?</h1>
+  <p class="lead">Your name is saved with every pallet, box and item you record.</p>
+  <div class="panel">
+    <label class="f" for="w-name">Your name</label>
+    <input id="w-name" type="text" list="w-names" autocomplete="off" value="${esc(me?.name || '')}">
+    <datalist id="w-names">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+    <label class="f" for="w-area">Your area of the store <small>(for example: Men's wall, Kids, Stockroom)</small></label>
+    <input id="w-area" type="text" autocomplete="off">
+    <div id="w-err"></div>
+    <button class="btn" data-act="save-who" style="margin-top:16px">Start packing</button>
+  </div>`;
+}
+
+/* ---------- screens: pack ---------- */
+function trailHTML(){
+  return `<div class="trail">
+    <span>${esc(pack.style)}</span>
+    ${pack.pallet ? `<span class="p">${pCode(pack.pallet)}</span>` : ''}
+    ${pack.box ? `<span>${bCode(pack.box)}</span>` : ''}
+    <button class="linkbtn" data-act="pack-reset">Start another style</button>
+  </div>`;
+}
+function packHTML(){
+  const err = pack.err ? `<div class="err">${esc(pack.err)}</div>` : '';
+  if (pack.stage === 'style') return `
+    <h1 class="h">Which style are you packing?</h1>
+    <p class="lead">Type the style number first. The app checks if this style already has a pallet.</p>
+    ${pack.saved ? `<div class="saved">${esc(pack.saved)}</div>` : ''}
+    <div class="panel">
+      <label class="f" for="k-style">Style number</label>
+      <input id="k-style" type="text" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(pack.style)}">
+      ${err}
+      <button class="btn" data-act="check-style" style="margin-top:14px">Check style</button>
+    </div>`;
+
+  if (pack.stage === 'pallet') {
+    const open = data.pallets.filter(p => p.status === 'open');
+    const rank = p => (pack.last && p.id === pack.last.pallet ? 0 : p.created_by === me.name ? 1 : 2);
+    open.sort((a, b) => rank(a) - rank(b) || b.id - a.id);
+    return `${trailHTML()}
+    <h1 class="h">New style. Pick its pallet.</h1>
+    <p class="lead">Every piece of ${esc(pack.style)} will go on the pallet you pick, for everyone.</p>
+    ${err}
+    ${open.map(p => palPick(p)).join('')}
+    <button class="pick new" data-act="new-pallet">Start a new pallet</button>`;
+  }
+
+  if (pack.stage === 'box') {
+    const p = idx.pal.get(pack.pallet) || { id: pack.pallet, area: '', created_by: '', status: 'open' };
+    const boxes = data.boxes.filter(b => b.pallet_id === p.id && b.status === 'open').sort((a, b) => (pack.last && a.id === pack.last.box ? -1 : 0) || b.id - a.id);
+    const n = itemsOf('style_number', pack.style).length;
+    const other = pack.known && pack.owner && pack.owner !== me.name;
+    const head = pack.known ? `
+      <div class="placard ${other ? 'stop' : ''}"><div class="stripes"></div><div class="in">
+        <p>${other ? `Stop. ${esc(pack.owner)} already started style ${esc(pack.style)}.` : `Style ${esc(pack.style)} already has a pallet.`}</p>
+        <div class="code">${pCode(p.id)}</div>
+        <p>${p.area ? `Find it in: ${esc(p.area)}. ` : ''}Take these pieces to ${pCode(p.id)}. You can't start another pallet for this style.</p>
+      </div></div>` : `
+      <div class="placard"><div class="in"><p>Style ${esc(pack.style)} now belongs to</p><div class="code">${pCode(p.id)}</div>
+        <p>${p.area ? esc(p.area) + '. ' : ''}Write ${pCode(p.id)} on the pallet if it is new.</p></div></div>`;
+    return `${trailHTML()}${head}${err}
+    ${p.status === 'closed' ? `<div class="note">${pCode(p.id)} is marked closed. <button class="linkbtn" data-act="reopen-pallet" data-id="${p.id}">Reopen it</button> to add pieces.</div>` : ''}
+    <h2 style="font:600 17px var(--body);margin:16px 0 8px">Which box on ${pCode(p.id)}?</h2>
+    ${boxes.map(b => { const its = itemsOf('box_id', b.id); return `
+      <button class="pick" data-act="choose-box" data-id="${b.id}"><span class="tag box">${bCode(b.id)}</span>
+        <span><b>${plural(sumQty(its), 'piece')} inside</b><small>Started by ${esc(b.created_by)}</small></span></button>`; }).join('')}
+    <button class="pick new" data-act="new-box">Start a new box on ${pCode(p.id)}</button>
+    ${n === 0 ? `<p class="small muted" style="margin-top:14px">Picked the wrong pallet? Nothing is packed for this style yet. <button class="linkbtn" data-act="release-style">Undo this pallet choice</button></p>` : ''}`;
+  }
+
+  // item form
+  const prev = data.items.filter(i => i.style_number === pack.style).slice(-1)[0] || {};
+  const f = pack.form || { brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', qty: 1 };
+  const uniq = k => [...new Set(data.items.map(i => i[k]).filter(Boolean))].sort();
+  return `${trailHTML()}
+    ${pack.saved ? `<div class="saved">${esc(pack.saved)}</div>` : ''}
+    <h1 class="h">Record the item</h1>
+    <p class="lead">One entry for each color of style ${esc(pack.style)} going into ${bCode(pack.box)}.</p>
+    <div class="panel">
+      <div class="photo" id="k-photo-wrap"><span>Take a photo of the item</span>
+        <input id="k-photo" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the item"></div>
+      <label class="f" for="k-color">Color</label>
+      <input id="k-color" type="text" list="l-color" autocomplete="off" value="${esc(f.color)}">
+      <datalist id="l-color">${uniq('color').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
+      <label class="f" for="k-brand">Brand</label>
+      <input id="k-brand" type="text" list="l-brand" autocomplete="off" value="${esc(f.brand)}">
+      <datalist id="l-brand">${uniq('brand').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
+      <label class="f" for="k-tag">Tag number <small>(optional)</small></label>
+      <input id="k-tag" type="text" autocomplete="off" autocapitalize="characters" value="${esc(f.tag)}">
+      <label class="f" for="k-qty">Quantity</label>
+      <div class="qty"><button type="button" data-act="qty" data-d="-1" aria-label="One less">&minus;</button>
+        <input id="k-qty" type="number" inputmode="numeric" min="1" value="${esc(f.qty)}">
+        <button type="button" data-act="qty" data-d="1" aria-label="One more">+</button></div>
+      <label class="f">Gender</label>
+      <div class="chips">${GENDERS.map(g => `<label><input type="radio" name="k-gender" value="${g}" ${f.gender === g ? 'checked' : ''}><span>${g}</span></label>`).join('')}</div>
+      <label class="f">Season</label>
+      <div class="chips">${SEASONS.map(g => `<label><input type="radio" name="k-season" value="${g}" ${f.season === g ? 'checked' : ''}><span>${g}</span></label>`).join('')}</div>
+      ${err}
+      <button class="btn" data-act="save-item" style="margin-top:18px">Save item</button>
+    </div>`;
+}
+function palPick(p){
+  const its = itemsOf('pallet_id', p.id);
+  const last = pack.last && p.id === pack.last.pallet;
+  return `<button class="pick ${last ? 'mine' : ''}" data-act="choose-pallet" data-id="${p.id}"><span class="tag">${pCode(p.id)}</span>
+    <span><b>${last ? 'Keep using this pallet' : esc(p.area || 'No area set')}</b>
+    <small>${last && p.area ? esc(p.area) + ', ' : ''}started by ${esc(p.created_by)}, ${plural(sumQty(its), 'piece')}</small></span></button>`;
+}
+function readForm(){
+  return { color: $('#k-color').value.trim(), brand: $('#k-brand').value.trim(), tag: $('#k-tag').value.trim(),
+    qty: parseInt($('#k-qty').value, 10), gender: $('input[name=k-gender]:checked')?.value || '', season: $('input[name=k-season]:checked')?.value || '' };
+}
+function packFail(e){ pack.err = e.message; render(); }
+
+/* ---------- screens: pallets ---------- */
+function palletsHTML(){
+  if (palView && idx.pal.get(palView)) return palletDetailHTML(idx.pal.get(palView));
+  palView = null;
+  const list = data.pallets.filter(p => !palMine || p.created_by === me.name).sort((a, b) => a.id - b.id);
+  return `<h1 class="h">Pallets</h1>
+  <p class="lead">${plural(data.pallets.length, 'pallet')}, ${plural(data.boxes.length, 'box')}. Tap one to see what is on it.</p>
+  <div class="seg"><button data-act="pal-mine" data-v="0" aria-pressed="${!palMine}">All</button><button data-act="pal-mine" data-v="1" aria-pressed="${palMine}">Started by me</button></div>
+  ${list.length ? `<div class="pgrid">${list.map(p => { const its = itemsOf('pallet_id', p.id); return `
+    <button class="ptile ${p.status === 'closed' ? 'closed' : ''}" data-act="open-pallet" data-id="${p.id}">
+      <div class="code">${pCode(p.id)}</div>
+      <p>${esc(p.area || 'No area set')}${p.status === 'closed' ? ' <span class="badge closed">Closed</span>' : ''}</p>
+      <p class="muted" style="color:inherit;opacity:.8">${plural(data.boxes.filter(b => b.pallet_id === p.id).length, 'box')}, ${plural(sumQty(its), 'piece')}</p>
+    </button>`; }).join('')}</div>` : `<div class="empty"><b>No pallets yet</b>Pallets appear here when someone starts one from the Pack tab.</div>`}`;
+}
+function palletDetailHTML(p){
+  const its = itemsOf('pallet_id', p.id), boxes = data.boxes.filter(b => b.pallet_id === p.id).sort((a, b) => a.id - b.id);
+  const styles = data.styles.filter(s => s.pallet_id === p.id);
+  return `<button class="linkbtn" data-act="open-pallet" data-id="">Back to all pallets</button>
+  <div class="placard"><div class="stripes"></div><div class="in">
+    <p>${esc(p.area || 'No area set')}${p.status === 'closed' ? ' <span class="badge closed">Closed</span>' : ''}</p>
+    <div class="code">${pCode(p.id)}</div>
+    <p>${plural(boxes.length, 'box')}, ${plural(styles.length, 'style')}, ${plural(sumQty(its), 'piece')}. Started by ${esc(p.created_by)}.</p>
+  </div></div>
+  <div class="row" style="margin-bottom:12px">
+    <button class="btn alt sm" data-act="toggle-pallet" data-id="${p.id}">${p.status === 'open' ? 'Close pallet' : 'Reopen pallet'}</button>
+    <button class="btn quiet sm" data-act="edit-area" data-id="${p.id}">Change area</button>
+    ${!boxes.length && !styles.length ? `<button class="btn danger sm" data-act="del-pallet" data-id="${p.id}">Delete</button>` : ''}
+  </div>
+  ${boxes.map(b => { const bi = itemsOf('box_id', b.id); return `
+    <div class="panel"><div class="boxhead"><span class="code">${bCode(b.id)}</span>
+      <span class="muted small">${plural(sumQty(bi), 'piece')}, by ${esc(b.created_by)}</span>
+      ${b.status === 'closed' ? '<span class="badge closed">Closed</span>' : ''}
+      <button class="linkbtn small" style="margin-left:auto" data-act="${bi.length ? 'toggle-box' : 'del-box'}" data-id="${b.id}">${bi.length ? (b.status === 'open' ? 'Close box' : 'Reopen box') : 'Delete empty box'}</button></div>
+      ${bi.length ? `<ul class="lines">${bi.map(i => `<li><span><b>${esc(i.style_number)}</b> ${esc(i.color)}<br><span class="muted small">${esc(i.brand)}</span></span><span class="n">${nf(i.quantity)}</span></li>`).join('')}</ul>` : ''}
+    </div>`; }).join('') || `<div class="empty"><b>No boxes on this pallet yet</b></div>`}`;
+}
+
+/* ---------- screens: inventory ---------- */
+const FLABEL = { pallet: 'Pallet', box: 'Box', brand: 'Brand', gender: 'Gender', season: 'Season', color: 'Color', by: 'Packed by' };
+function filtered(){
+  const q = filt.q.trim().toLowerCase();
+  let list = joined().filter(i =>
+    (!filt.pallet || String(i.pallet_id) === filt.pallet) && (!filt.box || String(i.box_id) === filt.box) &&
+    (!filt.brand || i.brand === filt.brand) && (!filt.gender || i.gender === filt.gender) && (!filt.season || i.season === filt.season) &&
+    (!filt.color || i.color === filt.color) && (!filt.by || i.created_by === filt.by) &&
+    (!q || [i.style_number, i.color, i.brand, i.tag_number, pCode(i.pallet_id), bCode(i.box_id), i.pallet?.area].join(' ').toLowerCase().includes(q)));
+  const by = { new: (a, b) => b.created_at.localeCompare(a.created_at), style: (a, b) => a.style_number.localeCompare(b.style_number, undefined, { numeric: true }) || a.color.localeCompare(b.color),
+    where: (a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id || a.style_number.localeCompare(b.style_number) };
+  return list.sort(by[invSort]);
+}
+function inventoryHTML(){
+  return `<h1 class="h">Inventory</h1>
+  <div id="inv-totals"></div>
+  <div class="tools"><input id="inv-q" type="search" placeholder="Search style, color, brand, tag, pallet" value="${esc(filt.q)}" aria-label="Search inventory">
+    <button class="btn alt" data-act="open-filters">Filter</button></div>
+  <div id="inv-chips" class="fchips"></div>
+  <div id="inv-list"></div>`;
+}
+function renderInvList(){
+  if (!$('#inv-list')) return;
+  const list = filtered();
+  $('#inv-totals').innerHTML = `<div class="totals"><div><b>${nf(sumQty(list))}</b>${unit(sumQty(list), 'piece')}</div><div><b>${nf(new Set(list.map(i => i.style_number)).size)}</b>${unit(new Set(list.map(i => i.style_number)).size, 'style')}</div>
+    <div><b>${nf(new Set(list.map(i => i.box_id)).size)}</b>${unit(new Set(list.map(i => i.box_id)).size, 'box')}</div><div><b>${nf(new Set(list.map(i => i.pallet_id)).size)}</b>${unit(new Set(list.map(i => i.pallet_id)).size, 'pallet')}</div></div>`;
+  const val = k => k === 'pallet' ? pCode(filt[k]) : k === 'box' ? bCode(filt[k]) : filt[k];
+  $('#inv-chips').innerHTML = Object.keys(FLABEL).filter(k => filt[k]).map(k => `<button data-act="clear-filter" data-k="${k}" aria-label="Remove filter ${FLABEL[k]}">${FLABEL[k]}: ${esc(val(k))} &times;</button>`).join('');
+  $('#inv-list').innerHTML = !data.items.length ? `<div class="empty"><b>Nothing packed yet</b>Items show up here the moment someone saves them.</div>`
+    : !list.length ? `<div class="empty"><b>No items match</b>Change the search or remove a filter.</div>`
+    : list.slice(0, invLimit).map(i => `
+      <button class="irow" data-act="open-item" data-id="${i.id}">
+        ${i.photo_path ? `<img loading="lazy" alt="" src="${esc(thumbUrl(i))}">` : '<span class="noimg"></span>'}
+        <span class="mid"><span class="st">${esc(i.style_number)}</span>
+          <span class="d">${esc(i.color)}, ${esc(i.brand)}</span><span class="d">${esc(i.gender)}, ${esc(i.season)}${i.tag_number ? ', tag ' + esc(i.tag_number) : ''}</span></span>
+        <span class="wide">${esc(i.color)}</span><span class="wide">${esc(i.brand)}</span><span class="wide">${esc(i.gender)}</span><span class="wide">${esc(i.season)}</span><span class="wide">${esc(i.tag_number || '')}</span>
+        <span class="loc wide" style="text-align:left">${pCode(i.pallet_id)}<br>${bCode(i.box_id)}</span>
+        <span class="loc"><span class="lc">${pCode(i.pallet_id)} ${bCode(i.box_id)}</span><em>${nf(i.quantity)}</em></span>
+      </button>`).join('') + (list.length > invLimit ? `<button class="btn quiet" data-act="inv-more">Show more (${nf(list.length - invLimit)} left)</button>` : '');
+}
+function filterSheet(){
+  const rows = joined(), opt = (k, vals, lab = v => v) => `<label class="f" for="f-${k}">${FLABEL[k]}</label><select id="f-${k}"><option value="">All</option>${vals.map(v => `<option value="${esc(v)}" ${String(filt[k]) === String(v) ? 'selected' : ''}>${esc(lab(v))}</option>`).join('')}</select>`;
+  const u = k => [...new Set(rows.map(r => r[k]).filter(Boolean))].sort();
+  openSheet(`<h2>Filter inventory</h2>
+    ${opt('pallet', data.pallets.map(p => p.id).sort((a, b) => a - b), v => pCode(v) + (idx.pal.get(v).area ? ', ' + idx.pal.get(v).area : ''))}
+    ${opt('box', data.boxes.map(b => b.id).sort((a, b) => a - b), v => bCode(v) + ' on ' + pCode(idx.box.get(v).pallet_id))}
+    ${opt('brand', u('brand'))}${opt('gender', u('gender'))}${opt('season', u('season'))}${opt('color', u('color'))}${opt('by', u('created_by'))}
+    <label class="f" for="f-sort">Sort by</label><select id="f-sort"><option value="new">Newest first</option><option value="style" ${invSort === 'style' ? 'selected' : ''}>Style number</option><option value="where" ${invSort === 'where' ? 'selected' : ''}>Pallet and box</option></select>
+    <div class="row" style="margin-top:18px"><button class="btn alt" data-act="reset-filters">Clear all</button><button class="btn" data-act="apply-filters">Show items</button></div>`);
+}
+function itemSheet(id, edit){
+  const i = joined().find(x => x.id === id); if (!i) return closeSheet();
+  if (!edit) return openSheet(`
+    ${i.photo_path ? `<img class="big" alt="Photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(photoUrl(i.photo_path))}">` : ''}
+    <h2>${esc(i.style_number)}</h2>
+    <dl class="facts"><dt>Where</dt><dd>${pCode(i.pallet_id)}, ${bCode(i.box_id)}${i.pallet?.area ? ' (' + esc(i.pallet.area) + ')' : ''}</dd>
+      <dt>Color</dt><dd>${esc(i.color)}</dd><dt>Brand</dt><dd>${esc(i.brand)}</dd><dt>Tag number</dt><dd>${esc(i.tag_number || 'None')}</dd>
+      <dt>Quantity</dt><dd>${nf(i.quantity)}</dd><dt>Gender</dt><dd>${esc(i.gender)}</dd><dt>Season</dt><dd>${esc(i.season)}</dd>
+      <dt>Packed by</dt><dd>${esc(i.created_by)}, ${new Date(i.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</dd></dl>
+    <div class="row"><button class="btn alt" data-act="edit-item" data-id="${i.id}">Edit</button><button class="btn" data-act="close-sheet">Done</button></div>`);
+  const sel = (id, vals, cur) => `<select id="${id}">${vals.map(v => `<option ${v === cur ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
+  openSheet(`<h2>Edit ${esc(i.style_number)}</h2>
+    <label class="f" for="e-color">Color</label><input id="e-color" type="text" value="${esc(i.color)}">
+    <label class="f" for="e-brand">Brand</label><input id="e-brand" type="text" value="${esc(i.brand)}">
+    <label class="f" for="e-tag">Tag number</label><input id="e-tag" type="text" value="${esc(i.tag_number || '')}">
+    <label class="f" for="e-qty">Quantity</label><input id="e-qty" type="number" inputmode="numeric" min="1" value="${i.quantity}">
+    <label class="f" for="e-gender">Gender</label>${sel('e-gender', GENDERS, i.gender)}
+    <label class="f" for="e-season">Season</label>${sel('e-season', SEASONS, i.season)}
+    <div id="e-err"></div>
+    <div class="row" style="margin-top:18px"><button class="btn alt" data-act="open-item" data-id="${i.id}">Cancel</button><button class="btn" data-act="save-edit" data-id="${i.id}">Save changes</button></div>
+    <button class="btn danger" data-act="del-item" data-id="${i.id}" style="margin-top:10px">Delete this item</button>`);
+}
+
+/* ---------- screens: export + setup ---------- */
+let exTitle = store.get('title') || 'Store inventory';
+function moreHTML(){
+  const nF = filtered().length, any = Object.keys(FLABEL).some(k => filt[k]) || filt.q;
+  return `<h1 class="h">Export</h1>
+  <p class="lead">A full list of every pallet, every box and every item, with a style index at the end.</p>
+  <div class="panel">
+    <label class="f" for="x-title">Title on the report</label><input id="x-title" type="text" value="${esc(exTitle)}">
+    <label class="f">What to include</label>
+    <div class="chips"><label><input type="radio" name="x-scope" value="all" checked><span>Everything (${nf(data.items.length)})</span></label>
+      ${any ? `<label><input type="radio" name="x-scope" value="filt"><span>Current inventory filter (${nf(nF)})</span></label>` : ''}</div>
+    <label class="f">Photos</label>
+    <div class="chips"><label><input type="radio" name="x-photos" value="1" checked><span>With photos</span></label><label><input type="radio" name="x-photos" value="0"><span>Without</span></label></div>
+    <button class="btn" data-act="export-pdf" style="margin-top:18px">Save as PDF</button>
+    <button class="btn alt" data-act="export-html">Download web page (HTML)</button>
+    <button class="btn quiet" data-act="export-csv">Download spreadsheet (CSV)</button>
+    <p class="small muted" style="margin-top:10px">For PDF, the print window opens. Choose "Save as PDF" there.</p>
+  </div>
+  <div class="panel"><h2>Invite employees</h2>
+    <p class="muted small" style="margin-bottom:12px">Send this link to each employee's phone. It opens the app already connected to your database. They only type their name.</p>
+    <button class="btn alt" data-act="invite">Share invite link</button></div>
+  <div class="panel"><h2>This phone</h2>
+    <dl class="facts"><dt>Name</dt><dd>${esc(me.name)}</dd><dt>Area</dt><dd>${esc(me.area || 'Not set')}</dd><dt>Database</dt><dd style="word-break:break-all">${esc(cfg.url.replace('https://', ''))}</dd></dl>
+    <button class="btn quiet" data-act="change-who">Change name or area</button>
+    <button class="btn quiet" data-act="disconnect">Disconnect this phone</button></div>`;
+}
+function exportRows(){
+  exTitle = $('#x-title').value.trim() || 'Store inventory'; store.set('title', exTitle);
+  const rows = $('input[name=x-scope]:checked').value === 'filt' ? filtered() : joined();
+  return { rows, photos: $('input[name=x-photos]:checked').value === '1' };
+}
+function manifestHTML(rows, { title, img }){
+  const by = (list, k) => { const m = new Map(); list.forEach(r => (m.get(r[k]) || m.set(r[k], []).get(r[k])).push(r)); return [...m].sort((a, b) => a[0] > b[0] ? 1 : -1); };
+  const cmp = (a, b) => a.style_number.localeCompare(b.style_number, undefined, { numeric: true }) || a.color.localeCompare(b.color);
+  const tot = `<div class="mf-tot"><div><b>${nf(sumQty(rows))}</b>${unit(sumQty(rows), 'piece')}</div><div><b>${nf(new Set(rows.map(r => r.style_number)).size)}</b>${unit(new Set(rows.map(r => r.style_number)).size, 'style')}</div>
+    <div><b>${nf(new Set(rows.map(r => r.box_id)).size)}</b>${unit(new Set(rows.map(r => r.box_id)).size, 'box')}</div><div><b>${nf(new Set(rows.map(r => r.pallet_id)).size)}</b>${unit(new Set(rows.map(r => r.pallet_id)).size, 'pallet')}</div></div>`;
+  const pals = by(rows, 'pallet_id').map(([pid, pr]) => {
+    const p = idx.pal.get(pid) || {};
+    return `<section class="mf-pal"><div class="mf-plac"><b>${pCode(pid)}</b><span>${esc(p.area || '')}</span>
+      <span class="r">${plural(new Set(pr.map(r => r.box_id)).size, 'box')}, ${plural(new Set(pr.map(r => r.style_number)).size, 'style')}<br>${plural(sumQty(pr), 'piece')}</span></div>
+      ${by(pr, 'box_id').map(([bid, br]) => `<div class="mf-box"><h3>${bCode(bid)} <small>${plural(sumQty(br), 'piece')} on ${pCode(pid)}</small></h3>
+        <table><thead><tr>${img ? '<th class="ph"></th>' : ''}<th class="st">Style</th><th>Color</th><th>Brand</th><th>Tag</th><th>Gender</th><th>Season</th><th class="q">Qty</th></tr></thead><tbody>
+        ${br.sort(cmp).map(r => `<tr>${img ? `<td class="ph">${r.photo_path ? `<img alt="" src="${esc(img(r))}">` : ''}</td>` : ''}<td class="st">${esc(r.style_number)}</td><td>${esc(r.color)}</td><td>${esc(r.brand)}</td><td>${esc(r.tag_number || '')}</td><td>${esc(r.gender)}</td><td>${esc(r.season)}</td><td class="q">${nf(r.quantity)}</td></tr>`).join('')}
+        </tbody></table></div>`).join('')}</section>`;
+  }).join('');
+  const index = by(rows, 'style_number').sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true })).map(([s, sr]) => `<tr><td class="st">${esc(s)}</td><td>${esc([...new Set(sr.map(r => r.brand))].join(', '))}</td>
+    <td>${esc([...new Set(sr.map(r => r.color))].join(', '))}</td><td class="where">${[...new Set(sr.map(r => pCode(r.pallet_id)))].join(', ')}</td>
+    <td>${[...new Set(sr.map(r => bCode(r.box_id)))].join(', ')}</td><td class="q">${nf(sumQty(sr))}</td></tr>`).join('');
+  return `<div class="mf"><header class="mf-head"><h1>${esc(title)}</h1><p>Packed inventory as of ${new Date().toLocaleString([], { dateStyle: 'long', timeStyle: 'short' })}</p>${tot}</header>
+    ${pals}<section class="mf-index"><h2>Style index</h2><table><thead><tr><th class="st">Style</th><th>Brand</th><th>Colors</th><th>Pallet</th><th>Boxes</th><th class="q">Pieces</th></tr></thead><tbody>${index}</tbody></table></section></div>`;
+}
+function download(name, text, type){
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+}
+const fileStamp = () => new Date().toISOString().slice(0, 10);
+async function embedThumbs(rows){
+  const map = new Map(), todo = rows.filter(r => r.photo_path); let done = 0;
+  const one = async r => {
+    try { const b = await (await fetch(thumbUrl(r))).blob();
+      map.set(r.id, await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(b); }));
+    } catch { map.set(r.id, thumbUrl(r)); }
+    setBusy(`Adding photos ${++done} of ${todo.length}`);
+  };
+  const q = todo.slice(); await Promise.all(Array.from({ length: 6 }, async () => { while (q.length) await one(q.shift()); }));
+  return map;
+}
+
+/* ---------- actions ---------- */
+const act = {
+  async connect(){
+    const c = { url: $('#c-url').value.trim().replace(/\/+$/, '').replace(/\/rest\/v1$/, ''), key: $('#c-key').value.trim() };
+    const fail = m => $('#c-err').innerHTML = `<div class="err">${m}</div>`;
+    if (!/^https?:\/\/.+/.test(c.url) || !c.key) return fail('Enter both the project URL and the public key.');
+    await withBusy('Connecting', async () => {
+      try { await call('/rest/v1/pallets?select=id&limit=1', { c }); }
+      catch (e) {
+        if (e.code === 'NETWORK') return fail('Could not reach that address. Check the project URL.');
+        if (e.status === 401 || e.status === 403) return fail('The database refused that key. Copy the anon (public) key again.');
+        return fail('Connected, but the tables are missing. Run the setup script in the Supabase SQL editor first, then try again.');
+      }
+      cfg = c; store.set('cfg', c); await refresh(); render();
+    });
+  },
+  'save-who'(){
+    const name = $('#w-name').value.trim(), area = $('#w-area').value.trim();
+    if (!name) return $('#w-err').innerHTML = '<div class="err">Type your name.</div>';
+    me = { name, area }; store.set('me', me); render();
+  },
+  'change-who'(){ me = null; render(); },
+  disconnect(){
+    openSheet(`<h2>Disconnect this phone?</h2><p class="lead">Nothing is deleted from the database. This phone will need the invite link again.</p>
+      <div class="row"><button class="btn alt" data-act="close-sheet">Cancel</button><button class="btn danger" data-act="disconnect-yes">Disconnect</button></div>`);
+  },
+  'disconnect-yes'(){ store.del('cfg'); store.del('me'); cfg = null; me = null; closeSheet(); render(); },
+  'close-sheet': closeSheet,
+
+  /* pack */
+  'pack-reset'(){ pack = newPack(pack.last); render(); },
+  async 'check-style'(){
+    const s = normStyle($('#k-style').value);
+    pack.style = s; pack.saved = null;
+    if (!s) return packFail(new Error('Type the style number from the tag.'));
+    await withBusy('Checking style ' + s, async () => {
+      try {
+        const [found] = await Promise.all([db.get('styles', 'select=*&style_number=' + eq(s)), loadAll()]);
+        pack.err = '';
+        if (found[0]) Object.assign(pack, { stage: 'box', pallet: found[0].pallet_id, known: true, owner: found[0].created_by });
+        else pack.stage = 'pallet';
+        render(); scrollTo(0, 0);
+      } catch (e) { packFail(e); }
+    });
+  },
+  async 'choose-pallet'(el){ await claim(+el.dataset.id); },
+  'new-pallet'(){
+    openSheet(`<h2>Start a new pallet</h2>
+      <label class="f" for="np-area">Where in the store is this pallet?</label>
+      <input id="np-area" type="text" value="${esc(me.area || '')}" autofocus>
+      <p class="note">The app gives the pallet its number. Write that number on the pallet in big letters.</p>
+      <div class="row"><button class="btn alt" data-act="close-sheet">Cancel</button><button class="btn" data-act="new-pallet-yes">Start pallet</button></div>`);
+  },
+  async 'new-pallet-yes'(){
+    const area = $('#np-area').value.trim(); closeSheet();
+    await withBusy('Starting pallet', async () => {
+      try {
+        // Last check before making a pallet: did someone claim this style a second ago?
+        const found = await db.get('styles', 'select=*&style_number=' + eq(pack.style));
+        if (found[0]) return blocked(found[0]);
+        const p = await db.insert('pallets', { area, created_by: me.name });
+        data.pallets.push(p); idx.pal.set(p.id, p);
+        await claim(p.id, true);
+      } catch (e) { packFail(e); }
+    });
+  },
+  async 'choose-box'(el){ pack.box = +el.dataset.id; pack.stage = 'item'; pack.err = ''; pack.form = null; render(); scrollTo(0, 0); },
+  async 'new-box'(){
+    await withBusy('Starting box', async () => {
+      try {
+        const b = await db.insert('boxes', { pallet_id: pack.pallet, created_by: me.name });
+        data.boxes.push(b); idx.box.set(b.id, b);
+        Object.assign(pack, { box: b.id, stage: 'item', err: '', form: null, saved: `New box ${bCode(b.id)}. Write ${bCode(b.id)} on the box now.` });
+        render(); scrollTo(0, 0);
+      } catch (e) { packFail(e); }
+    });
+  },
+  async 'release-style'(){
+    await withBusy('Undoing', async () => {
+      try { await db.remove('styles', 'style_number=' + eq(pack.style)); await loadAll(); Object.assign(pack, { stage: 'pallet', pallet: null, known: false, err: '' }); render(); }
+      catch (e) { packFail(new Error('This style already has items, so its pallet can\'t change.')); }
+    });
+  },
+  async 'reopen-pallet'(el){ await setStatus('pallets', +el.dataset.id, 'open'); },
+  qty(el){ const i = $('#k-qty'); i.value = Math.max(1, (parseInt(i.value, 10) || 0) + (+el.dataset.d)); },
+  async 'save-item'(){
+    const f = readForm(); pack.form = f;
+    const miss = !pack.photo ? 'Take a photo of the item first.' : !f.color ? 'Type the color.' : !f.brand ? 'Type the brand.'
+      : !(f.qty >= 1) ? 'Quantity must be 1 or more.' : !f.gender ? 'Pick a gender.' : !f.season ? 'Pick a season.' : '';
+    const showErr = m => { pack.err = m; const p = pack.photo; render(); if (p) showPhoto(p); };
+    if (miss) return showErr(miss);
+    await withBusy('Saving to the database', async () => {
+      try {
+        const id = pack.id, path = id + '.jpg';
+        const [full, thumb] = await Promise.all([shrink(pack.photo, 1400, .82), shrink(pack.photo, 280, .72)]);
+        await Promise.all([uploadPhoto(path, full), uploadPhoto('thumb/' + path, thumb)]);
+        const row = { id, style_number: pack.style, box_id: pack.box, color: f.color, brand: f.brand, tag_number: f.tag, quantity: f.qty,
+          gender: f.gender, season: f.season, photo_path: path, created_by: me.name };
+        let saved;
+        try { saved = await db.insert('items', row); }
+        catch (e) {             // a retry after a lost reply: the row may already be there
+          const again = e.code === '23505' ? await db.get('items', 'select=*&id=' + eq(id)) : [];
+          if (!again[0]) throw e; saved = again[0];
+        }
+        data.items.push(saved);
+        pack.last = { pallet: pack.pallet, box: pack.box };
+        Object.assign(pack, { id: uuid(), photo: null, err: '', form: { ...f, color: '', tag: '', qty: 1 },
+          saved: `Saved: ${nf(f.qty)} x ${pack.style} ${f.color} in ${bCode(pack.box)} on ${pCode(pack.pallet)}. Add the next color, or start another style.` });
+        render(); scrollTo(0, 0); toast('Saved', 'good');
+      } catch (e) {
+        showErr(/STYLE_PALLET/.test(e.message) ? 'This style belongs on a different pallet. Start the style again to see where it goes.' : e.message + ' Tap Save item to try again.');
+      }
+    });
+  },
+
+  /* pallets */
+  'pal-mine'(el){ palMine = el.dataset.v === '1'; render(); },
+  'open-pallet'(el){ palView = el.dataset.id ? +el.dataset.id : null; render(); scrollTo(0, 0); },
+  async 'toggle-pallet'(el){ const p = idx.pal.get(+el.dataset.id); await setStatus('pallets', p.id, p.status === 'open' ? 'closed' : 'open'); },
+  async 'toggle-box'(el){ const b = idx.box.get(+el.dataset.id); await setStatus('boxes', b.id, b.status === 'open' ? 'closed' : 'open'); },
+  'edit-area'(el){
+    const p = idx.pal.get(+el.dataset.id);
+    openSheet(`<h2>Where is ${pCode(p.id)}?</h2><input id="ea" type="text" value="${esc(p.area || '')}" autofocus>
+      <div class="row" style="margin-top:16px"><button class="btn alt" data-act="close-sheet">Cancel</button><button class="btn" data-act="save-area" data-id="${p.id}">Save area</button></div>`);
+  },
+  async 'save-area'(el){ const area = $('#ea').value.trim(); closeSheet(); await mutate('Saving', () => db.update('pallets', 'id=' + eq(el.dataset.id), { area })); },
+  async 'del-pallet'(el){ palView = null; await mutate('Deleting', () => db.remove('pallets', 'id=' + eq(el.dataset.id))); },
+  async 'del-box'(el){ await mutate('Deleting', () => db.remove('boxes', 'id=' + eq(el.dataset.id))); },
+
+  /* inventory */
+  'open-filters': filterSheet,
+  'apply-filters'(){ Object.keys(FLABEL).forEach(k => filt[k] = $('#f-' + k).value); invSort = $('#f-sort').value; invLimit = 150; closeSheet(); renderInvList(); },
+  'reset-filters'(){ Object.keys(FLABEL).forEach(k => filt[k] = ''); closeSheet(); renderInvList(); },
+  'clear-filter'(el){ filt[el.dataset.k] = ''; renderInvList(); },
+  'inv-more'(){ invLimit += 150; renderInvList(); },
+  'open-item'(el){ itemSheet(el.dataset.id); },
+  'edit-item'(el){ itemSheet(el.dataset.id, true); },
+  async 'save-edit'(el){
+    const patch = { color: $('#e-color').value.trim(), brand: $('#e-brand').value.trim(), tag_number: $('#e-tag').value.trim(),
+      quantity: parseInt($('#e-qty').value, 10), gender: $('#e-gender').value, season: $('#e-season').value };
+    if (!patch.color || !patch.brand || !(patch.quantity >= 1)) return $('#e-err').innerHTML = '<div class="err">Color, brand and a quantity of 1 or more are needed.</div>';
+    closeSheet(); await mutate('Saving changes', () => db.update('items', 'id=' + eq(el.dataset.id), patch), 'Saved changes');
+  },
+  'del-item'(el){
+    openSheet(`<h2>Delete this item?</h2><p class="lead">It is removed from the inventory for everyone. This can't be undone.</p>
+      <div class="row"><button class="btn alt" data-act="open-item" data-id="${el.dataset.id}">Keep it</button><button class="btn danger" data-act="del-item-yes" data-id="${el.dataset.id}">Delete</button></div>`);
+  },
+  async 'del-item-yes'(el){ closeSheet(); await mutate('Deleting', () => db.remove('items', 'id=' + eq(el.dataset.id)), 'Deleted'); },
+
+  /* export */
+  async 'export-pdf'(){
+    const { rows, photos } = exportRows(); if (!rows.length) return toast('There is nothing to export yet.', 'bad');
+    await withBusy('Building the report', async () => {
+      const root = $('#print-root'); root.innerHTML = manifestHTML(rows, { title: exTitle, img: photos ? thumbUrl : null });
+      const imgs = [...root.querySelectorAll('img')]; let n = 0;
+      await Promise.race([Promise.all(imgs.map(im => new Promise(ok => { const d = () => { setBusy(`Loading photos ${++n} of ${imgs.length}`); ok(); }; im.complete ? d() : (im.onload = im.onerror = d); }))), new Promise(ok => setTimeout(ok, 45000))]);
+    });
+    window.print();
+  },
+  async 'export-html'(){
+    const { rows, photos } = exportRows(); if (!rows.length) return toast('There is nothing to export yet.', 'bad');
+    await withBusy('Building the report', async () => {
+      const map = photos ? await embedThumbs(rows) : null;
+      const body = manifestHTML(rows, { title: exTitle, img: photos ? r => map.get(r.id) : null });
+      download(`inventory-${fileStamp()}.html`, `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(exTitle)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#E8ECEF}.page{max-width:980px;margin:0 auto;background:#fff;padding:32px 28px}.mf{font-size:14px}.mf-find{width:100%;height:46px;border:1.5px solid #AEB8C4;border-radius:8px;padding:0 14px;font:inherit;font-size:16px;margin-bottom:20px}
+.mf table{display:table}.scroll{overflow-x:auto}@media print{body{background:#fff}.page{padding:0;max-width:none}}${$('#mf-css').textContent}</style></head>
+<body><div class="page"><input class="mf-find" type="search" placeholder="Find a style, color, brand, tag, pallet or box" aria-label="Find in inventory">${body}</div>
+<script>document.querySelector('.mf-find').addEventListener('input',function(){var q=this.value.trim().toLowerCase();
+document.querySelectorAll('.mf tbody tr').forEach(function(r){r.hidden=!!q&&(r.textContent+' '+((r.closest('.mf-box')||r).querySelector('h3')||{textContent:''}).textContent).toLowerCase().indexOf(q)<0});
+document.querySelectorAll('.mf-box').forEach(function(b){b.hidden=!b.querySelector('tbody tr:not([hidden])')});
+document.querySelectorAll('.mf-pal').forEach(function(p){p.hidden=!p.querySelector('.mf-box:not([hidden])')})});<\/script></body></html>`, 'text/html');
+      toast('Downloaded', 'good');
+    });
+  },
+  'export-csv'(){
+    const { rows } = exportRows(); if (!rows.length) return toast('There is nothing to export yet.', 'bad');
+    const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [['Pallet','Pallet area','Box','Style number','Color','Brand','Tag number','Quantity','Gender','Season','Packed by','Packed at','Photo']]
+      .concat(rows.sort((a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id).map(r => [pCode(r.pallet_id), r.pallet?.area, bCode(r.box_id), r.style_number, r.color, r.brand, r.tag_number, r.quantity, r.gender, r.season, r.created_by, r.created_at, photoUrl(r.photo_path)]));
+    download(`inventory-${fileStamp()}.csv`, '﻿' + lines.map(l => l.map(cell).join(',')).join('\r\n'), 'text/csv');
+    toast('Downloaded', 'good');
+  },
+  async invite(){
+    const link = location.origin + location.pathname + '#join=' + btoa(JSON.stringify({ u: cfg.url, k: cfg.key }));
+    if (!/^https?:/.test(location.protocol)) toast('Put the app online first. A link to a file on this computer won\'t open on other phones.', 'bad');
+    try { if (navigator.share) return await navigator.share({ title: 'Packout', text: 'Open this to start packing', url: link }); } catch (e) { if (e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(link); toast('Invite link copied', 'good'); }
+    catch { openSheet(`<h2>Invite link</h2><input type="text" readonly value="${esc(link)}" onfocus="this.select()" autofocus><button class="btn" data-act="close-sheet" style="margin-top:14px">Done</button>`); }
+  }
+};
+async function blocked(row){
+  await refresh(true);
+  Object.assign(pack, { stage: 'box', pallet: row.pallet_id, known: true, owner: row.created_by, err: '' });
+  render(); scrollTo(0, 0);
+}
+async function claim(palletId, isNew){
+  const run = async () => {
+    try {
+      await db.insert('styles', { style_number: pack.style, pallet_id: palletId, created_by: me.name });
+      data.styles.push({ style_number: pack.style, pallet_id: palletId, created_by: me.name });
+      Object.assign(pack, { stage: 'box', pallet: palletId, known: false, err: '' });
+      render(); scrollTo(0, 0);
+      if (isNew) toast(`New pallet ${pCode(palletId)}. Write it on the pallet.`, 'good');
+    } catch (e) {
+      if (!isDup(e)) return packFail(e);
+      const found = await db.get('styles', 'select=*&style_number=' + eq(pack.style));   // someone else got there first
+      found[0] ? await blocked(found[0]) : packFail(e);
+    }
+  };
+  return isNew ? run() : withBusy('Assigning style to ' + pCode(palletId), run);
+}
+async function mutate(label, fn, okMsg){
+  await withBusy(label, async () => {
+    try { await fn(); await loadAll(); if (okMsg) toast(okMsg, 'good'); }
+    catch (e) { toast(e.code === '23503' ? 'This still has things on it, so it can\'t be deleted.' : e.message, 'bad'); }
+    render();
+  });
+}
+const setStatus = (table, id, status) => mutate('Saving', () => db.update(table, 'id=' + eq(id), { status }));
+function showPhoto(file){
+  const w = $('#k-photo-wrap'); if (!w) return;
+  w.querySelectorAll('img,.again').forEach(n => n.remove());
+  const img = new Image(); img.alt = 'Photo of the item'; img.src = URL.createObjectURL(file);
+  w.prepend(img); w.insertAdjacentHTML('beforeend', '<span class="again">Retake</span>');
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-tab]');
+  if (t) { tab = t.dataset.tab; if (tab === 'pallets') palView = null; render(); scrollTo(0, 0); if (tab !== 'pack') refresh(true).then(ok => ok && !sheetOpen() && softRender()); return; }
+  const a = e.target.closest('[data-act]');
+  if (a && act[a.dataset.act]) return act[a.dataset.act](a);
+  if (e.target.id === 'sheet') closeSheet();
+});
+document.addEventListener('change', e => { if (e.target.id === 'k-photo' && e.target.files[0]) { pack.photo = e.target.files[0]; showPhoto(pack.photo); } });
+document.addEventListener('input', e => { if (e.target.id === 'inv-q') { filt.q = e.target.value; invLimit = 150; renderInvList(); } });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'k-style') act['check-style']();
+  if (e.key === 'Escape' && sheetOpen()) closeSheet();
+});
+window.addEventListener('afterprint', () => $('#print-root').innerHTML = '');
+function softRender(){            // refresh what's on screen without disturbing typing
+  if (tab === 'inventory') renderInvList();
+  else if (tab === 'pallets') render();
+}
+setInterval(async () => {
+  if (!cfg || !me || document.hidden || busyN || sheetOpen()) return;
+  if (await refresh(true) && !busyN && !sheetOpen()) softRender();
+}, 15000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
+
+/* ---------- start ---------- */
+(async function start(){
+  const m = location.hash.match(/^#join=(.+)$/);
+  if (m) { try { const j = JSON.parse(atob(m[1])); if (j.u && j.k) { cfg = { url: j.u, key: j.k }; store.set('cfg', cfg); } } catch {} history.replaceState(null, '', location.pathname); }
+  render();
+  if (cfg) { await withBusy('Loading inventory', () => refresh()); render(); }
+})();
+</script>
+</body>
+</html>
