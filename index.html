@@ -2064,7 +2064,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.5';
+const APP_VERSION = '2026-11-22.6';
 let newVersion = false;
 async function checkVersion(){
   try {
