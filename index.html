@@ -48,7 +48,7 @@ h1,h2,h3,p{margin:0}
 #view.wide{max-width:1180px}
 #nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--paper);border-top:1px solid var(--line);
   display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom)}
-#nav button[hidden]{display:none}
+#nav[hidden],#nav button[hidden]{display:none}
 #nav button{border:0;background:none;padding:9px 4px 8px;display:grid;justify-items:center;gap:2px;font-size:13px;font-weight:500;color:var(--ink2)}
 #nav svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #nav button[aria-current=page]{color:var(--ink);font-weight:600}
@@ -62,7 +62,7 @@ h1,h2,h3,p{margin:0}
 label.f{display:block;font-weight:600;font-size:15px;margin:14px 0 6px}
 label.f:first-child{margin-top:0}
 label.f small{font-weight:400;color:var(--ink2)}
-input[type=text],input[type=url],input[type=number],input[type=search],select{
+input[type=text],input[type=password],input[type=url],input[type=number],input[type=search],select{
   width:100%;height:50px;border:1.5px solid #AEB8C4;border-radius:8px;background:#fff;padding:0 14px;font-size:17px}
 .typesel,select{-webkit-appearance:none;appearance:none;padding-right:44px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2313213A' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center/20px}
 .typesel{font-weight:600}
@@ -115,6 +115,9 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .switchrow input{width:24px;height:24px;flex:none;margin-top:2px;accent-color:var(--ink)}
 .tagbtn{margin-top:10px}.tagbtn svg,.tagbtn2 svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .tagbtn2{min-height:46px;font-size:16px;margin-bottom:4px}
+.staffrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.staffrow .row{flex-wrap:nowrap;gap:6px}
+.pinbig{font:700 48px var(--sign);letter-spacing:.18em;text-align:center;padding:18px 0 24px;font-variant-numeric:tabular-nums}
 .morebox{margin-top:4px}.morerow{display:flex;gap:8px}.morerow input{flex:1;text-align:center;font:700 24px/1 var(--sign)}.morerow .btn{width:auto;flex:none;min-height:50px}
 .addmore{display:block;margin-top:10px}
 .savedacts{margin-top:10px}.savedacts .btn{flex:1;font-size:15px}
@@ -398,7 +401,7 @@ async function call(path, { method = 'GET', body, headers = {}, timeout = 20000,
   let res;
   try {
     res = await fetch(c.url + path, { method, body, signal: ctrl.signal, cache: 'no-store',
-      headers: { apikey: c.key, Authorization: 'Bearer ' + c.key, ...(c.team ? { 'x-packout-team': c.team } : {}), ...(me && me.name ? { 'x-packout-name': encodeURIComponent(me.name).slice(0, 120) } : {}), ...headers } });
+      headers: { apikey: c.key, Authorization: 'Bearer ' + c.key, ...(c.team ? { 'x-packout-team': c.team } : {}), ...(c.session ? { 'x-packout-session': c.session } : {}), ...(me && me.name ? { 'x-packout-name': encodeURIComponent(me.name).slice(0, 120) } : {}), ...headers } });
   } catch (e) {
     throw new ApiError('No connection to the database. Check the internet on this phone and try again. Nothing was lost.', 0, 'NETWORK');
   } finally { clearTimeout(t); }
@@ -443,7 +446,7 @@ async function fnCall(name, body){
   const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 90000);
   try {
     const r = await fetch(`${cfg.url}/functions/v1/${name}`, { method: 'POST', signal: ctrl.signal,
-      headers: { apikey: cfg.key, 'Content-Type': 'application/json', ...(cfg.team ? { 'x-packout-team': cfg.team } : {}) }, body: JSON.stringify(body) });
+      headers: { apikey: cfg.key, 'Content-Type': 'application/json', ...(cfg.team ? { 'x-packout-team': cfg.team } : {}), ...(cfg.session ? { 'x-packout-session': cfg.session } : {}) }, body: JSON.stringify(body) });
     if (!r.ok) { let d = {}; try { d = await r.json(); } catch {} throw new ApiError(d.message || d.error || `The ${name} service answered ${r.status}.`, r.status, d.error || (r.status === 404 ? 'NO_FUNCTION' : 'FN')); }
     return r;
   } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError('No connection to the photo service. Check the internet.', 0, 'NETWORK'); }
@@ -580,6 +583,8 @@ function render(){
   const v = $('#view'); v.classList.toggle('wide', tab === 'inventory' && !!cfg && !!me);
   if (!cfg) { $('#nav').hidden = true; return v.innerHTML = connectHTML(); }
   if (cfg.view) { if (!me || !me.view) { me = { name: 'View only', view: true }; store.set('me', me); } if (tab === 'pack') tab = 'inventory'; $('#who').innerHTML = '<b>View only</b>'; }
+  if (!cfg.view && staff === 'checking') { $('#nav').hidden = true; return v.innerHTML = '<p class="lead" style="margin-top:30px">Checking who is signed in</p>'; }
+  if (!cfg.view && staff === 'out') { $('#nav').hidden = true; $('#help').hidden = true; return v.innerHTML = signinHTML(); }
   if (!me)  { $('#nav').hidden = true; return v.innerHTML = whoHTML(); }
   $('#nav').hidden = false; $('#help').hidden = !!cfg.view;
   $('#nav').style.gridTemplateColumns = cfg.view ? 'repeat(3,1fr)' : ''; $('#nav [data-tab=pack]').hidden = !!cfg.view;
@@ -608,6 +613,55 @@ function connectHTML(err = ''){
     <button class="btn" data-act="connect" style="margin-top:16px">Connect</button>
   </div>
   <p class="small muted">Employees don't need to do this. Send them the invite link from the Export tab after you connect.</p>`;
+}
+/* ---------- sign-in: each person has a name and a 6-digit PIN ---------- */
+let staff = null, staffNames = [], signinErr = '', signinPick = '';     // staff: null (old name mode) | 'checking' | 'out' | 'in'
+async function checkStaff(){
+  if (!cfg || cfg.view) return;
+  staff = 'checking';
+  try {
+    const w = await rpc('packout_whoami', {});
+    if (w && w.name) { me = { name: w.name, owner: !!w.owner }; store.set('me', me); staff = 'in'; return; }
+    const names = await rpc('packout_staff_names', {});
+    staffNames = (names || []).map(n => typeof n === 'string' ? n : Object.values(n)[0]);
+    if (staffNames.length) { staff = 'out'; me = null; store.del('me'); if (cfg.session) { delete cfg.session; store.set('cfg', cfg); } }
+    else staff = null;
+  } catch { staff = null; }          // sign-in not set up on this database: keep the simple name screen
+}
+function signinHTML(){
+  const last = signinPick || store.get('lastName') || '';
+  return `<h1 class="h">Sign in</h1>
+  <p class="lead">Choose your name and type your 6-digit PIN. You stay signed in on this phone.</p>
+  <div class="panel">
+    <label class="f" for="si-name">Your name</label>
+    <select id="si-name"><option value="">Choose your name</option>${staffNames.map(n => `<option ${n === last ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
+    <label class="f" for="si-pin">PIN</label>
+    <input id="si-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password" enterkeyhint="go">
+    ${signinErr ? `<div class="err">${esc(signinErr)}</div>` : ''}
+    <button class="btn" data-act="sign-in" style="margin-top:16px">Sign in</button>
+  </div>
+  <p class="small muted">Forgot your PIN? Ask Avigdor for a new one.</p>`;
+}
+async function staffSheet(){
+  openSheet(`<h2>Employees</h2><div id="st-list"><p class="lead">Loading</p></div>
+    <label class="f" for="st-new">Add a person</label><input id="st-new" type="text" autocomplete="off" placeholder="Name">
+    <button class="btn alt" data-act="staff-add" style="margin-top:10px">Add and make a PIN</button>
+    <button class="btn quiet" data-act="close-sheet">Done</button>`);
+  try {
+    const rows = await rpc('packout_staff_list', {});
+    if ($('#st-list')) $('#st-list').innerHTML = rows.map(r => `<div class="staffrow">
+      <div><b>${esc(r.name)}</b>${r.is_owner ? ' <span class="badge">Owner</span>' : ''}<br><span class="small muted">${!r.active ? 'Turned off' : r.locked ? 'Locked after 5 wrong PINs' : r.phones ? `Signed in on ${plural(r.phones, 'phone')}` : 'Not signed in yet'}</span></div>
+      <div class="row">
+        ${r.locked && r.active ? `<button class="btn sm" data-act="staff-unlock" data-n="${esc(r.name)}">Unlock</button>` : ''}
+        <button class="btn alt sm" data-act="staff-pin" data-n="${esc(r.name)}">New PIN</button>
+        ${r.is_owner ? '' : `<button class="btn ${r.active ? 'danger' : 'alt'} sm" data-act="staff-active" data-n="${esc(r.name)}" data-v="${r.active ? '0' : '1'}">${r.active ? 'Turn off' : 'Turn on'}</button>`}
+      </div></div>`).join('');
+  } catch (e) { if ($('#st-list')) $('#st-list').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
+}
+const newPin = () => { const a = new Uint32Array(1); let p; do { crypto.getRandomValues(a); p = String(a[0] % 1000000).padStart(6, '0'); } while (/^(\d)\1{5}$|012345|123456|234567|345678|456789|987654|876543|765432|654321|543210/.test(p)); return p; };
+function showPin(name, pin){
+  openSheet(`<h2>PIN for ${esc(name)}</h2><p class="lead">Give this PIN to ${esc(name)}. It is not shown again.</p>
+    <div class="pinbig">${pin}</div><button class="btn" data-act="staff-back">Done</button>`);
 }
 function whoHTML(){
   const names = [...new Set([...data.pallets, ...data.items].map(r => r.created_by))].sort();
@@ -751,7 +805,8 @@ function readForm(){
   return { type, color: $('#k-color').value.trim(), brand: $('#k-brand').value.trim(), tag: tagEl ? tagEl.value.trim() : '',
     sizes, more: [...document.querySelectorAll('.k-more')].map(i => i.value === '' ? '' : parseInt(i.value, 10)), gender: $('input[name=k-gender]:checked')?.value || '', season: $('input[name=k-season]:checked')?.value || '' };
 }
-function packFail(e){ pack.err = isDenied(e) ? DENIED_MSG : e.message; render(); }
+function packFail(e){ pack.err = isDenied(e) ? DENIED_MSG : e.message; render(); if (isDenied(e)) recheckSignin(); }
+function recheckSignin(){ if (staff === 'in') checkStaff().then(() => { if (staff === 'out') render(); }); }
 
 /* ---------- screens: pallets ---------- */
 function palletsHTML(){
@@ -1306,16 +1361,19 @@ function moreHTML(){
     <dl class="facts"><dt>Polished</dt><dd id="pol-count">${polishCountText()}</dd></dl>
     <label class="switchrow"><input type="checkbox" id="set-cc" ${setting('color_correct') ? 'checked' : ''}><span><b>Correct the color tint</b><br><span class="muted small">Uses the white backdrop to remove a yellow or blue tint from the camera. Off keeps colors exactly as the camera took them.</span></span></label>
     <button class="btn alt" data-act="polish-all" style="margin-top:12px">Polish the remaining photos</button></div>
+  ${me && me.owner ? `<div class="panel"><h2>Employees</h2>
+    <p class="muted small" style="margin-bottom:12px">Add people, give a new PIN, unlock a locked name, or turn someone off. Turning someone off signs them out on every phone.</p>
+    <button class="btn alt" data-act="staff-open">Manage employees</button></div>` : ''}
   <div class="panel"><h2>Manager view</h2>
     <p class="muted small" style="margin-bottom:12px">A link that shows pallets, boxes, inventory and exports, but cannot add, change or delete anything.</p>
     <button class="btn alt" data-act="share-view">Share the view-only link</button></div>
   <div class="panel"><h2>Invite employees</h2>
-    <p class="muted small" style="margin-bottom:12px">Show the join code and let the employee scan it with their phone camera, or send them the link. Either way they only type their name.</p>
+    <p class="muted small" style="margin-bottom:12px">Show the join code and let the employee scan it with their phone camera, or send them the link. Then they sign in with their name and PIN.</p>
     <button class="btn" data-act="join-code">Show join code</button>
     <button class="btn alt" data-act="invite">Share invite link</button></div>` : ''}
   <div class="panel"><h2>This phone</h2>
     <dl class="facts"><dt>Name</dt><dd>${esc(me.name)}</dd><dt>Access</dt><dd>${cfg.view ? 'View only' : cfg.team ? 'Team (can pack)' : 'Team'}</dd><dt>Database</dt><dd style="word-break:break-all">${esc(cfg.url.replace('https://', ''))}</dd></dl>
-    ${canEdit() ? '<button class="btn quiet" data-act="change-who">Change name</button>' : ''}
+    ${!canEdit() ? '' : staff === 'in' ? '<button class="btn quiet" data-act="sign-out">Sign out</button>' : '<button class="btn quiet" data-act="change-who">Change name</button>'}
     <button class="btn quiet" data-act="disconnect">Disconnect this phone</button></div>`;
 }
 function exportRows(){
@@ -1397,7 +1455,7 @@ const joinHash = withName => '#join=' + b64json({ u: cfg.url, k: cfg.key, ...(cf
 const viewLink = () => location.origin + location.pathname + '#view=' + b64json({ u: cfg.url, k: cfg.key });
 const canEdit = () => !!cfg && !cfg.view;
 const isDenied = e => e && (e.code === '42501' || /row-level security|permission denied/i.test(e.message || ''));
-const DENIED_MSG = 'This phone can only view the inventory. To pack, open the team link from the owner.';
+const DENIED_MSG = 'This phone is not allowed to make changes. Sign in again, or open the team link from Avigdor.';
 const fileStamp = () => new Date().toISOString().slice(0, 10);
 async function embedThumbs(rows){
   const map = new Map(), todo = rows.filter(r => r.photo_path); let done = 0;
@@ -1434,6 +1492,41 @@ const act = {
     if (!store.get('seenGuide')) { store.set('seenGuide', 1); guideSheet(true); }
   },
   'change-who'(){ me = null; render(); },
+  async 'sign-in'(){
+    const name = $('#si-name').value, pin = $('#si-pin').value.trim(); signinPick = name;
+    if (!name) { signinErr = 'Choose your name.'; return render(); }
+    if (!/^\d{6}$/.test(pin)) { signinErr = 'Type your 6-digit PIN.'; render(); return $('#si-pin').focus(); }
+    await withBusy('Signing in', async () => {
+      try {
+        const r = await rpc('packout_login', { p_name: name, p_pin: pin });
+        if (!r.ok) { signinErr = r.left ? `Wrong PIN. ${r.left} ${r.left === 1 ? 'try' : 'tries'} left.` : 'Wrong PIN. This name is now locked. Ask Avigdor to unlock it.'; render(); const i = $('#si-pin'); if (i) i.focus(); return; }
+        cfg.session = r.token; store.set('cfg', cfg); store.set('lastName', r.name);
+        me = { name: r.name, owner: !!r.owner }; store.set('me', me); staff = 'in'; signinErr = '';
+        await refresh(); render(); startLive();
+        if (!store.get('seenGuide')) { store.set('seenGuide', 1); guideSheet(true); }
+      } catch (e) {
+        signinErr = /LOCKED/.test(e.message) ? 'This name is locked after 5 wrong PINs. Ask Avigdor to unlock it.' : /NO_NAME/.test(e.message) ? 'This name is turned off. Ask Avigdor.' : /NOT_TEAM/.test(e.message) ? 'This phone needs the team link from Avigdor first.' : e.message;
+        render();
+      }
+    });
+  },
+  async 'sign-out'(){
+    try { await rpc('packout_logout', {}); } catch {}
+    delete cfg.session; store.set('cfg', cfg); me = null; store.del('me'); await checkStaff(); render();
+  },
+  'staff-open': staffSheet,
+  'staff-back': staffSheet,
+  async 'staff-add'(){
+    const name = $('#st-new').value.trim().replace(/\s+/g, ' '); if (!name) return toast('Type the name first.', 'bad');
+    const pin = newPin();
+    try { await rpc('packout_staff_save', { p_name: name, p_pin: pin }); showPin(name, pin); } catch (e) { toast(e.message, 'bad'); }
+  },
+  async 'staff-pin'(el){
+    const pin = newPin();
+    try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_pin: pin }); showPin(el.dataset.n, pin); } catch (e) { toast(e.message, 'bad'); }
+  },
+  async 'staff-unlock'(el){ try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_unlock: true }); staffSheet(); } catch (e) { toast(e.message, 'bad'); } },
+  async 'staff-active'(el){ try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_active: el.dataset.v === '1' }); staffSheet(); } catch (e) { toast(e.message, 'bad'); } },
   disconnect(){
     openSheet(`<h2>Disconnect this phone?</h2><p class="lead">Nothing is deleted from the database. This phone will need the invite link again.</p>
       <div class="row"><button class="btn alt" data-act="close-sheet">Cancel</button><button class="btn danger" data-act="disconnect-yes">Disconnect</button></div>`);
@@ -1800,7 +1893,7 @@ async function claim(palletId, isNew){
 async function mutate(label, fn, okMsg){
   await withBusy(label, async () => {
     try { await fn(); await loadAll(); if (okMsg) toast(okMsg, 'good'); }
-    catch (e) { toast(isDenied(e) ? DENIED_MSG : e.code === '23503' ? 'This still has things on it, so it can\'t be deleted.' : e.message, 'bad'); }
+    catch (e) { if (isDenied(e)) recheckSignin(); toast(isDenied(e) ? DENIED_MSG : e.code === '23503' ? 'This still has things on it, so it can\'t be deleted.' : e.message, 'bad'); }
     render();
   });
 }
@@ -1852,6 +1945,7 @@ document.addEventListener('input', e => { if (e.target.id === 'inv-q') { filt.q 
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'os') { e.preventDefault(); act['other-size-add'](); }
   if (e.key === 'Enter' && e.target.id === 'k-style') act['check-style']();
+  if (e.key === 'Enter' && e.target.id === 'si-pin') { e.preventDefault(); act['sign-in'](); }
   if (e.key === 'Enter' && e.target.id === 'k-color') { e.preventDefault(); const q = $('.szq'); if (q) { q.focus(); q.select(); } else e.target.blur(); }
   if (e.key === 'Enter' && (['k-tag', 'k-brand'].includes(e.target.id) || e.target.classList.contains('szq') || e.target.classList.contains('szt'))) { e.preventDefault(); e.target.blur(); }
   if (e.key === 'Escape' && sheetOpen()) closeSheet();
@@ -1900,8 +1994,9 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && cf
       if (cfg && cfg.team) setTimeout(() => toast('This phone already has the team link, so the view-only link was not applied.', 'bad'), 800);
       else { cfg = { url: j.u, key: j.k, view: true }; store.set('cfg', cfg); }
     } } catch {} if (!isStandalone()) history.replaceState(null, '', location.pathname); }
+  if (cfg && !cfg.view) { staff = 'checking'; render(); await checkStaff(); }
   render();
-  if (cfg) { await withBusy('Loading inventory', () => refresh()); render(); startLive(); }
+  if (cfg && staff !== 'out') { await withBusy('Loading inventory', () => refresh()); render(); startLive(); }
 })();
 </script>
 </body>

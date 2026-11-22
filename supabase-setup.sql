@@ -400,12 +400,49 @@ create table if not exists packout_private.app_secret (
 );
 revoke all on packout_private.app_secret from public, anon, authenticated;
 
+-- Staff sign-in (section 7) is created first so this rule can use it.
+create extension if not exists pgcrypto with schema extensions;
+create table if not exists packout_private.staff (
+  name       text primary key,
+  pin_hash   text not null,
+  is_owner   boolean not null default false,
+  active     boolean not null default true,
+  failed     int not null default 0,
+  created_at timestamptz not null default now()
+);
+create table if not exists packout_private.sessions (
+  token_hash text primary key,
+  name       text not null references packout_private.staff(name) on delete cascade on update cascade,
+  created_at timestamptz not null default now()
+);
+revoke all on packout_private.staff, packout_private.sessions from public, anon, authenticated;
+
+create or replace function packout_private.header(h text)
+returns text language sql stable set search_path = '' as $$
+  select coalesce(nullif(current_setting('request.headers', true), '')::json ->> h, '');
+$$;
+
+-- The team code from the invite link matches.
+create or replace function packout_private.team_ok()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select coalesce((select s.team_code is null or s.team_code = '' or s.team_code = packout_private.header('x-packout-team')
+                     from packout_private.app_secret s where s.id = 1), true);
+$$;
+
+-- The signed-in person on this phone, or null.
+create or replace function packout_private.session_name()
+returns text language sql stable security definer set search_path = '' as $$
+  select st.name from packout_private.sessions se join packout_private.staff st on st.name = se.name
+   where se.token_hash = encode(extensions.digest(packout_private.header('x-packout-session'), 'sha256'), 'hex')
+     and st.active
+     and packout_private.header('x-packout-session') <> '';
+$$;
+
+-- Writing needs the team code AND, once staff are set up, a signed-in person.
 create or replace function public.packout_can_write()
 returns boolean language sql stable security definer set search_path = '' as $$
-  select coalesce((
-    select s.team_code is null or s.team_code = ''
-        or s.team_code = coalesce(nullif(current_setting('request.headers', true), '')::json ->> 'x-packout-team', '')
-      from packout_private.app_secret s where s.id = 1), true);
+  select packout_private.team_ok()
+     and (not exists (select 1 from packout_private.staff) or packout_private.session_name() is not null);
 $$;
 revoke all on function public.packout_can_write() from public;
 grant execute on function public.packout_can_write() to anon, authenticated;
@@ -490,7 +527,7 @@ revoke all on packout_private.history from public, anon, authenticated;
 
 create or replace function packout_private.record_change()
 returns trigger language plpgsql security definer set search_path = '' as $$
-declare v_by text := nullif(current_setting('request.headers', true), '')::json ->> 'x-packout-name';
+declare v_by text := coalesce(packout_private.session_name(), nullif(current_setting('request.headers', true), '')::json ->> 'x-packout-name');
 begin
   insert into packout_private.history (tbl, op, by_name, old_row, new_row)
   values (tg_table_name, tg_op, v_by,
@@ -506,6 +543,113 @@ begin
   foreach t in array array['pallets', 'boxes', 'styles', 'items', 'settings'] loop
     execute format('drop trigger if exists packout_history on public.%I', t);
     execute format('create trigger packout_history after insert or update or delete on public.%I for each row execute function packout_private.record_change()', t);
+  end loop;
+end;
+$$;
+
+
+-- 7. Staff sign-in --------------------------------------------
+-- Each person signs in once per phone with their name and a 6-digit PIN.
+-- PINs are stored scrambled (bcrypt). 5 wrong tries lock the name until the owner unlocks it.
+
+create or replace function public.packout_staff_names()
+returns setof text language sql stable security definer set search_path = '' as $$
+  select name from packout_private.staff where active and packout_private.team_ok() order by name;
+$$;
+
+create or replace function public.packout_login(p_name text, p_pin text)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare st packout_private.staff; v_token text;
+begin
+  if not packout_private.team_ok() then raise exception 'NOT_TEAM' using errcode = '42501'; end if;
+  select * into st from packout_private.staff where name = p_name for update;
+  if not found or not st.active then raise exception 'NO_NAME'; end if;
+  if st.failed >= 5 then raise exception 'LOCKED'; end if;
+  if st.pin_hash <> extensions.crypt(coalesce(p_pin, ''), st.pin_hash) then
+    update packout_private.staff set failed = failed + 1 where name = p_name;
+    return jsonb_build_object('ok', false, 'left', greatest(0, 4 - st.failed));
+  end if;
+  update packout_private.staff set failed = 0 where name = p_name;
+  v_token := encode(extensions.gen_random_bytes(32), 'hex');
+  insert into packout_private.sessions (token_hash, name) values (encode(extensions.digest(v_token, 'sha256'), 'hex'), p_name);
+  return jsonb_build_object('ok', true, 'token', v_token, 'name', st.name, 'owner', st.is_owner);
+end;
+$$;
+
+create or replace function public.packout_whoami()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select case when n is null then null else jsonb_build_object('name', n, 'owner', (select is_owner from packout_private.staff where name = n)) end
+    from (select packout_private.session_name() as n) q;
+$$;
+
+create or replace function public.packout_logout()
+returns void language sql volatile security definer set search_path = '' as $$
+  delete from packout_private.sessions where token_hash = encode(extensions.digest(packout_private.header('x-packout-session'), 'sha256'), 'hex');
+$$;
+
+-- Owner only: list, add, change PIN, turn on/off, unlock.
+create or replace function packout_private.require_owner()
+returns void language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not packout_private.team_ok() or not coalesce((select is_owner from packout_private.staff where name = packout_private.session_name()), false) then
+    raise exception 'OWNER_ONLY' using errcode = '42501';
+  end if;
+end;
+$$;
+
+create or replace function public.packout_staff_list()
+returns table (name text, is_owner boolean, active boolean, locked boolean, phones bigint)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform packout_private.require_owner();
+  return query select s.name, s.is_owner, s.active, s.failed >= 5, (select count(*) from packout_private.sessions x where x.name = s.name)
+                 from packout_private.staff s order by s.is_owner desc, s.name;
+end;
+$$;
+
+create or replace function public.packout_staff_save(p_name text, p_pin text default null, p_active boolean default null, p_unlock boolean default false)
+returns void language plpgsql volatile security definer set search_path = '' as $$
+declare v_name text := btrim(p_name);
+begin
+  perform packout_private.require_owner();
+  if v_name = '' then raise exception 'Type a name'; end if;
+  if p_pin is not null and p_pin !~ '^[0-9]{6}$' then raise exception 'The PIN must be 6 digits'; end if;
+  if exists (select 1 from packout_private.staff where name = v_name) then
+    if v_name = packout_private.session_name() and p_active is false then raise exception 'You cannot turn off your own name'; end if;
+    update packout_private.staff set
+      pin_hash = coalesce(extensions.crypt(p_pin, extensions.gen_salt('bf', 8)), pin_hash),
+      active   = coalesce(p_active, active),
+      failed   = case when p_unlock or p_pin is not null then 0 else failed end
+     where name = v_name;
+    -- a new PIN or turning someone off signs them out on every phone
+    if p_pin is not null or p_active is false then delete from packout_private.sessions where name = v_name; end if;
+  else
+    if p_pin is null then raise exception 'A new person needs a PIN'; end if;
+    insert into packout_private.staff (name, pin_hash) values (v_name, extensions.crypt(p_pin, extensions.gen_salt('bf', 8)));
+  end if;
+end;
+$$;
+
+revoke all on function public.packout_login(text, text), public.packout_staff_save(text, text, boolean, boolean), public.packout_staff_list(),
+  public.packout_logout(), public.packout_whoami(), public.packout_staff_names() from public;
+grant execute on function public.packout_login(text, text), public.packout_staff_save(text, text, boolean, boolean), public.packout_staff_list(),
+  public.packout_logout(), public.packout_whoami(), public.packout_staff_names() to anon, authenticated;
+
+-- The signed-in name is what gets saved as "packed by", whatever the phone sends.
+create or replace function packout_private.stamp_creator()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare n text := packout_private.session_name();
+begin
+  if n is not null then new.created_by := n; end if;
+  return new;
+end;
+$$;
+do $$
+declare t text;
+begin
+  foreach t in array array['pallets', 'boxes', 'styles', 'items'] loop
+    execute format('drop trigger if exists packout_stamp on public.%I', t);
+    execute format('create trigger packout_stamp before insert on public.%I for each row execute function packout_private.stamp_creator()', t);
   end loop;
 end;
 $$;
