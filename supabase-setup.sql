@@ -52,6 +52,8 @@ create table if not exists public.items (
 
 -- Type of garment (Jeans, T-shirt, Hoodie...). Added later, so it is added to an existing table too.
 alter table public.items add column if not exists item_type text not null default '';
+-- Size (XS ... 3XL, One size, or anything typed such as 32 or 4T). One line per size.
+alter table public.items add column if not exists size text not null default '';
 
 create index if not exists items_style_idx  on public.items (style_number);
 create index if not exists items_box_idx    on public.items (box_id);
@@ -319,6 +321,58 @@ end;
 $$;
 
 grant execute on function public.save_item(jsonb, jsonb) to anon, authenticated;
+
+-- Save one color of a style: one line per size, all sharing the photo. If one
+-- size continues into more boxes, those boxes are created as in save_item.
+-- All or nothing, and safe to repeat after a lost reply.
+create or replace function public.save_entry(p jsonb, p_sizes jsonb, p_more jsonb default '[]'::jsonb)
+returns jsonb
+language plpgsql
+as $$
+declare
+  v_box    bigint := (p->>'box_id')::bigint;
+  v_pallet bigint;
+  v_prev   bigint;
+  v_new    bigint;
+  v_size   text;
+  v_tag    text;
+  v_boxes  jsonb := '[]'::jsonb;
+  z        jsonb;
+  m        jsonb;
+begin
+  if jsonb_array_length(p_sizes) = 0 then
+    raise exception 'Choose at least one size';
+  end if;
+  if jsonb_array_length(p_more) > 0 and jsonb_array_length(p_sizes) <> 1 then
+    raise exception 'More boxes can only be added when one size is packed';
+  end if;
+  for z in select * from jsonb_array_elements(p_sizes) loop
+    insert into public.items (id, style_number, box_id, item_type, size, color, brand, tag_number, quantity, gender, season, photo_path, created_by)
+    values ((z->>'id')::uuid, p->>'style_number', v_box, coalesce(p->>'item_type', ''), coalesce(z->>'size', ''), p->>'color', p->>'brand',
+            coalesce(z->>'tag_number', p->>'tag_number', ''), (z->>'qty')::int, p->>'gender', p->>'season', p->>'photo_path', p->>'created_by')
+    on conflict (id) do nothing;
+  end loop;
+  v_size := coalesce(p_sizes->0->>'size', '');
+  v_tag  := coalesce(p_sizes->0->>'tag_number', p->>'tag_number', '');
+  select pallet_id into v_pallet from public.boxes where id = v_box;
+  v_prev := v_box;
+  for m in select * from jsonb_array_elements(p_more) loop
+    select box_id into v_new from public.items where id = (m->>'id')::uuid;
+    if v_new is null then
+      insert into public.boxes (pallet_id, created_by) values (v_pallet, p->>'created_by') returning id into v_new;
+      insert into public.items (id, style_number, box_id, item_type, size, color, brand, tag_number, quantity, gender, season, photo_path, created_by)
+      values ((m->>'id')::uuid, p->>'style_number', v_new, coalesce(p->>'item_type', ''), v_size, p->>'color', p->>'brand',
+              v_tag, (m->>'qty')::int, p->>'gender', p->>'season', p->>'photo_path', p->>'created_by');
+    end if;
+    update public.boxes set status = 'closed' where id = v_prev;
+    v_boxes := v_boxes || to_jsonb(v_new);
+    v_prev := v_new;
+  end loop;
+  return jsonb_build_object('boxes', v_boxes);
+end;
+$$;
+
+grant execute on function public.save_entry(jsonb, jsonb, jsonb) to anon, authenticated;
 grant execute on function public.move_style(text, bigint, text, text) to anon, authenticated;
 grant execute on function public.rename_style(text, text) to anon, authenticated;
 grant execute on function public.delete_style(text) to anon, authenticated;
