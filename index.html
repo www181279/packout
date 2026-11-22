@@ -101,6 +101,15 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 /* save bar stays above the bottom tabs */
 .savebar{position:sticky;bottom:var(--navh,64px);z-index:14;margin:0 -16px;padding:10px 16px 12px;background:var(--floor);border-top:1px solid var(--line)}
 .savebar .err{margin:0 0 10px}
+.sizechips button{border:1.5px solid #AEB8C4;border-radius:8px;padding:10px 0;min-width:58px;background:#fff;font-weight:600;font-size:16px}
+.sizechips button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.sizechips button[data-act=other-size]{min-width:0;padding:10px 14px;border-style:dashed}
+.szlist{margin-top:12px;border-top:1px solid var(--line)}
+.szrow{padding:10px 0;border-bottom:1px solid var(--line)}
+.szhead{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.szname{font:700 26px/1 var(--sign)}
+.sztag{margin-top:8px}.sztag input{height:44px;font-size:16px}.sztag .btn{min-height:44px}
+.sztotal{margin-top:8px;font-weight:600;color:var(--ink)}
 .morebox{margin-top:4px}.morerow{display:flex;gap:8px}.morerow input{flex:1;text-align:center;font:700 24px/1 var(--sign)}.morerow .btn{width:auto;flex:none;min-height:50px}
 .addmore{display:block;margin-top:10px}
 .savedacts{margin-top:10px}.savedacts .btn{flex:1}
@@ -324,6 +333,10 @@ const TYPES = {
   'Other': ['Activewear', 'Swimwear', 'Pajamas', 'Underwear', 'Socks', 'Shoes', 'Bag', 'Hat', 'Accessory']
 };
 const ALL_TYPES = Object.values(TYPES).flat();
+const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'One size'];
+const sizeRank = z => { const i = SIZES.indexOf(z); if (i >= 0) return i; const n = parseFloat(z); return isNaN(n) ? 1000 : 100 + n; };
+const bySize = (a, b) => sizeRank(a) - sizeRank(b) || String(a).localeCompare(String(b));
+const sizesOf = rows => [...new Set(rows.map(r => r.size).filter(Boolean))].sort(bySize);
 // <select> of types, grouped; types typed in by hand before are offered too
 function typeSelect(id, cur, { blank = 'Choose a type', other = true } = {}){
   const mine = [...new Set(data.items.map(i => i.item_type).filter(t => t && !ALL_TYPES.includes(t)))].sort();
@@ -446,7 +459,7 @@ let idx = { pal: new Map(), box: new Map(), style: new Map() };
 let tab = 'pack';
 let pack = newPack(store.get('last'), store.get('last'));   // keep filling the box this phone used last
 let palView = null, palMine = false;
-let filt = { q: '', pallet: '', box: '', item_type: '', brand: '', gender: '', season: '', color: '', by: '' }, invLimit = 150, invSort = 'new';
+let filt = { q: '', pallet: '', box: '', item_type: '', size: '', brand: '', gender: '', season: '', color: '', by: '' }, invLimit = 150, invSort = 'new';
 function newPack(last, keep){ return { stage: 'style', style: '', pallet: null, box: null, known: false, owner: '', err: '', saved: null, photo: null, id: uuid(), last: last || null, keep: keep || null }; }
 // "keep" = the employee asked to put the next style into the same box
 // If the box or style this phone is working on was deleted (here or on another phone), start over cleanly.
@@ -643,7 +656,8 @@ function packHTML(){
 
   // item form: the fields that change every time come first; the ones that carry over sit below
   const prev = data.items.filter(i => i.style_number === pack.style).slice(-1)[0] || store.get('lastForm') || {};
-  const f = pack.form || { type: prev.item_type || prev.type || '', brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', qty: 1, more: [] };
+  const f = pack.form || { type: prev.item_type || prev.type || '', brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', sizes: [], more: [] };
+  const sizes = f.sizes || [];
   const typeOther = f.type === '__other' || (f.type && !ALL_TYPES.includes(f.type) && !data.items.some(i => i.item_type === f.type));
   const more = f.more || [];
   const uniq = k => [...new Set(data.items.map(i => i[k]).filter(Boolean))].sort();
@@ -657,17 +671,23 @@ function packHTML(){
       <input id="k-color" type="text" list="l-color" autocomplete="off" enterkeyhint="next" value="${esc(f.color)}">
       <div id="k-colorhint" class="chint">${colorHintHTML()}</div>
       <datalist id="l-color">${uniq('color').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
-      <label class="f" for="k-qty">${more.length ? `Quantity in ${bCode(pack.box)}` : 'Quantity'}</label>
-      <div class="qty"><button type="button" data-act="qty" data-d="-1" aria-label="One less">&minus;</button>
-        <input id="k-qty" type="number" inputmode="numeric" min="1" enterkeyhint="done" value="${esc(f.qty)}">
-        <button type="button" data-act="qty" data-d="1" aria-label="One more">+</button></div>
-      ${more.map((q, n) => `<div class="morebox"><label class="f" for="k-more-${n}">Quantity in new box ${n + 1}</label>
+      <label class="f">Size <small>(tap every size of this color you are packing)</small></label>
+      <div class="chips sizechips">${[...SIZES, ...sizes.map(z => z.size).filter(z => !SIZES.includes(z))].map(z => `<button type="button" data-act="toggle-size" data-size="${esc(z)}" aria-pressed="${sizes.some(x => x.size === z)}">${esc(z)}</button>`).join('')}<button type="button" data-act="other-size">Other size</button></div>
+      ${sizes.length ? `<div class="szlist">${sizes.map((z, n) => `<div class="szrow" data-size="${esc(z.size)}">
+        <div class="szhead"><span class="szname">${esc(z.size)}</span><span class="small muted">${more.length ? `in ${bCode(pack.box)}` : 'quantity'}</span></div>
+        <div class="qty"><button type="button" data-act="qty" data-for="k-q-${n}" data-d="-1" aria-label="One less ${esc(z.size)}">&minus;</button>
+          <input id="k-q-${n}" class="szq" type="number" inputmode="numeric" min="1" enterkeyhint="done" value="${esc(z.qty)}" aria-label="Quantity of size ${esc(z.size)}">
+          <button type="button" data-act="qty" data-for="k-q-${n}" data-d="1" aria-label="One more ${esc(z.size)}">+</button></div>
+        ${sizes.length > 1 ? `<div class="withscan sztag"><input id="k-t-${n}" class="szt" type="text" autocomplete="off" autocapitalize="characters" placeholder="Tag number (optional)" value="${esc(z.tag || '')}" aria-label="Tag number for size ${esc(z.size)}">${scanBtn('k-t-' + n)}</div>` : ''}
+      </div>`).join('')}</div>
+      ${sizes.length > 1 ? `<p class="small muted sztotal">Total ${nf(sizes.reduce((a, z) => a + (+z.qty || 0), 0))} pieces in ${sizes.length} sizes.</p>` : ''}` : '<p class="small muted">No size chosen yet.</p>'}
+      ${sizes.length === 1 ? `${more.map((q, n) => `<div class="morebox"><label class="f" for="k-more-${n}">Quantity of ${esc(sizes[0].size)} in new box ${n + 1}</label>
         <div class="morerow"><input id="k-more-${n}" class="k-more" type="number" inputmode="numeric" min="1" value="${esc(q)}">
         <button type="button" class="btn quiet" data-act="del-more" data-n="${n}" aria-label="Remove new box ${n + 1}">Remove</button></div></div>`).join('')}
-      <button type="button" class="linkbtn addmore" data-act="add-more">+ This color needs ${more.length ? 'one more box' : 'another box'}</button>
-      ${more.length ? `<p class="small muted">${more.length > 1 ? `${bCode(pack.box)} and every new box except the last will be marked full.` : `${bCode(pack.box)} will be marked full. The new box stays open.`} Total ${nf((+f.qty || 0) + more.reduce((a, b) => a + (+b || 0), 0))} pieces.</p>` : ''}
-      <label class="f" for="k-tag">Tag number <small>(optional)</small></label>
-      <div class="withscan"><input id="k-tag" type="text" autocomplete="off" autocapitalize="characters" enterkeyhint="done" value="${esc(f.tag)}"><button type="button" class="btn alt" data-act="scan" data-target="tag" aria-label="Scan a barcode with the camera"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>Scan</button></div>
+      <button type="button" class="linkbtn addmore" data-act="add-more">+ This ${more.length ? 'needs one more box' : 'size needs another box'}</button>
+      ${more.length ? `<p class="small muted moretotal">${more.length > 1 ? `${bCode(pack.box)} and every new box except the last will be marked full.` : `${bCode(pack.box)} will be marked full. The new box stays open.`} Total ${nf((+sizes[0].qty || 0) + more.reduce((a, b) => a + (+b || 0), 0))} pieces.</p>` : ''}` : ''}
+      ${sizes.length > 1 ? '' : `<label class="f" for="k-tag">Tag number <small>(optional)</small></label>
+      <div class="withscan"><input id="k-tag" type="text" autocomplete="off" autocapitalize="characters" enterkeyhint="done" value="${esc(f.tag)}">${scanBtn('tag')}</div>`}
       <div class="samehead"><b>Same for the whole style</b><span>Kept from the last item</span></div>
       <label class="f" for="k-type">Type</label>
       ${typeSelect('k-type', typeOther ? '__other' : f.type)}
@@ -692,8 +712,13 @@ function palPick(p){
 }
 function readForm(){
   const ts = $('#k-type').value, type = ts === '__other' ? ($('#k-type-other').value.trim() || '__other') : ts;
-  return { type, color: $('#k-color').value.trim(), brand: $('#k-brand').value.trim(), tag: $('#k-tag').value.trim(),
-    qty: parseInt($('#k-qty').value, 10), more: [...document.querySelectorAll('.k-more')].map(i => i.value === '' ? '' : parseInt(i.value, 10)), gender: $('input[name=k-gender]:checked')?.value || '', season: $('input[name=k-season]:checked')?.value || '' };
+  const sizes = [...document.querySelectorAll('.szrow')].map(r => {
+    const q = r.querySelector('.szq').value, t = r.querySelector('.szt');
+    return { size: r.dataset.size, qty: q === '' ? '' : parseInt(q, 10), tag: t ? t.value.trim() : '' };
+  });
+  const tagEl = $('#k-tag');
+  return { type, color: $('#k-color').value.trim(), brand: $('#k-brand').value.trim(), tag: tagEl ? tagEl.value.trim() : '',
+    sizes, more: [...document.querySelectorAll('.k-more')].map(i => i.value === '' ? '' : parseInt(i.value, 10)), gender: $('input[name=k-gender]:checked')?.value || '', season: $('input[name=k-season]:checked')?.value || '' };
 }
 function packFail(e){ pack.err = e.message; render(); }
 
@@ -737,20 +762,20 @@ function palletDetailHTML(p){
       ${b.status === 'closed' ? '<span class="badge closed">Closed</span>' : ''}
       <button class="linkbtn small" style="margin-left:auto" data-act="${bi.length ? 'toggle-box' : 'del-box'}" data-id="${b.id}">${bi.length ? (b.status === 'open' ? 'Close box' : 'Reopen box') : 'Delete empty box'}</button>
       ${bi.length ? `<button class="linkbtn small" data-act="print-labels" data-box="${b.id}">Print label</button>` : ''}</div>
-      ${bi.length ? `<ul class="lines">${bi.map(i => `<li><span><b>${esc(i.style_number)}</b> ${esc(i.color)}<br><span class="muted small">${esc([i.item_type, i.brand].filter(Boolean).join(', '))}</span></span><span class="n">${nf(i.quantity)}</span></li>`).join('')}</ul>` : ''}
+      ${bi.length ? `<ul class="lines">${bi.map(i => `<li><span><b>${esc(i.style_number)}</b> ${esc(i.color)}${i.size ? ', ' + esc(i.size) : ''}<br><span class="muted small">${esc([i.item_type, i.brand].filter(Boolean).join(', '))}</span></span><span class="n">${nf(i.quantity)}</span></li>`).join('')}</ul>` : ''}
     </div>`; }).join('') || `<div class="empty"><b>No boxes on this pallet yet</b></div>`}`;
 }
 
 /* ---------- screens: inventory ---------- */
-const FLABEL = { pallet: 'Pallet', box: 'Box', item_type: 'Type', brand: 'Brand', gender: 'Gender', season: 'Season', color: 'Color', by: 'Packed by' };
+const FLABEL = { pallet: 'Pallet', box: 'Box', item_type: 'Type', size: 'Size', brand: 'Brand', gender: 'Gender', season: 'Season', color: 'Color', by: 'Packed by' };
 function filtered(){
   const q = filt.q.trim().toLowerCase();
   let list = joined().filter(i =>
     (!filt.pallet || String(i.pallet_id) === filt.pallet) && (!filt.box || String(i.box_id) === filt.box) &&
-    (!filt.item_type || i.item_type === filt.item_type) && (!filt.brand || i.brand === filt.brand) && (!filt.gender || i.gender === filt.gender) && (!filt.season || i.season === filt.season) &&
+    (!filt.item_type || i.item_type === filt.item_type) && (!filt.size || i.size === filt.size) && (!filt.brand || i.brand === filt.brand) && (!filt.gender || i.gender === filt.gender) && (!filt.season || i.season === filt.season) &&
     (!filt.color || i.color === filt.color) && (!filt.by || i.created_by === filt.by) &&
-    (!q || [i.style_number, i.item_type, i.color, i.brand, i.tag_number, pCode(i.pallet_id), bCode(i.box_id)].join(' ').toLowerCase().includes(q)));
-  const by = { new: (a, b) => b.created_at.localeCompare(a.created_at), style: (a, b) => a.style_number.localeCompare(b.style_number, undefined, { numeric: true }) || a.color.localeCompare(b.color),
+    (!q || [i.style_number, i.item_type, i.size && 'size ' + i.size, i.color, i.brand, i.tag_number, pCode(i.pallet_id), bCode(i.box_id)].join(' ').toLowerCase().includes(q)));
+  const by = { new: (a, b) => b.created_at.localeCompare(a.created_at), style: (a, b) => a.style_number.localeCompare(b.style_number, undefined, { numeric: true }) || a.color.localeCompare(b.color) || bySize(a.size, b.size),
     where: (a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id || a.style_number.localeCompare(b.style_number) };
   return list.sort(by[invSort]);
 }
@@ -774,7 +799,7 @@ function renderInvList(){
     : list.slice(0, invLimit).map(i => `
       <button class="irow" data-act="open-item" data-id="${i.id}">
         ${i.photo_path ? `<img loading="lazy" alt="" src="${esc(thumbUrl(i))}">` : '<span class="noimg"></span>'}
-        <span class="mid"><span class="st">${esc(i.style_number)}</span>${i.item_type ? `<span class="tp">${esc(i.item_type)}</span>` : ''}
+        <span class="mid"><span class="st">${esc(i.style_number)}</span>${i.item_type || i.size ? `<span class="tp">${esc([i.item_type, i.size && 'Size ' + i.size].filter(Boolean).join(', '))}</span>` : ''}
           <span class="d">${esc(i.color)}, ${esc(i.brand)}</span><span class="d">${esc(i.gender)}, ${esc(i.season)}${i.tag_number ? ', tag ' + esc(i.tag_number) : ''}</span></span>
         <span class="wide">${esc(i.color)}</span><span class="wide">${esc(i.brand)}</span><span class="wide">${esc(i.gender)}</span><span class="wide">${esc(i.season)}</span><span class="wide">${esc(i.tag_number || '')}</span>
         <span class="loc wide" style="text-align:left">${pCode(i.pallet_id)}<br>${bCode(i.box_id)}</span>
@@ -787,7 +812,7 @@ function filterSheet(){
   openSheet(`<h2>Filter inventory</h2>
     ${opt('pallet', data.pallets.map(p => p.id).sort((a, b) => a - b), v => pCode(v))}
     ${opt('box', data.boxes.map(b => b.id).sort((a, b) => a - b), v => bCode(v) + ' on ' + pCode(idx.box.get(v).pallet_id))}
-    ${opt('item_type', u('item_type'))}${opt('brand', u('brand'))}${opt('gender', u('gender'))}${opt('season', u('season'))}${opt('color', u('color'))}${opt('by', u('created_by'))}
+    ${opt('item_type', u('item_type'))}${opt('size', u('size').sort(bySize))}${opt('brand', u('brand'))}${opt('gender', u('gender'))}${opt('season', u('season'))}${opt('color', u('color'))}${opt('by', u('created_by'))}
     <label class="f" for="f-sort">Sort by</label><select id="f-sort"><option value="new">Newest first</option><option value="style" ${invSort === 'style' ? 'selected' : ''}>Style number</option><option value="where" ${invSort === 'where' ? 'selected' : ''}>Pallet and box</option></select>
     <div class="row" style="margin-top:18px"><button class="btn alt" data-act="reset-filters">Clear all</button><button class="btn" data-act="apply-filters">Show items</button></div>`);
 }
@@ -797,7 +822,7 @@ function itemSheet(id, edit){
     ${i.photo_path ? `<img class="big" alt="Photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(photoUrl(i.photo_path))}">` : ''}
     <h2>${esc(i.style_number)}</h2>
     <dl class="facts"><dt>Where</dt><dd>${pCode(i.pallet_id)}, ${bCode(i.box_id)}</dd>
-      <dt>Type</dt><dd>${esc(i.item_type || 'Not set')}</dd><dt>Color</dt><dd>${esc(i.color)}</dd><dt>Brand</dt><dd>${esc(i.brand)}</dd><dt>Tag number</dt><dd>${esc(i.tag_number || 'None')}</dd>
+      <dt>Type</dt><dd>${esc(i.item_type || 'Not set')}</dd><dt>Size</dt><dd>${esc(i.size || 'Not set')}</dd><dt>Color</dt><dd>${esc(i.color)}</dd><dt>Brand</dt><dd>${esc(i.brand)}</dd><dt>Tag number</dt><dd>${esc(i.tag_number || 'None')}</dd>
       <dt>Quantity</dt><dd>${nf(i.quantity)}</dd><dt>Gender</dt><dd>${esc(i.gender)}</dd><dt>Season</dt><dd>${esc(i.season)}</dd>
       <dt>Packed by</dt><dd>${esc(i.created_by)}, ${new Date(i.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</dd></dl>
     <div class="row"><button class="btn alt" data-act="edit-item" data-id="${i.id}">Edit</button><button class="btn" data-act="close-sheet">Done</button></div>
@@ -806,6 +831,8 @@ function itemSheet(id, edit){
   openSheet(`<h2>Edit ${esc(i.style_number)}</h2>
     <label class="f" for="e-type">Type</label>${typeSelect('e-type', i.item_type)}
     <input id="e-type-other" type="text" autocomplete="off" placeholder="For example: Overalls" hidden>
+    <label class="f" for="e-size">Size</label><input id="e-size" type="text" list="l-sizes" autocapitalize="characters" value="${esc(i.size || '')}">
+    <datalist id="l-sizes">${[...new Set([...SIZES, ...data.items.map(x => x.size).filter(Boolean)])].map(z => `<option value="${esc(z)}">`).join('')}</datalist>
     <label class="f" for="e-color">Color</label><input id="e-color" type="text" value="${esc(i.color)}">
     <label class="f" for="e-brand">Brand</label><input id="e-brand" type="text" value="${esc(i.brand)}">
     <label class="f" for="e-tag">Tag number</label><input id="e-tag" type="text" value="${esc(i.tag_number || '')}">
@@ -815,6 +842,14 @@ function itemSheet(id, edit){
     <div id="e-err"></div>
     <div class="row" style="margin-top:18px"><button class="btn alt" data-act="open-item" data-id="${i.id}">Cancel</button><button class="btn" data-act="save-edit" data-id="${i.id}">Save changes</button></div>
     <button class="btn danger" data-act="del-item" data-id="${i.id}" style="margin-top:10px">Delete this item</button>`);
+}
+
+const scanBtn = target => `<button type="button" class="btn alt" data-act="scan" data-target="${target}" aria-label="Scan a barcode with the camera"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>Scan</button>`;
+
+function updateTotals(){            // keep the "Total ... pieces" lines right while numbers are typed
+  const f = readForm(), sum = f.sizes.reduce((a, z) => a + (+z.qty || 0), 0);
+  const t = $('.sztotal'); if (t) t.textContent = `Total ${nf(sum)} pieces in ${f.sizes.length} sizes.`;
+  const m = $('.moretotal'); if (m) m.textContent = m.textContent.replace(/Total [\d,]+ pieces\./, `Total ${nf(sum + f.more.reduce((a, b) => a + (+b || 0), 0))} pieces.`);
 }
 
 /* ---------- colour of the garment, read from the item photo ---------- */
@@ -883,7 +918,7 @@ async function openScanner(target){
         const val = String(text).trim();
         closeSheet(); if (navigator.vibrate) navigator.vibrate(60);
         if (target === 'style') { const i = $('#k-style'); if (i) { i.value = val; act['check-style'](); } }
-        else { const i = $('#k-tag'); if (i) { i.value = val; toast('Tag ' + val, 'good'); } }
+        else { const i = target === 'tag' ? $('#k-tag') : document.getElementById(target); if (i) { i.value = val; toast('Tag ' + val, 'good'); } }
       }, () => {});
     if (scanner !== sc) return sc.stop().then(() => sc.clear()).catch(() => {});   // closed while starting
     say('<p class="lead">Hold the barcode inside the frame. It reads on its own.</p>');
@@ -966,7 +1001,7 @@ function styleSheet(st){
   const { its, pieces, boxes } = styleStats(st);
   openSheet(`<h2>Style ${esc(st)}</h2>
     <dl class="facts"><dt>Pallet</dt><dd>${pCode(s.pallet_id)}</dd><dt>Packed</dt><dd>${plural(pieces, 'piece')} in ${plural(boxes, 'box')}</dd>
-      <dt>Colors</dt><dd>${esc([...new Set(its.map(i => i.color))].join(', ') || 'None yet')}</dd><dt>Started by</dt><dd>${esc(s.created_by)}</dd></dl>
+      <dt>Colors</dt><dd>${esc([...new Set(its.map(i => i.color))].join(', ') || 'None yet')}</dd><dt>Sizes</dt><dd>${esc(sizesOf(its).join(', ') || 'None yet')}</dd><dt>Started by</dt><dd>${esc(s.created_by)}</dd></dl>
     <button class="btn" data-act="move-style" data-style="${esc(st)}">Move to another pallet</button>
     <button class="btn alt" data-act="edit-style" data-style="${esc(st)}">Edit style</button>
     <button class="btn danger" data-act="del-style" data-style="${esc(st)}">Delete style</button>
@@ -1069,19 +1104,19 @@ function exportRows(){
 }
 function manifestHTML(rows, { title, img, sheets }){
   const by = (list, k) => { const m = new Map(); list.forEach(r => (m.get(r[k]) || m.set(r[k], []).get(r[k])).push(r)); return [...m].sort((a, b) => a[0] > b[0] ? 1 : -1); };
-  const cmp = (a, b) => a.style_number.localeCompare(b.style_number, undefined, { numeric: true }) || a.color.localeCompare(b.color);
+  const cmp = (a, b) => a.style_number.localeCompare(b.style_number, undefined, { numeric: true }) || a.color.localeCompare(b.color) || bySize(a.size, b.size);
   const tot = `<div class="mf-tot"><div><b>${nf(sumQty(rows))}</b>${unit(sumQty(rows), 'piece')}</div><div><b>${nf(new Set(rows.map(r => r.style_number)).size)}</b>${unit(new Set(rows.map(r => r.style_number)).size, 'style')}</div>
     <div><b>${nf(new Set(rows.map(r => r.box_id)).size)}</b>${unit(new Set(rows.map(r => r.box_id)).size, 'box')}</div><div><b>${nf(new Set(rows.map(r => r.pallet_id)).size)}</b>${unit(new Set(rows.map(r => r.pallet_id)).size, 'pallet')}</div></div>`;
   const pals = by(rows, 'pallet_id').map(([pid, pr]) => {
     const sum = !sheets ? '' : `<p class="ps-meta">Pallet breakdown, printed ${new Date().toLocaleString([], { dateStyle: 'long', timeStyle: 'short' })}${idx.pal.get(pid)?.status === 'closed' ? '. Pallet closed.' : '. Pallet still open: more may be added.'}</p>
-      <h3 class="ps-h">Styles on this pallet</h3><table class="mf-sum"><thead><tr><th class="st">Style</th><th>Type</th><th>Brand</th><th>Colors</th><th>Boxes</th><th class="q">Pieces</th></tr></thead><tbody>
-      ${by(pr, 'style_number').sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true })).map(([st, sr]) => `<tr><td class="st">${esc(st)}</td><td>${esc([...new Set(sr.map(r => r.item_type).filter(Boolean))].join(', '))}</td><td>${esc([...new Set(sr.map(r => r.brand))].join(', '))}</td><td>${esc([...new Set(sr.map(r => r.color))].join(', '))}</td><td>${[...new Set(sr.map(r => r.box_id))].sort((a, b) => a - b).map(bCode).join(', ')}</td><td class="q">${nf(sumQty(sr))}</td></tr>`).join('')}
+      <h3 class="ps-h">Styles on this pallet</h3><table class="mf-sum"><thead><tr><th class="st">Style</th><th>Type</th><th>Brand</th><th>Colors</th><th>Sizes</th><th>Boxes</th><th class="q">Pieces</th></tr></thead><tbody>
+      ${by(pr, 'style_number').sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true })).map(([st, sr]) => `<tr><td class="st">${esc(st)}</td><td>${esc([...new Set(sr.map(r => r.item_type).filter(Boolean))].join(', '))}</td><td>${esc([...new Set(sr.map(r => r.brand))].join(', '))}</td><td>${esc([...new Set(sr.map(r => r.color))].join(', '))}</td><td>${esc(sizesOf(sr).join(', '))}</td><td>${[...new Set(sr.map(r => r.box_id))].sort((a, b) => a - b).map(bCode).join(', ')}</td><td class="q">${nf(sumQty(sr))}</td></tr>`).join('')}
       </tbody></table><h3 class="ps-h">Box by box</h3>`;
     return `<section class="mf-pal"><div class="mf-plac"><b>${pCode(pid)}</b>
       <span class="r">${plural(new Set(pr.map(r => r.box_id)).size, 'box')}, ${plural(new Set(pr.map(r => r.style_number)).size, 'style')}<br>${plural(sumQty(pr), 'piece')}</span></div>${sum}
       ${by(pr, 'box_id').map(([bid, br]) => `<div class="mf-box"><h3>${bCode(bid)} <small>${plural(sumQty(br), 'piece')} on ${pCode(pid)}</small></h3>
-        <table><thead><tr>${img ? '<th class="ph"></th>' : ''}<th class="st">Style</th><th>Type</th><th>Color</th><th>Brand</th><th>Tag</th><th>Gender</th><th>Season</th><th class="q">Qty</th></tr></thead><tbody>
-        ${br.sort(cmp).map(r => `<tr>${img ? `<td class="ph">${r.photo_path ? `<img alt="" src="${esc(img(r))}">` : ''}</td>` : ''}<td class="st">${esc(r.style_number)}</td><td>${esc(r.item_type || '')}</td><td>${esc(r.color)}</td><td>${esc(r.brand)}</td><td>${esc(r.tag_number || '')}</td><td>${esc(r.gender)}</td><td>${esc(r.season)}</td><td class="q">${nf(r.quantity)}</td></tr>`).join('')}
+        <table><thead><tr>${img ? '<th class="ph"></th>' : ''}<th class="st">Style</th><th>Type</th><th>Color</th><th>Size</th><th>Brand</th><th>Tag</th><th>Gender</th><th>Season</th><th class="q">Qty</th></tr></thead><tbody>
+        ${br.sort(cmp).map(r => `<tr>${img ? `<td class="ph">${r.photo_path ? `<img alt="" src="${esc(img(r))}">` : ''}</td>` : ''}<td class="st">${esc(r.style_number)}</td><td>${esc(r.item_type || '')}</td><td>${esc(r.color)}</td><td>${esc(r.size || '')}</td><td>${esc(r.brand)}</td><td>${esc(r.tag_number || '')}</td><td>${esc(r.gender)}</td><td>${esc(r.season)}</td><td class="q">${nf(r.quantity)}</td></tr>`).join('')}
         </tbody></table></div>`).join('')}</section>`;
   }).join('');
   const index = by(rows, 'style_number').sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true })).map(([s, sr]) => `<tr><td class="st">${esc(s)}</td><td>${esc([...new Set(sr.map(r => r.item_type).filter(Boolean))].join(', '))}</td><td>${esc([...new Set(sr.map(r => r.brand))].join(', '))}</td>
@@ -1115,11 +1150,11 @@ function printSheets(ids, photos = true){
 function labelsHTML(boxes, size){
   const [, , per, max] = LABELS[size];
   const one = b => {
-    const m = new Map(); itemsOf('box_id', b.id).forEach(i => { const g = m.get(i.style_number) || m.set(i.style_number, { colors: new Set(), type: i.item_type, qty: 0 }).get(i.style_number); g.colors.add(i.color); g.qty += i.quantity; });
+    const m = new Map(); itemsOf('box_id', b.id).forEach(i => { const g = m.get(i.style_number) || m.set(i.style_number, { colors: new Set(), sizes: [], type: i.item_type, qty: 0 }).get(i.style_number); g.colors.add(i.color); g.sizes.push(i); g.qty += i.quantity; });
     const list = [...m].sort((a, c) => a[0].localeCompare(c[0], undefined, { numeric: true })), total = list.reduce((n, [, g]) => n + g.qty, 0);
     return `<div class="lbl"><div class="lb-top"><span class="lb-pal">${pCode(b.pallet_id)}</span><span>${list.length ? plural(total, 'piece') : 'Nothing recorded yet'}</span></div>
       <div class="lb-box">${bCode(b.id)}</div>
-      <table><tbody>${list.slice(0, max).map(([st, g]) => `<tr><td class="s">${esc(st)}</td><td>${esc([g.type, [...g.colors].join(', ')].filter(Boolean).join(': '))}</td><td class="q">${nf(g.qty)}</td></tr>`).join('')}</tbody></table>
+      <table><tbody>${list.slice(0, max).map(([st, g]) => `<tr><td class="s">${esc(st)}</td><td>${esc([g.type, [...g.colors].join(', ')].filter(Boolean).join(': '))}${sizesOf(g.sizes).length ? ` <span style="white-space:nowrap">(${esc(sizesOf(g.sizes).join(' '))})</span>` : ''}</td><td class="q">${nf(g.qty)}</td></tr>`).join('')}</tbody></table>
       ${list.length > max ? `<div class="more">and ${plural(list.length - max, 'more style')}. See the pallet breakdown.</div>` : ''}</div>`;
   };
   const pages = []; for (let i = 0; i < boxes.length; i += per) pages.push(boxes.slice(i, i + per));
@@ -1245,11 +1280,32 @@ const act = {
   async 'reopen-pallet'(el){ await setStatus('pallets', +el.dataset.id, 'open'); },
   'add-more'(){ const f = readForm(); f.more.push(''); pack.form = f; pack.err = ''; const p = pack.photo; render(); if (p) showPhoto(p); const i = document.querySelectorAll('.k-more'); if (i.length) i[i.length - 1].focus(); },
   'del-more'(el){ const f = readForm(); f.more.splice(+el.dataset.n, 1); pack.form = f; const p = pack.photo; render(); if (p) showPhoto(p); },
-  qty(el){ const i = $('#k-qty'); i.value = Math.max(1, (parseInt(i.value, 10) || 0) + (+el.dataset.d)); },
+  qty(el){ const i = $('#' + el.dataset.for); if (!i) return; i.value = Math.max(1, (parseInt(i.value, 10) || 0) + (+el.dataset.d)); updateTotals(); },
+  'toggle-size'(el){
+    const f = readForm(), z = el.dataset.size;
+    if (f.sizes.length === 1 && f.tag) f.sizes[0].tag = f.tag;              // the single tag field belongs to that size
+    const k = f.sizes.findIndex(x => x.size === z);
+    if (k >= 0) f.sizes.splice(k, 1); else f.sizes.push({ size: z, qty: 1, tag: f.sizes.length ? '' : f.tag });
+    f.tag = f.sizes.length === 1 ? (f.sizes[0].tag || '') : '';
+    f.sizes.sort((a, b) => bySize(a.size, b.size));
+    if (f.sizes.length !== 1) f.more = [];                    // more boxes only when one size is packed
+    pack.form = f; pack.err = ''; const p = pack.photo; const y = scrollY; render(); if (p) showPhoto(p); scrollTo(0, y);
+  },
+  'other-size'(){
+    openSheet(`<h2>Other size</h2><label class="f" for="os">Size, for example 32, 32x34, 4T or 10</label>
+      <input id="os" type="text" autocomplete="off" autocapitalize="characters" autofocus>
+      <div class="row" style="margin-top:16px"><button class="btn alt" data-act="close-sheet">Cancel</button><button class="btn" data-act="other-size-add">Add size</button></div>`);
+  },
+  'other-size-add'(){
+    const z = $('#os').value.trim().toUpperCase().replace(/\s+/g, ''); closeSheet(); if (!z) return;
+    const f = readForm(); if (!f.sizes.some(x => x.size === z)) f.sizes.push({ size: z, qty: 1, tag: '' });
+    f.sizes.sort((a, b) => bySize(a.size, b.size)); if (f.sizes.length !== 1) f.more = [];
+    pack.form = f; const p = pack.photo; const y = scrollY; render(); if (p) showPhoto(p); scrollTo(0, y);
+  },
   async 'save-item'(){
     const f = readForm(); pack.form = f;
     const miss = !pack.photo ? 'Take a photo of the item first.' : !f.color ? 'Type the color.' : !f.brand ? 'Type the brand.'
-      : !(f.qty >= 1) ? 'Quantity must be 1 or more.' : f.more.some(q => !(q >= 1)) ? 'Type the quantity for each new box, or remove it.' : !f.type ? 'Choose the type.' : f.type === '__other' ? 'Type what kind of item it is.' : !f.gender ? 'Pick a gender.' : !f.season ? 'Pick a season.' : '';
+      : !f.sizes.length ? 'Choose the size.' : f.sizes.some(z => !(z.qty >= 1)) ? 'Type the quantity for each size.' : f.more.some(q => !(q >= 1)) ? 'Type the quantity for each new box, or remove it.' : !f.type ? 'Choose the type.' : f.type === '__other' ? 'Type what kind of item it is.' : !f.gender ? 'Pick a gender.' : !f.season ? 'Pick a season.' : '';
     const showErr = m => { pack.err = m; const p = pack.photo; render(); if (p) showPhoto(p); };
     if (miss) return showErr(miss);
     await withBusy('Saving to the database', async () => {
@@ -1257,35 +1313,33 @@ const act = {
         const id = pack.id, path = id + '.jpg';
         const [full, thumb] = await Promise.all([shrink(pack.photo, 1400, .82), shrink(pack.photo, 280, .72)]);
         await Promise.all([uploadPhoto(path, full), uploadPhoto('thumb/' + path, thumb)]);
-        const row = { id, style_number: pack.style, box_id: pack.box, item_type: f.type, color: f.color, brand: f.brand, tag_number: f.tag, quantity: f.qty,
+        const row = { style_number: pack.style, box_id: pack.box, item_type: f.type, color: f.color, brand: f.brand, tag_number: f.tag,
           gender: f.gender, season: f.season, photo_path: path, created_by: me.name };
+        // one line per size, all with this photo; the same ids are reused if Save is tapped again after a lost reply
+        pack.ids = pack.ids || {}; f.sizes.forEach((z, n) => { if (!pack.ids[z.size]) pack.ids[z.size] = n === 0 ? id : uuid(); });
+        if (!pack.moreIds || pack.moreIds.length !== f.more.length) pack.moreIds = f.more.map(() => uuid());
+        const r = await rpc('save_entry', { p: row,
+          p_sizes: f.sizes.map(z => ({ id: pack.ids[z.size], size: z.size, qty: z.qty, tag_number: f.sizes.length > 1 ? z.tag : f.tag })),
+          p_more: f.more.map((q, n) => ({ id: pack.moreIds[n], qty: q })) });
+        await loadAll();
+        const total = f.sizes.reduce((a, z) => a + z.qty, 0) + f.more.reduce((a, b) => a + b, 0);
         let msg;
         if (f.more.length) {
-          // the same ids are reused if this is tapped again after a lost reply
-          if (!pack.moreIds || pack.moreIds.length !== f.more.length) pack.moreIds = f.more.map(() => uuid());
-          const r = await rpc('save_item', { p: row, p_more: f.more.map((q, n) => ({ id: pack.moreIds[n], qty: q })) });
-          await loadAll();
-          const boxes = [pack.box, ...r.boxes], qtys = [f.qty, ...f.more];
-          msg = `Saved ${nf(qtys.reduce((a, b) => a + b, 0))} x ${pack.style} ${f.color}: ` + boxes.map((b, n) => `${bCode(b)}: ${nf(qtys[n])}${n < boxes.length - 1 ? ' (full)' : ''}`).join(', ')
+          const boxes = [pack.box, ...r.boxes], qtys = [f.sizes[0].qty, ...f.more];
+          msg = `Saved ${nf(total)} x ${pack.style} ${f.color} size ${f.sizes[0].size}: ` + boxes.map((b, n) => `${bCode(b)}: ${nf(qtys[n])}${n < boxes.length - 1 ? ' (full)' : ''}`).join(', ')
             + `. Write ${r.boxes.map(bCode).join(' and ')} on the new ${r.boxes.length > 1 ? 'boxes' : 'box'}. You are now in ${bCode(boxes[boxes.length - 1])}.`;
           pack.box = boxes[boxes.length - 1];
         } else {
-          let saved;
-          try { saved = await db.insert('items', row); }
-          catch (e) {             // a retry after a lost reply: the row may already be there
-            const again = e.code === '23505' ? await db.get('items', 'select=*&id=' + eq(id)) : [];
-            if (!again[0]) throw e; saved = again[0];
-          }
-          data.items.push(saved);
-          msg = `Saved ${nf(f.qty)} x ${pack.style} ${f.color} in ${bCode(pack.box)}. Next color: take the photo.`;
+          msg = `Saved ${pack.style} ${f.color} in ${bCode(pack.box)}: ${f.sizes.map(z => `${z.size} x ${nf(z.qty)}`).join(', ')}${f.sizes.length > 1 ? ` (${nf(total)} pieces)` : ''}. Next color: take the photo.`;
         }
         pack.last = { pallet: pack.pallet, box: pack.box }; store.set('last', pack.last);
         store.set('lastForm', { type: f.type, brand: f.brand, gender: f.gender, season: f.season });
         if (navigator.vibrate) navigator.vibrate(40);
-        Object.assign(pack, { id: uuid(), moreIds: null, photo: null, colors: null, err: '', justSaved: true, form: { ...f, color: '', tag: '', qty: 1, more: [] }, saved: msg });
+        Object.assign(pack, { id: uuid(), ids: null, moreIds: null, photo: null, colors: null, err: '', justSaved: true,
+          form: { ...f, color: '', tag: '', sizes: f.sizes.map(z => ({ size: z.size, qty: 1, tag: '' })), more: [] }, saved: msg });
         render(); scrollTo(0, 0);
       } catch (e) {
-        showErr(needsUpdate(e) ? 'The database needs the latest setup script before items can go into more than one box.' : /STYLE_PALLET/.test(e.message) ? 'This style belongs on a different pallet. Start the style again to see where it goes.' : e.code === '23503' ? 'This box or style was removed by someone. Tap "Start another style" and enter the style again.' : e.message + ' Tap Save item to try again.');
+        showErr(needsUpdate(e) ? 'The database needs the latest setup script before sizes can be saved.' : /STYLE_PALLET/.test(e.message) ? 'This style belongs on a different pallet. Start the style again to see where it goes.' : e.code === '23503' ? 'This box or style was removed by someone. Tap "Start another style" and enter the style again.' : e.message + ' Tap Save item to try again.');
       }
     });
   },
@@ -1311,6 +1365,7 @@ const act = {
       quantity: parseInt($('#e-qty').value, 10), gender: $('#e-gender').value, season: $('#e-season').value };
     const et = $('#e-type').value, etype = et === '__other' ? $('#e-type-other').value.trim() : et;
     if (etype) patch.item_type = etype;
+    patch.size = $('#e-size').value.trim().toUpperCase().replace(/^ONE SIZE$/, 'One size');
     if (!patch.color || !patch.brand || !(patch.quantity >= 1)) return $('#e-err').innerHTML = '<div class="err">Color, brand and a quantity of 1 or more are needed.</div>';
     closeSheet(); await mutate('Saving changes', () => db.update('items', 'id=' + eq(el.dataset.id), patch), 'Saved changes');
   },
@@ -1441,8 +1496,8 @@ document.querySelectorAll('.mf-pal').forEach(function(p){p.hidden=!p.querySelect
   'export-csv'(){
     const { rows } = exportRows(); if (!rows.length) return toast('There is nothing to export yet.', 'bad');
     const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const lines = [['Pallet','Box','Style number','Type','Color','Brand','Tag number','Quantity','Gender','Season','Packed by','Packed at','Photo']]
-      .concat(rows.sort((a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id).map(r => [pCode(r.pallet_id), bCode(r.box_id), r.style_number, r.item_type, r.color, r.brand, r.tag_number, r.quantity, r.gender, r.season, r.created_by, r.created_at, photoUrl(r.photo_path)]));
+    const lines = [['Pallet','Box','Style number','Type','Color','Size','Brand','Tag number','Quantity','Gender','Season','Packed by','Packed at','Photo']]
+      .concat(rows.sort((a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id).map(r => [pCode(r.pallet_id), bCode(r.box_id), r.style_number, r.item_type, r.color, r.size, r.brand, r.tag_number, r.quantity, r.gender, r.season, r.created_by, r.created_at, photoUrl(r.photo_path)]));
     download(`inventory-${fileStamp()}.csv`, '﻿' + lines.map(l => l.map(cell).join(',')).join('\r\n'), 'text/csv');
     toast('Downloaded', 'good');
   },
@@ -1528,12 +1583,13 @@ document.addEventListener('change', e => {
   }
 });
 document.addEventListener('change', e => { if (e.target.id === 'p-label') { labelSize = e.target.value; store.set('labels', labelSize); } });
-document.addEventListener('input', e => { if (e.target.id === 'k-color') delete e.target.dataset.auto; });
+document.addEventListener('input', e => { if (e.target.id === 'k-color') delete e.target.dataset.auto; if (e.target.matches && e.target.matches('.szq, .k-more')) updateTotals(); });
 document.addEventListener('input', e => { if (e.target.id === 'inv-q') { filt.q = e.target.value; invLimit = 150; renderInvList(); } });
 document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.id === 'os') { e.preventDefault(); act['other-size-add'](); }
   if (e.key === 'Enter' && e.target.id === 'k-style') act['check-style']();
-  if (e.key === 'Enter' && e.target.id === 'k-color') { e.preventDefault(); const q = $('#k-qty'); q.focus(); q.select(); }
-  if (e.key === 'Enter' && ['k-qty', 'k-tag', 'k-brand'].includes(e.target.id)) { e.preventDefault(); e.target.blur(); }
+  if (e.key === 'Enter' && e.target.id === 'k-color') { e.preventDefault(); const q = $('.szq'); if (q) { q.focus(); q.select(); } else e.target.blur(); }
+  if (e.key === 'Enter' && (['k-tag', 'k-brand'].includes(e.target.id) || e.target.classList.contains('szq') || e.target.classList.contains('szt'))) { e.preventDefault(); e.target.blur(); }
   if (e.key === 'Escape' && sheetOpen()) closeSheet();
 });
 window.addEventListener('afterprint', () => $('#print-root').innerHTML = '');
