@@ -1204,14 +1204,13 @@ async function composePro(cutBlob, origBlob){
   for (let y = 0; y < bw; y++) for (let x = 0; x < bw; x++) if (B[(y * bw + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   if (x1 < 0) throw new Error('No garment was found in the photo.');
   const pad = 2 / k2, bx = Math.max(0, x0 / k2 - pad), by = Math.max(0, y0 / k2 - pad), bwid = Math.min(Dg - bx, (x1 - x0 + 1) / k2 + 2 * pad), bhei = Math.min(Dg - by, (y1 - y0 + 1) / k2 + 2 * pad);
-  // the item fills the picture: a tight frame in the item's own shape, with a thin white edge
-  const pd = Math.max(bwid, bhei) * POL.edge, fw = bwid + 2 * pd, fh = bhei + 2 * pd;
-  const sc = Math.min(POL.size / Math.max(fw, fh), 2.2), OW = Math.round(fw * sc), OH = Math.round(fh * sc);
+  // always a square picture; the item fills it, leaving only a thin white edge on its longer side
+  const OW = POL.size, OH = POL.size, sc = Math.min(OW * (1 - 2 * POL.edge) / Math.max(bwid, bhei), 2.2), dw = bwid * sc, dh = bhei * sc;
   const out = canvasOf(OW, OH), ox = out.getContext('2d');
   ox.fillStyle = '#fff'; ox.fillRect(0, 0, OW, OH);
   ox.imageSmoothingQuality = 'high';
   ox.shadowColor = 'rgba(0,0,0,.10)'; ox.shadowBlur = 18; ox.shadowOffsetY = 6;     // a soft shadow on the backdrop, outside the garment
-  ox.drawImage(rot, bx, by, bwid, bhei, pd * sc, pd * sc, bwid * sc, bhei * sc);
+  ox.drawImage(rot, bx, by, bwid, bhei, (OW - dw) / 2, (OH - dh) / 2, dw, dh);
   const T = 320, ts = Math.min(T / OW, T / OH), th2 = canvasOf(T, T), tx = th2.getContext('2d');
   tx.fillStyle = '#fff'; tx.fillRect(0, 0, T, T); tx.imageSmoothingQuality = 'high';
   tx.drawImage(out, (T - OW * ts) / 2, (T - OH * ts) / 2, OW * ts, OH * ts);
@@ -2085,7 +2084,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.8';
+const APP_VERSION = '2026-11-22.9';
 let newVersion = false;
 async function checkVersion(){
   try {
