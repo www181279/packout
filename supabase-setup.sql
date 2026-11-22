@@ -472,5 +472,43 @@ begin
 end;
 $$;
 
+
+-- 6. Change history -------------------------------------------
+-- Every add, change and delete is copied here, with the phone's name and time,
+-- so mistakes or deliberate damage can be traced and undone. Phones cannot read
+-- or erase it; only the owner sees it in the Supabase dashboard.
+create table if not exists packout_private.history (
+  id        bigint generated always as identity primary key,
+  at        timestamptz not null default now(),
+  tbl       text not null,
+  op        text not null,
+  by_name   text,
+  old_row   jsonb,
+  new_row   jsonb
+);
+revoke all on packout_private.history from public, anon, authenticated;
+
+create or replace function packout_private.record_change()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare v_by text := nullif(current_setting('request.headers', true), '')::json ->> 'x-packout-name';
+begin
+  insert into packout_private.history (tbl, op, by_name, old_row, new_row)
+  values (tg_table_name, tg_op, v_by,
+          case when tg_op <> 'INSERT' then to_jsonb(old) end,
+          case when tg_op <> 'DELETE' then to_jsonb(new) end);
+  return null;
+end;
+$$;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['pallets', 'boxes', 'styles', 'items', 'settings'] loop
+    execute format('drop trigger if exists packout_history on public.%I', t);
+    execute format('create trigger packout_history after insert or update or delete on public.%I for each row execute function packout_private.record_change()', t);
+  end loop;
+end;
+$$;
+
 -- Tell the API about the new tables right away.
 notify pgrst, 'reload schema';

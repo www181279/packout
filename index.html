@@ -398,7 +398,7 @@ async function call(path, { method = 'GET', body, headers = {}, timeout = 20000,
   let res;
   try {
     res = await fetch(c.url + path, { method, body, signal: ctrl.signal, cache: 'no-store',
-      headers: { apikey: c.key, Authorization: 'Bearer ' + c.key, ...(c.team ? { 'x-packout-team': c.team } : {}), ...headers } });
+      headers: { apikey: c.key, Authorization: 'Bearer ' + c.key, ...(c.team ? { 'x-packout-team': c.team } : {}), ...(me && me.name ? { 'x-packout-name': encodeURIComponent(me.name).slice(0, 120) } : {}), ...headers } });
   } catch (e) {
     throw new ApiError('No connection to the database. Check the internet on this phone and try again. Nothing was lost.', 0, 'NETWORK');
   } finally { clearTimeout(t); }
@@ -933,8 +933,16 @@ const colorHintHTML = () => pack.colors && pack.colors.length ? `<span class="sm
 /* ---------- barcode scanner (camera) ---------- */
 const SCAN_LIB = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
 let scanner = null;
+// Outside libraries are pinned to an exact version and checked against a fingerprint, so a changed file is refused.
+const SRI = {
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/dist/umd/supabase.js': 'sha384-A97u3Qnt9GZHURO9YJZRe7VQgGUeFzcv6I1oIGnUTxQrCxnpQMwR0/G8F2zt9abZ',
+  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js': 'sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+',
+  'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js': 'sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F',
+  'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js': 'sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1'
+};
 function loadScript(src){
   return new Promise((ok, no) => { const el = document.createElement('script'); el.src = src; el.onload = ok;
+    if (SRI[src]) { el.integrity = SRI[src]; el.crossOrigin = 'anonymous'; }
     el.onerror = () => { el.remove(); no(new Error('This part of the app could not load. Check the internet on this phone.')); }; document.head.appendChild(el); });
 }
 function stopScanner(){
@@ -971,7 +979,7 @@ async function openScanner(target){
 }
 
 /* ---------- text reader (photo of the tag) ---------- */
-const OCR_LIB = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+const OCR_LIB = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
 let ocrWorker = null, ocrRun = 0;
 function ocrRows(text){
   const seen = new Set();
@@ -1742,7 +1750,8 @@ document.querySelectorAll('.mf-pal').forEach(function(p){p.hidden=!p.querySelect
   },
   'export-csv'(){
     const { rows } = exportRows(); if (!rows.length) return toast('There is nothing to export yet.', 'bad');
-    const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    // a cell that starts like a formula is written as text, so a spreadsheet never runs it
+    const cell = v => { let t = String(v ?? ''); if (/^[=+@\t\r]/.test(t) || /^-[^0-9]/.test(t)) t = "'" + t; return `"${t.replace(/"/g, '""')}"`; };
     const lines = [['Pallet','Box','Style number','Type','Color','Size','Brand','Tag number','Quantity','Gender','Season','Packed by','Packed at','Photo']]
       .concat(rows.sort((a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id).map(r => [pCode(r.pallet_id), bCode(r.box_id), r.style_number, r.item_type, r.color, r.size, r.brand, r.tag_number, r.quantity, r.gender, r.season, r.created_by, r.created_at, fullUrl(r)]));
     download(`inventory-${fileStamp()}.csv`, '﻿' + lines.map(l => l.map(cell).join(',')).join('\r\n'), 'text/csv');
