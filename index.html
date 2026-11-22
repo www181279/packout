@@ -117,6 +117,10 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .qty{display:grid;grid-template-columns:56px 1fr 56px;gap:8px}
 .qty button{border:1.5px solid var(--ink);border-radius:8px;background:#fff;font-size:26px;font-weight:600;line-height:1}
 .qty input{text-align:center;font:700 26px/1 var(--sign)}
+.withscan{display:flex;gap:8px}.withscan input{flex:1;min-width:0}.withscan .btn{width:auto;flex:none;min-height:50px;padding:8px 14px}
+.withscan svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+#scan-view{border-radius:10px;overflow:hidden;background:#0b1220;min-height:220px;margin-bottom:12px}
+#scan-view video{width:100%!important;display:block}
 .saved{background:var(--go-bg);border-left:4px solid var(--go);border-radius:6px;padding:10px 12px;margin-bottom:12px;font-weight:500}
 
 /* pallets */
@@ -288,7 +292,7 @@ async function withBusy(label, fn){
   finally { if (--busyN === 0) $('#busy').classList.remove('on'); }
 }
 function openSheet(html){ $('#toast').className = ''; $('#sheet .card').innerHTML = html; $('#sheet').classList.add('on'); const f = $('#sheet [autofocus]'); if (f) f.focus(); }
-function closeSheet(){ $('#sheet').classList.remove('on'); $('#sheet .card').innerHTML = ''; }
+function closeSheet(){ stopScanner(); $('#sheet').classList.remove('on'); $('#sheet .card').innerHTML = ''; }
 const sheetOpen = () => $('#sheet').classList.contains('on');
 
 /* ---------- Supabase over plain HTTPS (no library needed) ---------- */
@@ -448,7 +452,7 @@ function packHTML(){
     ${pack.saved ? `<div class="saved">${esc(pack.saved)}</div>` : ''}
     <div class="panel">
       <label class="f" for="k-style">Style number</label>
-      <input id="k-style" type="text" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(pack.style)}">
+      <div class="withscan"><input id="k-style" type="text" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(pack.style)}"><button type="button" class="btn alt" data-act="scan" data-target="style" aria-label="Scan a barcode with the camera"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>Scan</button></div>
       ${err}
       <button class="btn" data-act="check-style" style="margin-top:14px">Check style</button>
     </div>`;
@@ -507,7 +511,7 @@ function packHTML(){
       <input id="k-brand" type="text" list="l-brand" autocomplete="off" value="${esc(f.brand)}">
       <datalist id="l-brand">${uniq('brand').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <label class="f" for="k-tag">Tag number <small>(optional)</small></label>
-      <input id="k-tag" type="text" autocomplete="off" autocapitalize="characters" value="${esc(f.tag)}">
+      <div class="withscan"><input id="k-tag" type="text" autocomplete="off" autocapitalize="characters" value="${esc(f.tag)}"><button type="button" class="btn alt" data-act="scan" data-target="tag" aria-label="Scan a barcode with the camera"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>Scan</button></div>
       <label class="f" for="k-qty">Quantity</label>
       <div class="qty"><button type="button" data-act="qty" data-d="-1" aria-label="One less">&minus;</button>
         <input id="k-qty" type="number" inputmode="numeric" min="1" value="${esc(f.qty)}">
@@ -646,6 +650,46 @@ function itemSheet(id, edit){
     <div id="e-err"></div>
     <div class="row" style="margin-top:18px"><button class="btn alt" data-act="open-item" data-id="${i.id}">Cancel</button><button class="btn" data-act="save-edit" data-id="${i.id}">Save changes</button></div>
     <button class="btn danger" data-act="del-item" data-id="${i.id}" style="margin-top:10px">Delete this item</button>`);
+}
+
+/* ---------- barcode scanner (camera) ---------- */
+const SCAN_LIB = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+let scanner = null;
+function loadScript(src){
+  return new Promise((ok, no) => { const el = document.createElement('script'); el.src = src; el.onload = ok;
+    el.onerror = () => { el.remove(); no(new Error('The scanner could not load. Check the internet on this phone.')); }; document.head.appendChild(el); });
+}
+function stopScanner(){
+  const sc = scanner; scanner = null;
+  if (sc) Promise.resolve().then(() => sc.stop()).then(() => sc.clear()).catch(() => {});
+}
+async function openScanner(target){
+  openSheet(`<h2>Scan the ${target === 'style' ? 'style' : 'tag'} barcode</h2>
+    <div id="scan-view"></div><div id="scan-msg"><p class="lead">Starting the camera</p></div>
+    <button class="btn alt" data-act="close-sheet">Cancel</button>`);
+  const say = html => { const m = $('#scan-msg'); if (m) m.innerHTML = html; };
+  try {
+    if (!window.Html5Qrcode) await loadScript(SCAN_LIB);
+    if (!$('#scan-view')) return;
+    const sc = new Html5Qrcode('scan-view', { experimentalFeatures: { useBarCodeDetectorIfSupported: true }, verbose: false });
+    scanner = sc; let done = false;
+    await sc.start({ facingMode: 'environment' },
+      { fps: 12, qrbox: (w, h) => ({ width: Math.max(60, Math.floor(w * .9)), height: Math.max(60, Math.floor(Math.min(h * .55, 190))) }) },
+      text => {
+        if (done || scanner !== sc) return; done = true;
+        const val = String(text).trim();
+        closeSheet(); if (navigator.vibrate) navigator.vibrate(60);
+        if (target === 'style') { const i = $('#k-style'); if (i) { i.value = val; act['check-style'](); } }
+        else { const i = $('#k-tag'); if (i) { i.value = val; toast('Tag ' + val, 'good'); } }
+      }, () => {});
+    if (scanner !== sc) return sc.stop().then(() => sc.clear()).catch(() => {});   // closed while starting
+    say('<p class="lead">Hold the barcode inside the frame. It reads on its own.</p>');
+  } catch (e) {
+    scanner = null;
+    const m = String(e && (e.name || '') + ' ' + (e.message || e));
+    say(`<div class="err">${/NotAllowed|Permission/i.test(m) ? 'The camera is blocked for this app. Allow the camera in the browser settings, then try again. You can still type the number.'
+      : /NotFound|Overconstrained/i.test(m) ? 'No camera was found on this device. Type the number instead.' : esc(e.message || 'The camera could not start.') + ' You can still type the number.'}</div>`);
+  }
 }
 
 /* ---------- style: move, edit, delete ---------- */
@@ -923,6 +967,8 @@ const act = {
       <div class="row"><button class="btn alt" data-act="open-item" data-id="${el.dataset.id}">Keep it</button><button class="btn danger" data-act="del-item-yes" data-id="${el.dataset.id}">Delete</button></div>`);
   },
   async 'del-item-yes'(el){ closeSheet(); const it = data.items.find(i => i.id === el.dataset.id); await mutate('Deleting', async () => { await db.remove('items', 'id=' + eq(el.dataset.id)); await removePhotos([it && it.photo_path]); }, 'Deleted'); },
+
+  scan(el){ openScanner(el.dataset.target); },
 
   /* styles */
   'open-style'(el){ styleSheet(el.dataset.style); },
