@@ -1371,7 +1371,7 @@ async function doMove(st, target){
       render();
       const to = pCode(r.to_pallet), steps = [
         ...(target ? [] : [`Write <b>${to}</b> on the new pallet.`]),
-        ...r.moved_boxes.map(b => `Carry <b>${bCode(b.box)}</b> (${plural(b.pieces, 'piece')}) from ${pCode(r.from_pallet)} to ${to}.`),
+        ...r.moved_boxes.map(b => `Carry ${bCode(b.box)} (${plural(b.pieces, 'piece')}) from ${pCode(r.from_pallet)} to ${to}${b.new_box && b.new_box !== b.box ? ` and change its number to <b>${bCode(b.new_box)}</b>` : ''}.`),
         ...r.repack.map(b => `${bCode(b.from_box)} also holds other styles, so it stays. Take the ${plural(b.pieces, 'piece')} of ${esc(st)} out of it, put them in a new box, write <b>${bCode(b.to_box)}</b> on it and place it on ${to}.`)];
       openSheet(`<h2>Style ${esc(st)} now belongs on ${to}</h2>
         <div class="placard"><div class="in"><p>Moved from ${pCode(r.from_pallet)} to</p><div class="code">${to}</div></div></div>
@@ -2064,7 +2064,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.4';
+const APP_VERSION = '2026-11-22.5';
 let newVersion = false;
 async function checkVersion(){
   try {
