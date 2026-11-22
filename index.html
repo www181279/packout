@@ -48,6 +48,7 @@ h1,h2,h3,p{margin:0}
 #view.wide{max-width:1180px}
 #nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--paper);border-top:1px solid var(--line);
   display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom)}
+#nav button[hidden]{display:none}
 #nav button{border:0;background:none;padding:9px 4px 8px;display:grid;justify-items:center;gap:2px;font-size:13px;font-weight:500;color:var(--ink2)}
 #nav svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #nav button[aria-current=page]{color:var(--ink);font-weight:600}
@@ -110,6 +111,10 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .szname{font:700 26px/1 var(--sign)}
 .sztag{margin-top:8px}.sztag input{height:44px;font-size:16px}.sztag .btn{min-height:44px}
 .sztotal{margin-top:8px;font-weight:600;color:var(--ink)}
+.switchrow{display:flex;gap:12px;align-items:flex-start;margin-top:12px;cursor:pointer}
+.switchrow input{width:24px;height:24px;flex:none;margin-top:2px;accent-color:var(--ink)}
+.tagbtn{margin-top:10px}.tagbtn svg,.tagbtn2 svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.tagbtn2{min-height:46px;font-size:16px;margin-bottom:4px}
 .morebox{margin-top:4px}.morerow{display:flex;gap:8px}.morerow input{flex:1;text-align:center;font:700 24px/1 var(--sign)}.morerow .btn{width:auto;flex:none;min-height:50px}
 .addmore{display:block;margin-top:10px}
 .savedacts{margin-top:10px}.savedacts .btn{flex:1;font-size:15px}
@@ -393,7 +398,7 @@ async function call(path, { method = 'GET', body, headers = {}, timeout = 20000,
   let res;
   try {
     res = await fetch(c.url + path, { method, body, signal: ctrl.signal, cache: 'no-store',
-      headers: { apikey: c.key, Authorization: 'Bearer ' + c.key, ...headers } });
+      headers: { apikey: c.key, Authorization: 'Bearer ' + c.key, ...(c.team ? { 'x-packout-team': c.team } : {}), ...headers } });
   } catch (e) {
     throw new ApiError('No connection to the database. Check the internet on this phone and try again. Nothing was lost.', 0, 'NETWORK');
   } finally { clearTimeout(t); }
@@ -431,11 +436,31 @@ async function uploadPhoto(path, blob){
 }
 // Remove photo files for deleted items. Best effort: the inventory rows are already gone.
 async function removePhotos(paths){
-  const prefixes = paths.filter(Boolean).flatMap(p => [p, 'thumb/' + p]);
+  const prefixes = paths.filter(Boolean).flatMap(p => [p, 'thumb/' + p, 'pro/' + p, 'pro/thumb/' + p]);
   if (prefixes.length) try { await call(`/storage/v1/object/${BUCKET}`, { method: 'DELETE', body: JSON.stringify({ prefixes }), headers: { 'Content-Type': 'application/json' } }); } catch {}
 }
+async function fnCall(name, body){
+  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 90000);
+  try {
+    const r = await fetch(`${cfg.url}/functions/v1/${name}`, { method: 'POST', signal: ctrl.signal,
+      headers: { apikey: cfg.key, 'Content-Type': 'application/json', ...(cfg.team ? { 'x-packout-team': cfg.team } : {}) }, body: JSON.stringify(body) });
+    if (!r.ok) { let d = {}; try { d = await r.json(); } catch {} throw new ApiError(d.message || d.error || `The ${name} service answered ${r.status}.`, r.status, d.error || (r.status === 404 ? 'NO_FUNCTION' : 'FN')); }
+    return r;
+  } catch (e) { if (e instanceof ApiError) throw e; throw new ApiError('No connection to the photo service. Check the internet.', 0, 'NETWORK'); }
+  finally { clearTimeout(t); }
+}
+const notSetUp = e => e && (e.code === 'NO_KEY' || e.code === 'NO_FUNCTION');
+function blobToB64(b){ return new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = no; r.readAsDataURL(b); }); }
+let settings = {}, settingsLoaded = false;
+const setting = k => settings[k] && settings[k].value;
+async function loadSettings(){ try { const rows = await call('/rest/v1/settings?select=*'); settings = Object.fromEntries(rows.map(r => [r.key, r])); } catch { /* table not created yet */ } }
+async function saveSetting(k, value){
+  await call('/rest/v1/settings?on_conflict=key', { method: 'POST', body: JSON.stringify({ key: k, value }), headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' } });
+  settings[k] = { key: k, value };
+}
 const photoUrl = (path, c = cfg) => path ? `${c.url}/storage/v1/object/public/${BUCKET}/${path}` : '';
-const thumbUrl = it => it.photo_path ? photoUrl('thumb/' + it.photo_path) : '';
+const thumbUrl = it => it.photo_path ? photoUrl((it.photo_pro ? 'pro/thumb/' : 'thumb/') + it.photo_path) : '';
+const fullUrl = it => it.photo_path ? photoUrl((it.photo_pro ? 'pro/' : '') + it.photo_path) : '';
 
 function shrink(file, max, quality){
   return new Promise((resolve, reject) => {
@@ -493,7 +518,9 @@ function applyKeep(){
 async function loadAll(){
   const [pallets, boxes, styles, items] = await Promise.all(['pallets','boxes','styles','items'].map(t => db.all(t)));
   data = { pallets, boxes, styles, items }; loaded = true;
+  if (!settingsLoaded) { settingsLoaded = true; loadSettings(); }
   rebuildIdx();
+  setTimeout(polishTick, 1500);
   setSync(true);
 }
 function rebuildIdx(){
@@ -552,8 +579,10 @@ function render(){
   $('#who').innerHTML = me ? `<b>${esc(me.name)}</b>` : '';
   const v = $('#view'); v.classList.toggle('wide', tab === 'inventory' && !!cfg && !!me);
   if (!cfg) { $('#nav').hidden = true; return v.innerHTML = connectHTML(); }
+  if (cfg.view) { if (!me || !me.view) { me = { name: 'View only', view: true }; store.set('me', me); } if (tab === 'pack') tab = 'inventory'; $('#who').innerHTML = '<b>View only</b>'; }
   if (!me)  { $('#nav').hidden = true; return v.innerHTML = whoHTML(); }
-  $('#nav').hidden = false; $('#help').hidden = false;
+  $('#nav').hidden = false; $('#help').hidden = !!cfg.view;
+  $('#nav').style.gridTemplateColumns = cfg.view ? 'repeat(3,1fr)' : ''; $('#nav [data-tab=pack]').hidden = !!cfg.view;
   document.querySelectorAll('#nav button').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   validatePack();
   v.innerHTML = ({ pack: packHTML, pallets: palletsHTML, inventory: inventoryHTML, more: moreHTML })[tab]();
@@ -615,7 +644,8 @@ function packHTML(){
     <div class="panel">
       <label class="f" for="k-style">Style number</label>
       <input id="k-style" type="text" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(pack.style)}">
-      <div class="tools2"><label class="btn alt filebtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M8 9h8M12 9v7"/></svg>Read the style from the tag<input id="k-ocr" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to read the style number"></label></div>
+      <div class="tools2"><label class="btn alt filebtn tagbtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Take a photo of the tag<input id="k-tagphoto" data-where="style" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in the style and details"></label></div>
+      <p class="small muted" style="margin-top:8px">The app reads the style, color, size, type and brand from the tag. Check them before saving.</p>
       ${err}
       <button class="btn" data-act="check-style" style="margin-top:14px">Check style</button>
     </div>`;
@@ -658,7 +688,8 @@ function packHTML(){
 
   // item form: the fields that change every time come first; the ones that carry over sit below
   const prev = data.items.filter(i => i.style_number === pack.style).slice(-1)[0] || store.get('lastForm') || {};
-  const f = pack.form || { type: prev.item_type || prev.type || '', brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', sizes: [], more: [] };
+  let f = pack.form || { type: prev.item_type || prev.type || '', brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', sizes: [], more: [] };
+  if (!pack.form && pack.tagRead) { f = mergeTag(f, pack.tagRead); pack.tagRead = null; pack.form = f; }
   const sizes = f.sizes || [];
   const typeOther = f.type === '__other' || (f.type && !ALL_TYPES.includes(f.type) && !data.items.some(i => i.item_type === f.type));
   const more = f.more || [];
@@ -670,6 +701,8 @@ function packHTML(){
     <div class="panel">
       <div class="photo" id="k-photo-wrap">${pack.reuse && !pack.photo ? `<img alt="Same photo as the last box" src="${esc(photoUrl(pack.reuse.path))}"><span class="again">Same photo. Tap to retake</span>` : '<span>Tap to take a photo of the item</span>'}
         <input id="k-photo" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the item"></div>
+      <label class="btn alt filebtn tagbtn2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Read the tag for this color<input id="k-tagphoto" data-where="item" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in this item"></label>
+      ${pack.tagNote ? `<div class="note">${esc(pack.tagNote)}</div>` : ''}
       <label class="f" for="k-color">Color</label>
       <input id="k-color" type="text" list="l-color" autocomplete="off" enterkeyhint="next" value="${esc(f.color)}">
       <div id="k-colorhint" class="chint">${colorHintHTML()}</div>
@@ -718,7 +751,7 @@ function readForm(){
   return { type, color: $('#k-color').value.trim(), brand: $('#k-brand').value.trim(), tag: tagEl ? tagEl.value.trim() : '',
     sizes, more: [...document.querySelectorAll('.k-more')].map(i => i.value === '' ? '' : parseInt(i.value, 10)), gender: $('input[name=k-gender]:checked')?.value || '', season: $('input[name=k-season]:checked')?.value || '' };
 }
-function packFail(e){ pack.err = e.message; render(); }
+function packFail(e){ pack.err = isDenied(e) ? DENIED_MSG : e.message; render(); }
 
 /* ---------- screens: pallets ---------- */
 function palletsHTML(){
@@ -744,21 +777,21 @@ function palletDetailHTML(p){
     <div class="code">${pCode(p.id)}</div>
     <p>${plural(boxes.length, 'box')}, ${plural(styles.length, 'style')}, ${plural(sumQty(its), 'piece')}. Started by ${esc(p.created_by)}.</p>
   </div></div>
-  <div class="row" style="margin-bottom:12px">
+  ${canEdit() ? `<div class="row" style="margin-bottom:12px">
     <button class="btn alt sm" data-act="toggle-pallet" data-id="${p.id}">${p.status === 'open' ? 'Close pallet' : 'Reopen pallet'}</button>
     ${!boxes.length && !styles.length ? `<button class="btn danger sm" data-act="del-pallet" data-id="${p.id}">Delete</button>` : ''}
-  </div>
+  </div>` : ''}
   ${boxes.length ? `<div class="row" style="margin-bottom:12px">
     <button class="btn quiet sm" data-act="print-sheets" data-id="${p.id}">Print breakdown</button>
     <button class="btn quiet sm" data-act="print-labels" data-id="${p.id}">Print box labels</button></div>` : ''}
   ${styles.length ? `<div class="panel"><h2>Styles on this pallet</h2><ul class="lines">${styles.map(s => { const si = itemsOf('style_number', s.style_number); return `
     <li><span><b>${esc(s.style_number)}</b><br><span class="muted small">${plural(sumQty(si), 'piece')} in ${plural(new Set(si.map(i => i.box_id)).size, 'box')}</span></span>
-      <button class="btn quiet sm" style="margin-left:auto" data-act="open-style" data-style="${esc(s.style_number)}">Move or edit</button></li>`; }).join('')}</ul></div>` : ''}
+      ${canEdit() ? `<button class="btn quiet sm" style="margin-left:auto" data-act="open-style" data-style="${esc(s.style_number)}">Move or edit</button>` : ''}</li>`; }).join('')}</ul></div>` : ''}
   ${boxes.map(b => { const bi = itemsOf('box_id', b.id); return `
     <div class="panel"><div class="boxhead"><span class="code">${bCode(b.id)}</span>
       <span class="muted small">${plural(sumQty(bi), 'piece')}, by ${esc(b.created_by)}</span>
       ${b.status === 'closed' ? '<span class="badge closed">Closed</span>' : ''}
-      <button class="linkbtn small" style="margin-left:auto" data-act="${bi.length ? 'toggle-box' : 'del-box'}" data-id="${b.id}">${bi.length ? (b.status === 'open' ? 'Close box' : 'Reopen box') : 'Delete empty box'}</button>
+      ${canEdit() ? `<button class="linkbtn small" style="margin-left:auto" data-act="${bi.length ? 'toggle-box' : 'del-box'}" data-id="${b.id}">${bi.length ? (b.status === 'open' ? 'Close box' : 'Reopen box') : 'Delete empty box'}</button>` : '<span style="margin-left:auto"></span>'}
       ${bi.length ? `<button class="linkbtn small" data-act="print-labels" data-box="${b.id}">Print label</button>` : ''}</div>
       ${bi.length ? `<ul class="lines">${bi.map(i => `<li><span><b>${esc(i.style_number)}</b> ${esc(i.color)}${i.size ? ', ' + esc(i.size) : ''}<br><span class="muted small">${esc([i.item_type, i.brand].filter(Boolean).join(', '))}</span></span><span class="n">${nf(i.quantity)}</span></li>`).join('')}</ul>` : ''}
     </div>`; }).join('') || `<div class="empty"><b>No boxes on this pallet yet</b></div>`}`;
@@ -817,14 +850,15 @@ function filterSheet(){
 function itemSheet(id, edit){
   const i = joined().find(x => x.id === id); if (!i) return closeSheet();
   if (!edit) return openSheet(`
-    ${i.photo_path ? `<img class="big" alt="Photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(photoUrl(i.photo_path))}">` : ''}
+    ${i.photo_path ? `<img class="big" id="big-photo" alt="Photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(fullUrl(i))}">
+      ${i.photo_pro ? `<button class="linkbtn small" data-act="flip-photo" data-a="${esc(fullUrl(i))}" data-b="${esc(photoUrl(i.photo_path))}" style="margin:-6px 0 8px">Show the original photo</button>` : ''}` : ''}
     <h2>${esc(i.style_number)}</h2>
     <dl class="facts"><dt>Where</dt><dd>${pCode(i.pallet_id)}, ${bCode(i.box_id)}</dd>
       <dt>Type</dt><dd>${esc(i.item_type || 'Not set')}</dd><dt>Size</dt><dd>${esc(i.size || 'Not set')}</dd><dt>Color</dt><dd>${esc(i.color)}</dd><dt>Brand</dt><dd>${esc(i.brand)}</dd><dt>Tag number</dt><dd>${esc(i.tag_number || 'None')}</dd>
       <dt>Quantity</dt><dd>${nf(i.quantity)}</dd><dt>Gender</dt><dd>${esc(i.gender)}</dd><dt>Season</dt><dd>${esc(i.season)}</dd>
       <dt>Packed by</dt><dd>${esc(i.created_by)}, ${new Date(i.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</dd></dl>
-    <div class="row"><button class="btn alt" data-act="edit-item" data-id="${i.id}">Edit</button><button class="btn" data-act="close-sheet">Done</button></div>
-    <button class="btn quiet" data-act="open-style" data-style="${esc(i.style_number)}" style="margin-top:10px">Move, edit or delete the whole style</button>`);
+    ${canEdit() ? `<div class="row"><button class="btn alt" data-act="edit-item" data-id="${i.id}">Edit</button><button class="btn" data-act="close-sheet">Done</button></div>
+    <button class="btn quiet" data-act="open-style" data-style="${esc(i.style_number)}" style="margin-top:10px">Move, edit or delete the whole style</button>` : '<button class="btn" data-act="close-sheet">Done</button>'}`);
   const sel = (id, vals, cur) => `<select id="${id}">${vals.map(v => `<option ${v === cur ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
   openSheet(`<h2>Edit ${esc(i.style_number)}</h2>
     <label class="f" for="e-type">Type</label>${typeSelect('e-type', i.item_type)}
@@ -944,6 +978,171 @@ function ocrRows(text){
   return String(text || '').split(/\n+/).map(l => l.replace(/[^A-Za-z0-9 \-_\/.#]/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase())
     .filter(l => l.replace(/[^A-Z0-9]/g, '').length >= 2 && !seen.has(l) && seen.add(l)).slice(0, 14);
 }
+/* ---------- photo polishing ----------
+   The server cuts the garment out of the backdrop (it never draws or changes the garment).
+   Here on the phone: remove the hanger hook, straighten a small tilt, center on white, optional tint correction. */
+const POL = { size: 1600, fill: .86 };
+let polishBusy = false, polishOff = false;
+const polishQ = () => store.get('polishQ') || [];
+function enqueuePolish(paths){
+  const q = polishQ(), have = new Set(q.map(x => x.path));
+  paths.filter(p => p && !have.has(p)).forEach(p => q.push({ path: p, tries: 0 }));
+  store.set('polishQ', q); polishOff = false; setTimeout(polishTick, 300);
+}
+function polishCountText(){
+  const all = [...new Set(data.items.map(i => i.photo_path).filter(Boolean))];
+  const done = new Set(data.items.filter(i => i.photo_pro).map(i => i.photo_path)).size;
+  const q = polishQ().length;
+  return `${nf(done)} of ${plural(all.length, 'photo')}${q ? `, ${nf(q)} waiting on this phone` : ''}`;
+}
+async function polishTick(){
+  if (polishBusy || polishOff || !cfg || !canEdit() || !navigator.onLine) return;
+  const q = polishQ(); if (!q.length) return;
+  const job = q[0];
+  if (data.items.some(i => i.photo_path === job.path && i.photo_pro) || !data.items.some(i => i.photo_path === job.path)) {
+    store.set('polishQ', polishQ().filter(x => x.path !== job.path)); return setTimeout(polishTick, 50);
+  }
+  polishBusy = true;
+  try {
+    const cut = await (await fnCall('polish-photo', { path: job.path })).blob();
+    const orig = setting('color_correct') ? await fetch(photoUrl(job.path)).then(r => r.ok ? r.blob() : null).catch(() => null) : null;
+    const { full, thumb } = await composePro(cut, orig);
+    await Promise.all([uploadPhoto('pro/' + job.path, full), uploadPhoto('pro/thumb/' + job.path, thumb)]);
+    await call('/rest/v1/items?photo_path=' + eq(job.path), { method: 'PATCH', body: JSON.stringify({ photo_pro: true }), headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' } });
+    data.items.forEach(i => { if (i.photo_path === job.path) i.photo_pro = true; });
+    store.set('polishQ', polishQ().filter(x => x.path !== job.path));
+    if (!sheetOpen() && !busyN && tab !== 'pack') softRender();
+    const pc = $('#pol-count'); if (pc) pc.textContent = polishCountText();
+  } catch (e) {
+    if (notSetUp(e) || isDenied(e) || needsUpdate(e) || ['42703', 'PGRST204'].includes(e.code)) polishOff = true;          // not switched on yet: keep the list, try again next time the app opens
+    else if (e.code !== 'NETWORK') { const q2 = polishQ(); const j = q2.find(x => x.path === job.path); if (j && ++j.tries >= 3) q2.splice(q2.indexOf(j), 1); else if (j) q2.push(q2.splice(q2.indexOf(j), 1)[0]); store.set('polishQ', q2); }
+  } finally {
+    polishBusy = false;
+    if (!polishOff && polishQ().length) setTimeout(polishTick, 1500);
+  }
+}
+window.addEventListener('online', () => setTimeout(polishTick, 1000));
+const loadImg = blob => new Promise((ok, no) => { const u = URL.createObjectURL(blob), im = new Image(); im.onload = () => { ok(im); setTimeout(() => URL.revokeObjectURL(u), 0); }; im.onerror = () => no(new Error('The photo could not be opened.')); im.src = u; });
+function canvasOf(w, h){ const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
+const toJpeg = (c, q) => new Promise(ok => c.toBlob(ok, 'image/jpeg', q));
+async function composePro(cutBlob, origBlob){
+  const im = await loadImg(cutBlob);
+  const W = im.naturalWidth, H = im.naturalHeight;
+  const cut = canvasOf(W, H), cx = cut.getContext('2d'); cx.drawImage(im, 0, 0);
+  // small copy of the mask for measuring
+  const k = Math.min(1, 480 / Math.max(W, H)), aw = Math.max(1, Math.round(W * k)), ah = Math.max(1, Math.round(H * k));
+  const a = canvasOf(aw, ah).getContext('2d'); a.drawImage(cut, 0, 0, aw, ah);
+  const A = a.getImageData(0, 0, aw, ah).data;
+  const on = (x, y) => A[(y * aw + x) * 4 + 3] > 128;
+  // 1. hanger hook: thin rows above the garment (less than 10% of its widest row)
+  const widths = []; let maxW = 0, top = -1, bottom = -1;
+  for (let y = 0; y < ah; y++) { let n = 0; for (let x = 0; x < aw; x++) if (on(x, y)) n++; widths.push(n); if (n) { if (top < 0) top = y; bottom = y; } maxW = Math.max(maxW, n); }
+  if (top < 0) throw new Error('No garment was found in the photo.');
+  let cutRow = 0;
+  if (maxW > 0) {
+    let r = top; while (r <= bottom && widths[r] < maxW * .10) r++;
+    if (r > top && r - top < (bottom - top) * .3) cutRow = r;
+  }
+  if (cutRow) cx.clearRect(0, 0, W, Math.ceil(cutRow / k));
+  // 2. tilt, from the shape's moments (only a clear, small tilt of a long shape)
+  let sx = 0, sy = 0, n = 0;
+  for (let y = cutRow; y < ah; y++) for (let x = 0; x < aw; x++) if (on(x, y)) { sx += x; sy += y; n++; }
+  let angle = 0;
+  if (n > 50) {
+    const mx = sx / n, my = sy / n; let m20 = 0, m02 = 0, m11 = 0;
+    for (let y = cutRow; y < ah; y++) for (let x = 0; x < aw; x++) if (on(x, y)) { const dx = x - mx, dy = y - my; m20 += dx * dx; m02 += dy * dy; m11 += dx * dy; }
+    const th = .5 * Math.atan2(2 * m11, m20 - m02), half = (m20 + m02) / 2, d = Math.sqrt(((m20 - m02) / 2) ** 2 + m11 ** 2);
+    const elong = Math.sqrt((half + d) / Math.max(1e-6, half - d));
+    const dev = th > 0 ? th - Math.PI / 2 : th + Math.PI / 2, deg = Math.abs(dev) * 180 / Math.PI;
+    if (elong > 1.4 && deg >= .8 && deg <= 7) angle = -dev;
+  }
+  // 3. optional tint correction from the white backdrop (whole picture, same amount everywhere)
+  if (origBlob) try {
+    const o = await loadImg(origBlob); const b = canvasOf(aw, ah).getContext('2d'); b.drawImage(o, 0, 0, aw, ah);
+    const O = b.getImageData(0, 0, aw, ah).data; let r = 0, g = 0, bl = 0, c = 0;
+    for (let i = 0; i < O.length; i += 4) if (A[i + 3] < 10) { const l = (O[i] + O[i + 1] + O[i + 2]) / 3; if (l > 140) { r += O[i]; g += O[i + 1]; bl += O[i + 2]; c++; } }
+    if (c > aw * ah * .05) {
+      const m = (r + g + bl) / 3, cl = v => Math.min(1.12, Math.max(.9, v)), gr = cl(m / r), gg = cl(m / g), gb = cl(m / bl);
+      if (Math.max(Math.abs(gr - 1), Math.abs(gg - 1), Math.abs(gb - 1)) > .015) {
+        const D = cx.getImageData(0, 0, W, H), P = D.data;
+        for (let i = 0; i < P.length; i += 4) { P[i] = P[i] * gr; P[i + 1] = P[i + 1] * gg; P[i + 2] = P[i + 2] * gb; }
+        cx.putImageData(D, 0, 0);
+      }
+    }
+  } catch { /* keep the camera's colors */ }
+  // 4. rotate, find the garment's edges, center it on white
+  const Dg = Math.ceil(Math.hypot(W, H)), rot = canvasOf(Dg, Dg), rx = rot.getContext('2d');
+  rx.translate(Dg / 2, Dg / 2); rx.rotate(angle); rx.drawImage(cut, -W / 2, -H / 2);
+  const k2 = Math.min(1, 480 / Dg), bw = Math.round(Dg * k2), b2 = canvasOf(bw, bw).getContext('2d'); b2.drawImage(rot, 0, 0, bw, bw);
+  const B = b2.getImageData(0, 0, bw, bw).data; let x0 = bw, y0 = bw, x1 = -1, y1 = -1;
+  for (let y = 0; y < bw; y++) for (let x = 0; x < bw; x++) if (B[(y * bw + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) throw new Error('No garment was found in the photo.');
+  const pad = 2 / k2, bx = Math.max(0, x0 / k2 - pad), by = Math.max(0, y0 / k2 - pad), bwid = Math.min(Dg - bx, (x1 - x0 + 1) / k2 + 2 * pad), bhei = Math.min(Dg - by, (y1 - y0 + 1) / k2 + 2 * pad);
+  const S = POL.size, sc = Math.min(S * POL.fill / bwid, S * POL.fill / bhei, 2.2), dw = bwid * sc, dh = bhei * sc;
+  const out = canvasOf(S, S), ox = out.getContext('2d');
+  ox.fillStyle = '#fff'; ox.fillRect(0, 0, S, S);
+  ox.imageSmoothingQuality = 'high';
+  ox.shadowColor = 'rgba(0,0,0,.10)'; ox.shadowBlur = 28; ox.shadowOffsetY = 10;     // a soft shadow on the backdrop, outside the garment
+  ox.drawImage(rot, bx, by, bwid, bhei, (S - dw) / 2, (S - dh) / 2, dw, dh);
+  const th2 = canvasOf(320, 320), tx = th2.getContext('2d'); tx.imageSmoothingQuality = 'high'; tx.drawImage(out, 0, 0, 320, 320);
+  return { full: await toJpeg(out, .9), thumb: await toJpeg(th2, .78) };
+}
+
+/* ---------- tag reading: the AI reader on the server, the on-phone text reader as a fallback ---------- */
+let tagRun = 0;
+function mergeTag(f, t){
+  f = { ...f, sizes: [...(f.sizes || [])], more: [...(f.more || [])] };
+  const known = t.upc && data.items.find(i => i.tag_number && i.tag_number.replace(/\D/g, '') === t.upc);
+  if (known) Object.assign(f, { type: known.item_type || f.type, brand: known.brand || f.brand, gender: known.gender || f.gender, season: known.season || f.season });
+  if (t.item_type) f.type = t.item_type;
+  if (t.brand) f.brand = t.brand;
+  if (t.gender) f.gender = t.gender;
+  if (t.color && (!f.color || f.colorAuto)) { f.color = t.color; f.colorAuto = false; }
+  pack.colorCode = t.color_code && t.color === t.color_code ? t.color_code.toUpperCase() : null;
+  const size = t.size && String(t.size).trim().toUpperCase();
+  if (size && !f.sizes.some(z => z.size === size)) { f.sizes.push({ size, qty: 1, tag: '' }); f.sizes.sort((a, b) => bySize(a.size, b.size)); f.more = []; }
+  if (t.upc) {
+    if (f.sizes.length > 1) { const z = f.sizes.find(z => z.size === size); if (z && !z.tag) z.tag = t.upc; }
+    else if (!f.tag) f.tag = t.upc;
+  }
+  pack.tagNote = t.notes ? 'From the tag: ' + t.notes : '';
+  return f;
+}
+function tagFactsHTML(t){
+  const rows = [['Style', t.style], ['Color', t.color], ['Size', t.size], ['Type', t.item_type], ['Brand', t.brand], ['Gender', t.gender], ['Barcode', t.upc], ['Description', t.description]].filter(r => r[1]);
+  return rows.length ? `<dl class="facts">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : '';
+}
+async function readTag(file, where){
+  const run = ++tagRun, url = URL.createObjectURL(file);
+  const again = `<label class="btn alt filebtn">Take the photo again<input id="k-tagphoto" data-where="${where}" type="file" accept="image/*" capture="environment"></label>`;
+  openSheet(`<h2>Reading the tag</h2><img class="big" style="max-height:26vh" src="${url}" alt="Your photo of the tag">
+    <div id="tag-out"><p class="lead">Reading the style, color, size and brand. This takes a few seconds.</p></div>
+    <button class="btn quiet" data-act="close-sheet" style="margin-top:10px">Cancel</button>`);
+  try {
+    const body = { tag: await blobToB64(await shrink(file, 1600, .9)), types: ALL_TYPES, sizes: SIZES, style: where === 'item' ? pack.style : '' };
+    if (where === 'item' && pack.photo) body.item = await blobToB64(await shrink(pack.photo, 900, .8));
+    const t = await (await fnCall('read-tag', body)).json();
+    if (run !== tagRun || !$('#tag-out')) return;
+    t.style = normStyle(t.style);
+    pack.lastTag = { t, file, where };
+    const other = where === 'item' && t.style && t.style !== pack.style;
+    const known = where === 'style' && t.style && styleRow(t.style);
+    $('#sheet h2').textContent = 'From the tag';
+    $('#tag-out').innerHTML = tagFactsHTML(t)
+      + (t.notes ? `<div class="note">Check: ${esc(t.notes)}</div>` : '')
+      + (other ? `<div class="err">This tag says style ${esc(t.style)}, but you are packing ${esc(pack.style)}. Make sure it is the right piece.</div>` : '')
+      + (known ? `<p class="small muted">Style ${esc(t.style)} is already on ${pCode(known.pallet_id)}.</p>` : '')
+      + (where === 'style'
+        ? (t.style ? `<button class="btn" data-act="tag-use">Use style ${esc(t.style)}</button>` : `<div class="err">The style number was not clear on this photo.</div>`)
+          + `<button class="btn alt" data-act="tag-ocr">Pick the style from the text myself</button>`
+        : `<button class="btn" data-act="tag-use">Fill in the form</button>`)
+      + again;
+  } catch (e) {
+    if (run !== tagRun || !$('#tag-out')) return;
+    if (where === 'style' && (notSetUp(e) || e.code === 'NETWORK')) return runOcr(file);    // the AI reader is not available: use the text reader on the phone
+    $('#tag-out').innerHTML = `<div class="err">${esc(notSetUp(e) ? 'Tag reading is not switched on yet. Type the details.' : e.message)}</div>` + again;
+  } finally { URL.revokeObjectURL(url); }
+}
 async function runOcr(file){
   const run = ++ocrRun, url = URL.createObjectURL(file);
   const again = `<label class="btn alt filebtn">Take the photo again<input id="k-ocr" type="file" accept="image/*" capture="environment"></label>`;
@@ -979,7 +1178,7 @@ async function runOcr(file){
 function guideSheet(first){
   openSheet(`<h2>${first ? 'How packing works' : 'How to use Packout'}</h2>
     <ol class="guide">
-      <li><b class="n">1</b><span><strong>Enter the style number</strong>Type it, or tap Read the style from the tag and photograph the tag.</span></li>
+      <li><b class="n">1</b><span><strong>Enter the style number</strong>Type it, or tap Take a photo of the tag. The app fills in the style, color, size, type and brand.</span></li>
       <li><b class="n">2</b><span><strong>Follow the pallet the app shows</strong>A new style goes in your box. If the style was already started, the app shows its pallet. Take the pieces there.</span></li>
       <li><b class="n">3</b><span><strong>One entry per color</strong>Take the photo, check the color, set the quantity, tap Save item. Then photograph the next color.</span></li>
       <li><b class="n">4</b><span><strong>When a box is full</strong>After saving, tap <em>Same color, next box</em> to keep going with the same photo, or <em>Box full</em> at the top. Write the new box number on the box. <em>Next style</em> when the style is done.</span></li>
@@ -1094,13 +1293,21 @@ function moreHTML(){
   ${isStandalone() ? '' : `<div class="panel"><h2>Open it full screen, like an app</h2>
     <p class="muted small" style="margin-bottom:12px">A phone browser always shows its address bar on a web page. To hide it, add Packout to this phone's home screen and open it from there.</p>
     <button class="btn alt" data-act="install">Add to home screen</button></div>`}
+  ${canEdit() ? `<div class="panel"><h2>Item photos</h2>
+    <p class="muted small" style="margin-bottom:10px">Each saved photo is cleaned up on its own: background and hanger hook removed, straightened and centered on white. The garment itself is never changed, and the original is kept.</p>
+    <dl class="facts"><dt>Polished</dt><dd id="pol-count">${polishCountText()}</dd></dl>
+    <label class="switchrow"><input type="checkbox" id="set-cc" ${setting('color_correct') ? 'checked' : ''}><span><b>Correct the color tint</b><br><span class="muted small">Uses the white backdrop to remove a yellow or blue tint from the camera. Off keeps colors exactly as the camera took them.</span></span></label>
+    <button class="btn alt" data-act="polish-all" style="margin-top:12px">Polish the remaining photos</button></div>
+  <div class="panel"><h2>Manager view</h2>
+    <p class="muted small" style="margin-bottom:12px">A link that shows pallets, boxes, inventory and exports, but cannot add, change or delete anything.</p>
+    <button class="btn alt" data-act="share-view">Share the view-only link</button></div>
   <div class="panel"><h2>Invite employees</h2>
     <p class="muted small" style="margin-bottom:12px">Show the join code and let the employee scan it with their phone camera, or send them the link. Either way they only type their name.</p>
     <button class="btn" data-act="join-code">Show join code</button>
-    <button class="btn alt" data-act="invite">Share invite link</button></div>
+    <button class="btn alt" data-act="invite">Share invite link</button></div>` : ''}
   <div class="panel"><h2>This phone</h2>
-    <dl class="facts"><dt>Name</dt><dd>${esc(me.name)}</dd><dt>Database</dt><dd style="word-break:break-all">${esc(cfg.url.replace('https://', ''))}</dd></dl>
-    <button class="btn quiet" data-act="change-who">Change name</button>
+    <dl class="facts"><dt>Name</dt><dd>${esc(me.name)}</dd><dt>Access</dt><dd>${cfg.view ? 'View only' : cfg.team ? 'Team (can pack)' : 'Team'}</dd><dt>Database</dt><dd style="word-break:break-all">${esc(cfg.url.replace('https://', ''))}</dd></dl>
+    ${canEdit() ? '<button class="btn quiet" data-act="change-who">Change name</button>' : ''}
     <button class="btn quiet" data-act="disconnect">Disconnect this phone</button></div>`;
 }
 function exportRows(){
@@ -1177,7 +1384,12 @@ function download(name, text, type){
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
 const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
-const joinHash = withName => '#join=' + btoa(unescape(encodeURIComponent(JSON.stringify({ u: cfg.url, k: cfg.key, ...(withName && me ? { n: me.name } : {}) }))));
+const b64json = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const joinHash = withName => '#join=' + b64json({ u: cfg.url, k: cfg.key, ...(cfg.team ? { t: cfg.team } : {}), ...(withName && me ? { n: me.name } : {}) });
+const viewLink = () => location.origin + location.pathname + '#view=' + b64json({ u: cfg.url, k: cfg.key });
+const canEdit = () => !!cfg && !cfg.view;
+const isDenied = e => e && (e.code === '42501' || /row-level security|permission denied/i.test(e.message || ''));
+const DENIED_MSG = 'This phone can only view the inventory. To pack, open the team link from the owner.';
 const fileStamp = () => new Date().toISOString().slice(0, 10);
 async function embedThumbs(rows){
   const map = new Map(), todo = rows.filter(r => r.photo_path); let done = 0;
@@ -1344,17 +1556,18 @@ const act = {
           p_sizes: f.sizes.map(z => ({ id: pack.ids[z.size], size: z.size, qty: z.qty, tag_number: f.sizes.length > 1 ? z.tag : f.tag })),
           p_more: [] });
         await loadAll();
+        if (!reuse) enqueuePolish([path]);
         const total = f.sizes.reduce((a, z) => a + z.qty, 0);
         const msg = `Saved ${pack.style} ${f.color} in ${bCode(pack.box)}: ${f.sizes.map(z => `${z.size} x ${nf(z.qty)}`).join(', ')}${f.sizes.length > 1 ? ` (${nf(total)} pieces)` : ''}.`;
         pack.last = { pallet: pack.pallet, box: pack.box }; store.set('last', pack.last);
         store.set('lastForm', { type: f.type, brand: f.brand, gender: f.gender, season: f.season });
         if (navigator.vibrate) navigator.vibrate(40);
-        Object.assign(pack, { id: uuid(), ids: null, photo: null, reuse: null, colors: null, err: '', justSaved: true, runPath: path,
+        Object.assign(pack, { id: uuid(), ids: null, photo: null, reuse: null, colors: null, err: '', justSaved: true, runPath: path, tagNote: '', colorCode: null,
           lastEntry: { path, color: f.color, type: f.type, brand: f.brand, gender: f.gender, season: f.season },
           form: { ...f, color: '', tag: '', sizes: f.sizes.map(z => ({ size: z.size, qty: 1, tag: '' })), more: [] }, saved: msg });
         render(); scrollTo(0, 0);
       } catch (e) {
-        showErr(needsUpdate(e) ? 'The database needs the latest setup script before sizes can be saved.' : /STYLE_PALLET/.test(e.message) ? 'This style belongs on a different pallet. Start the style again to see where it goes.' : e.code === '23503' ? 'This box or style was removed by someone. Tap "Start another style" and enter the style again.' : e.message + ' Tap Save item to try again.');
+        showErr(isDenied(e) ? DENIED_MSG : needsUpdate(e) ? 'The database needs the latest setup script before sizes can be saved.' : /STYLE_PALLET/.test(e.message) ? 'This style belongs on a different pallet. Start the style again to see where it goes.' : e.code === '23503' ? 'This box or style was removed by someone. Tap "Start another style" and enter the style again.' : e.message + ' Tap Save item to try again.');
       }
     });
   },
@@ -1394,6 +1607,25 @@ const act = {
   guide(){ guideSheet(false); },
   'join-code'(){ joinCodeSheet(); },
   'use-color'(el){ const i = $('#k-color'); if (i) { i.value = el.dataset.v; delete i.dataset.auto; } },
+  'tag-use'(){
+    const L = pack.lastTag; closeSheet(); if (!L) return;
+    if (L.where === 'style') { pack.tagRead = L.t; const i = $('#k-style'); if (i) { i.value = L.t.style; act['check-style'](); } return; }
+    const ph = pack.photo; pack.form = mergeTag(readForm(), L.t); pack.err = ''; const y = scrollY; render(); if (ph) showPhoto(ph); scrollTo(0, y);
+    toast('Filled in from the tag. Check the quantity.', 'good');
+  },
+  'flip-photo'(el){ const im = $('#big-photo'); if (!im) return; const showB = im.src === el.dataset.a; im.src = showB ? el.dataset.b : el.dataset.a; el.textContent = showB ? 'Show the polished photo' : 'Show the original photo'; },
+  'polish-all'(){
+    const todo = [...new Set(data.items.filter(i => i.photo_path && !i.photo_pro).map(i => i.photo_path))];
+    if (!todo.length) return toast('All photos are already polished.', 'good');
+    enqueuePolish(todo); toast(`Polishing ${plural(todo.length, 'photo')}. Keep the app open; it continues next time if you close it.`, 'good');
+    const pc = $('#pol-count'); if (pc) pc.textContent = polishCountText();
+  },
+  async 'share-view'(){
+    const url = viewLink(), text = 'Packout, view only. Open on your phone to see the pallets, boxes and inventory as we pack. Nothing can be changed from this link.';
+    try { if (navigator.share) return await navigator.share({ title: 'Packout, view only', text, url }); } catch (e) { if (e.name === 'AbortError') return; }
+    try { await navigator.clipboard.writeText(url); toast('View-only link copied.', 'good'); } catch { openSheet(`<h2>View-only link</h2><p class="lead">Copy this link and send it.</p><textarea readonly style="width:100%;min-height:120px">${esc(url)}</textarea><button class="btn" data-act="close-sheet">Done</button>`); }
+  },
+  'tag-ocr'(){ const L = pack.lastTag; if (L) runOcr(L.file); },
   'ocr-pick'(el){
     const v = normStyle(el.dataset.v); closeSheet();
     const i = $('#k-style'); if (!i) return;
@@ -1512,7 +1744,7 @@ document.querySelectorAll('.mf-pal').forEach(function(p){p.hidden=!p.querySelect
     const { rows } = exportRows(); if (!rows.length) return toast('There is nothing to export yet.', 'bad');
     const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const lines = [['Pallet','Box','Style number','Type','Color','Size','Brand','Tag number','Quantity','Gender','Season','Packed by','Packed at','Photo']]
-      .concat(rows.sort((a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id).map(r => [pCode(r.pallet_id), bCode(r.box_id), r.style_number, r.item_type, r.color, r.size, r.brand, r.tag_number, r.quantity, r.gender, r.season, r.created_by, r.created_at, photoUrl(r.photo_path)]));
+      .concat(rows.sort((a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id).map(r => [pCode(r.pallet_id), bCode(r.box_id), r.style_number, r.item_type, r.color, r.size, r.brand, r.tag_number, r.quantity, r.gender, r.season, r.created_by, r.created_at, fullUrl(r)]));
     download(`inventory-${fileStamp()}.csv`, '﻿' + lines.map(l => l.map(cell).join(',')).join('\r\n'), 'text/csv');
     toast('Downloaded', 'good');
   },
@@ -1559,7 +1791,7 @@ async function claim(palletId, isNew){
 async function mutate(label, fn, okMsg){
   await withBusy(label, async () => {
     try { await fn(); await loadAll(); if (okMsg) toast(okMsg, 'good'); }
-    catch (e) { toast(e.code === '23503' ? 'This still has things on it, so it can\'t be deleted.' : e.message, 'bad'); }
+    catch (e) { toast(isDenied(e) ? DENIED_MSG : e.code === '23503' ? 'This still has things on it, so it can\'t be deleted.' : e.message, 'bad'); }
     render();
   });
 }
@@ -1587,15 +1819,23 @@ document.addEventListener('change', e => {
       pack.colors = names;
       const hint = $('#k-colorhint'), inp = $('#k-color');
       if (hint) hint.innerHTML = colorHintHTML();
-      if (inp && names[0] && (!inp.value.trim() || inp.dataset.auto === '1')) { inp.value = names[0]; inp.dataset.auto = '1'; }
+      if (inp && names[0] && pack.colorCode && inp.value.trim().toUpperCase() === pack.colorCode) inp.value = `${pack.colorCode} (${names[0]})`;
+      else if (inp && names[0] && (!inp.value.trim() || inp.dataset.auto === '1')) { inp.value = names[0]; inp.dataset.auto = '1'; }
     });
   }
   if (e.target.id === 'k-ocr' && e.target.files[0]) { const f = e.target.files[0]; e.target.value = ''; runOcr(f); }
+  if (e.target.id === 'k-tagphoto' && e.target.files[0]) { const f = e.target.files[0], w = e.target.dataset.where || 'style'; e.target.value = ''; readTag(f, w); }
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'k-type' || e.target.id === 'e-type' || e.target.id === 's-type') {
     const o = $('#' + e.target.id + '-other'); if (o) { o.hidden = e.target.value !== '__other'; if (!o.hidden) o.focus(); }
   }
+});
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'set-cc') return;
+  const v = e.target.checked;
+  try { await saveSetting('color_correct', v); toast(v ? 'Tint correction is on for new photos.' : 'Tint correction is off. Colors stay as the camera took them.', 'good'); }
+  catch (er) { e.target.checked = !v; toast(isDenied(er) ? DENIED_MSG : 'Could not save the setting: ' + er.message, 'bad'); }
 });
 document.addEventListener('change', e => { if (e.target.id === 'p-label') { labelSize = e.target.value; store.set('labels', labelSize); } });
 document.addEventListener('input', e => { if (e.target.id === 'k-color') delete e.target.dataset.auto; if (e.target.matches && e.target.matches('.szq, .k-more')) updateTotals(); });
@@ -1644,8 +1884,13 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && cf
 
 /* ---------- start ---------- */
 (async function start(){
-  const m = location.hash.match(/^#join=(.+)$/);
-  if (m) { try { const j = JSON.parse(decodeURIComponent(escape(atob(m[1])))); if (j.u && j.k) { cfg = { url: j.u, key: j.k }; store.set('cfg', cfg); if (j.n && !me) { me = { name: j.n }; store.set('me', me); } } } catch {} if (!isStandalone()) history.replaceState(null, '', location.pathname); }
+  const m = location.hash.match(/^#(join|view)=(.+)$/);
+  if (m) { try { const j = JSON.parse(decodeURIComponent(escape(atob(m[2]))));
+    if (j.u && j.k && m[1] === 'join') { cfg = { url: j.u, key: j.k, ...(j.t ? { team: j.t } : {}) }; store.set('cfg', cfg); if (j.n && !me) { me = { name: j.n }; store.set('me', me); } }
+    if (j.u && j.k && m[1] === 'view') {
+      if (cfg && cfg.team) setTimeout(() => toast('This phone already has the team link, so the view-only link was not applied.', 'bad'), 800);
+      else { cfg = { url: j.u, key: j.k, view: true }; store.set('cfg', cfg); }
+    } } catch {} if (!isStandalone()) history.replaceState(null, '', location.pathname); }
   render();
   if (cfg) { await withBusy('Loading inventory', () => refresh()); render(); startLive(); }
 })();

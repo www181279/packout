@@ -378,27 +378,65 @@ grant execute on function public.rename_style(text, text) to anon, authenticated
 grant execute on function public.delete_style(text) to anon, authenticated;
 
 -- 3. Access for the app ---------------------------------------
--- The app has no logins: anyone who has your invite link can read and
--- write the inventory. Share the link only with your employees.
+-- The app has no logins. Anyone with a link can READ the inventory.
+-- Adding, changing and deleting needs the private team code, which is
+-- only inside the employees' invite link (never in this file). The
+-- manager's view-only link has no team code, so it can only look.
+-- Until a team code is set, every link can write.
+
+alter table public.items add column if not exists photo_pro boolean not null default false;
+
+create table if not exists public.settings (
+  key         text primary key,
+  value       jsonb,
+  updated_at  timestamptz not null default now()
+);
+
+create schema if not exists packout_private;
+revoke all on schema packout_private from public, anon, authenticated;
+create table if not exists packout_private.app_secret (
+  id         int primary key default 1 check (id = 1),
+  team_code  text
+);
+revoke all on packout_private.app_secret from public, anon, authenticated;
+
+create or replace function public.packout_can_write()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select coalesce((
+    select s.team_code is null or s.team_code = ''
+        or s.team_code = coalesce(nullif(current_setting('request.headers', true), '')::json ->> 'x-packout-team', '')
+      from packout_private.app_secret s where s.id = 1), true);
+$$;
+revoke all on function public.packout_can_write() from public;
+grant execute on function public.packout_can_write() to anon, authenticated;
+
+-- Used by the server functions (tag reading, photo polishing) to check the caller.
+create or replace function public.packout_is_team()
+returns boolean language sql stable security invoker set search_path = '' as $$ select public.packout_can_write(); $$;
+grant execute on function public.packout_is_team() to anon, authenticated;
 
 grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete
-  on public.pallets, public.boxes, public.styles, public.items
+  on public.pallets, public.boxes, public.styles, public.items, public.settings
   to anon, authenticated;
 
-alter table public.pallets enable row level security;
-alter table public.boxes   enable row level security;
-alter table public.styles  enable row level security;
-alter table public.items   enable row level security;
-
-drop policy if exists "packout pallets" on public.pallets;
-create policy "packout pallets" on public.pallets for all to anon, authenticated using (true) with check (true);
-drop policy if exists "packout boxes" on public.boxes;
-create policy "packout boxes" on public.boxes for all to anon, authenticated using (true) with check (true);
-drop policy if exists "packout styles" on public.styles;
-create policy "packout styles" on public.styles for all to anon, authenticated using (true) with check (true);
-drop policy if exists "packout items" on public.items;
-create policy "packout items" on public.items for all to anon, authenticated using (true) with check (true);
+do $$
+declare t text;
+begin
+  foreach t in array array['pallets', 'boxes', 'styles', 'items', 'settings'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists "packout %s" on public.%I', t, t);
+    execute format('drop policy if exists "packout %s read" on public.%I', t, t);
+    execute format('drop policy if exists "packout %s add" on public.%I', t, t);
+    execute format('drop policy if exists "packout %s change" on public.%I', t, t);
+    execute format('drop policy if exists "packout %s remove" on public.%I', t, t);
+    execute format('create policy "packout %s read" on public.%I for select to anon, authenticated using (true)', t, t);
+    execute format('create policy "packout %s add" on public.%I for insert to anon, authenticated with check (public.packout_can_write())', t, t);
+    execute format('create policy "packout %s change" on public.%I for update to anon, authenticated using (public.packout_can_write()) with check (public.packout_can_write())', t, t);
+    execute format('create policy "packout %s remove" on public.%I for delete to anon, authenticated using (public.packout_can_write())', t, t);
+  end loop;
+end;
+$$;
 
 -- 4. Photo storage --------------------------------------------
 
@@ -411,20 +449,20 @@ create policy "packout photos read" on storage.objects
   for select to anon, authenticated using (bucket_id = 'item-photos');
 drop policy if exists "packout photos upload" on storage.objects;
 create policy "packout photos upload" on storage.objects
-  for insert to anon, authenticated with check (bucket_id = 'item-photos');
+  for insert to anon, authenticated with check (bucket_id = 'item-photos' and public.packout_can_write());
 drop policy if exists "packout photos replace" on storage.objects;
 create policy "packout photos replace" on storage.objects
-  for update to anon, authenticated using (bucket_id = 'item-photos') with check (bucket_id = 'item-photos');
+  for update to anon, authenticated using (bucket_id = 'item-photos' and public.packout_can_write()) with check (bucket_id = 'item-photos' and public.packout_can_write());
 drop policy if exists "packout photos delete" on storage.objects;
 create policy "packout photos delete" on storage.objects
-  for delete to anon, authenticated using (bucket_id = 'item-photos');
+  for delete to anon, authenticated using (bucket_id = 'item-photos' and public.packout_can_write());
 
 -- 5. Live updates: every phone hears about changes within a second.
 do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['pallets', 'boxes', 'styles', 'items'] loop
+    foreach t in array array['pallets', 'boxes', 'styles', 'items', 'settings'] loop
       if not exists (select 1 from pg_publication_tables
                       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
         execute format('alter publication supabase_realtime add table public.%I', t);
