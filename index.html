@@ -413,7 +413,7 @@ function shrink(file, max, quality){
 
 /* ---------- state ---------- */
 let me = store.get('me');                         // { name }
-let data = { pallets: [], boxes: [], styles: [], items: [] };
+let data = { pallets: [], boxes: [], styles: [], items: [] }, loaded = false;
 let idx = { pal: new Map(), box: new Map(), style: new Map() };
 let tab = 'pack';
 let pack = newPack(store.get('last'), store.get('last'));   // keep filling the box this phone used last
@@ -421,6 +421,19 @@ let palView = null, palMine = false;
 let filt = { q: '', pallet: '', box: '', brand: '', gender: '', season: '', color: '', by: '' }, invLimit = 150, invSort = 'new';
 function newPack(last, keep){ return { stage: 'style', style: '', pallet: null, box: null, known: false, owner: '', err: '', saved: null, photo: null, id: uuid(), last: last || null, keep: keep || null }; }
 // "keep" = the employee asked to put the next style into the same box
+// If the box or style this phone is working on was deleted (here or on another phone), start over cleanly.
+function validatePack(){
+  if (!me || !cfg || !loaded) return false;      // nothing to check against until the data is in
+  if (pack.keep && !idx.box.get(pack.keep.box)) pack.keep = null;
+  if (pack.last && !idx.box.get(pack.last.box)) { pack.last = null; store.del('last'); }
+  const goneBox = (pack.stage === 'item' || pack.stage === 'box') && pack.box && !idx.box.get(pack.box);
+  const goneStyle = (pack.stage === 'item' || pack.stage === 'box') && !styleRow(pack.style);
+  if (!goneBox && !goneStyle) return false;
+  const what = goneBox ? bCode(pack.box) : 'Style ' + pack.style;
+  pack = newPack(pack.last, pack.last && { ...pack.last });
+  pack.saved = `${what} was deleted. Enter the style to continue.`;
+  return true;
+}
 function applyKeep(){
   const k = pack.keep, b = k && idx.box.get(k.box);
   if (k && b && b.status === 'open' && b.pallet_id === pack.pallet) Object.assign(pack, { box: k.box, stage: 'item', form: null, err: '' });
@@ -428,7 +441,7 @@ function applyKeep(){
 
 async function loadAll(){
   const [pallets, boxes, styles, items] = await Promise.all(['pallets','boxes','styles','items'].map(t => db.all(t)));
-  data = { pallets, boxes, styles, items };
+  data = { pallets, boxes, styles, items }; loaded = true;
   idx = { pal: new Map(pallets.map(p => [p.id, p])), box: new Map(boxes.map(b => [b.id, b])), style: new Map(styles.map(s => [s.style_number, s])) };
   setSync(true);
 }
@@ -452,6 +465,7 @@ function render(){
   if (!me)  { $('#nav').hidden = true; return v.innerHTML = whoHTML(); }
   $('#nav').hidden = false; $('#help').hidden = false;
   document.querySelectorAll('#nav button').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+  validatePack();
   v.innerHTML = ({ pack: packHTML, pallets: palletsHTML, inventory: inventoryHTML, more: moreHTML })[tab]();
   if (tab === 'inventory') renderInvList();
   setBars();
@@ -502,7 +516,7 @@ function trailHTML(){
 function packHTML(){
   const err = pack.err ? `<div class="err">${esc(pack.err)}</div>` : '';
   if (pack.stage === 'style') return `
-    ${pack.keep ? `<h1 class="h">Next style for ${bCode(pack.keep.box)}</h1>
+    ${pack.keep && idx.box.get(pack.keep.box) ? `<h1 class="h">Next style for ${bCode(pack.keep.box)}</h1>
     <p class="lead">It goes into ${bCode(pack.keep.box)} on ${pCode(pack.keep.pallet)}, unless this style already belongs on another pallet. <button class="linkbtn" data-act="pack-fresh">Use a different box or pallet</button></p>`
     : `<h1 class="h">Which style are you packing?</h1>
     <p class="lead">Type the style number first. The app checks if this style already has a pallet.</p>`}
@@ -1114,6 +1128,8 @@ const act = {
   },
   async 'choose-box'(el){ pack.box = +el.dataset.id; pack.last = { pallet: pack.pallet, box: pack.box }; store.set('last', pack.last); pack.stage = 'item'; pack.err = ''; pack.form = null; render(); scrollTo(0, 0); },
   async 'new-box'(){
+    if (pack.stage === 'item' && pack.box && !itemsOf('box_id', pack.box).length)
+      return toast(`${bCode(pack.box)} is still empty. Save an item in it first.`, 'bad');
     const wasItem = pack.stage === 'item' ? readForm() : null;     // box filled up mid-style: keep what was typed
     await withBusy('Starting box', async () => {
       try {
@@ -1381,6 +1397,7 @@ document.addEventListener('keydown', e => {
 });
 window.addEventListener('afterprint', () => $('#print-root').innerHTML = '');
 function softRender(){            // refresh what's on screen without disturbing typing
+  if (tab === 'pack') { if (validatePack()) render(); return; }
   if (tab === 'inventory') renderInvList();
   else if (tab === 'pallets') render();
 }

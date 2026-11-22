@@ -257,6 +257,28 @@ begin
 end;
 $$;
 
+-- When the last item of a style or of a box is deleted, the style's pallet
+-- claim and the empty box go too, so nothing is left behind and box numbers are freed.
+create or replace function public.tidy_after_item_delete()
+returns trigger
+language plpgsql
+as $$
+begin
+  if not exists (select 1 from public.items where style_number = old.style_number) then
+    delete from public.styles where style_number = old.style_number;
+  end if;
+  if not exists (select 1 from public.items where box_id = old.box_id) then
+    delete from public.boxes where id = old.box_id;
+  end if;
+  return null;
+end;
+$$;
+
+drop trigger if exists items_tidy on public.items;
+create trigger items_tidy
+  after delete on public.items
+  for each row execute function public.tidy_after_item_delete();
+
 grant execute on function public.move_style(text, bigint, text, text) to anon, authenticated;
 grant execute on function public.rename_style(text, text) to anon, authenticated;
 grant execute on function public.delete_style(text) to anon, authenticated;
