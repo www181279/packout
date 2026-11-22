@@ -374,7 +374,7 @@ let me = store.get('me');                         // { name }
 let data = { pallets: [], boxes: [], styles: [], items: [] };
 let idx = { pal: new Map(), box: new Map(), style: new Map() };
 let tab = 'pack';
-let pack = newPack();
+let pack = newPack(store.get('last'), store.get('last'));   // keep filling the box this phone used last
 let palView = null, palMine = false;
 let filt = { q: '', pallet: '', box: '', brand: '', gender: '', season: '', color: '', by: '' }, invLimit = 150, invSort = 'new';
 function newPack(last, keep){ return { stage: 'style', style: '', pallet: null, box: null, known: false, owner: '', err: '', saved: null, photo: null, id: uuid(), last: last || null, keep: keep || null }; }
@@ -452,7 +452,7 @@ function packHTML(){
   const err = pack.err ? `<div class="err">${esc(pack.err)}</div>` : '';
   if (pack.stage === 'style') return `
     ${pack.keep ? `<h1 class="h">Next style for ${bCode(pack.keep.box)}</h1>
-    <p class="lead">It goes into ${bCode(pack.keep.box)} on ${pCode(pack.keep.pallet)}, unless this style already belongs on another pallet. <button class="linkbtn" data-act="pack-reset">Use a different box or pallet</button></p>`
+    <p class="lead">It goes into ${bCode(pack.keep.box)} on ${pCode(pack.keep.pallet)}, unless this style already belongs on another pallet. <button class="linkbtn" data-act="pack-fresh">Use a different box or pallet</button></p>`
     : `<h1 class="h">Which style are you packing?</h1>
     <p class="lead">Type the style number first. The app checks if this style already has a pallet.</p>`}
     ${pack.saved ? `<div class="saved">${esc(pack.saved)}</div>` : ''}
@@ -531,7 +531,8 @@ function packHTML(){
       ${err}
       <button class="btn" data-act="save-item" style="margin-top:18px">Save item</button>
     </div>
-    <button class="btn alt" data-act="same-box">Add a different style to this box</button>`;
+    <button class="btn alt" data-act="same-box">Next style, same box</button>
+    <button class="btn quiet" data-act="new-box">This box is full. Start a new box</button>`;
 }
 function palPick(p){
   const its = itemsOf('pallet_id', p.id);
@@ -901,7 +902,8 @@ const act = {
   'close-sheet': closeSheet,
 
   /* pack */
-  'pack-reset'(){ pack = newPack(pack.last); render(); },
+  'pack-reset'(){ pack = newPack(pack.last, pack.last && { ...pack.last }); render(); },
+  'pack-fresh'(){ pack = newPack(pack.last); render(); },
   'same-box'(){ pack = newPack(pack.last, { pallet: pack.pallet, box: pack.box }); render(); scrollTo(0, 0); const i = $('#k-style'); if (i) i.focus(); },
   async 'check-style'(){
     const s = normStyle($('#k-style').value);
@@ -938,14 +940,16 @@ const act = {
       } catch (e) { packFail(e); }
     });
   },
-  async 'choose-box'(el){ pack.box = +el.dataset.id; pack.stage = 'item'; pack.err = ''; pack.form = null; render(); scrollTo(0, 0); },
+  async 'choose-box'(el){ pack.box = +el.dataset.id; pack.last = { pallet: pack.pallet, box: pack.box }; store.set('last', pack.last); pack.stage = 'item'; pack.err = ''; pack.form = null; render(); scrollTo(0, 0); },
   async 'new-box'(){
+    const wasItem = pack.stage === 'item' ? readForm() : null;     // box filled up mid-style: keep what was typed
     await withBusy('Starting box', async () => {
       try {
         const b = await db.insert('boxes', { pallet_id: pack.pallet, created_by: me.name });
         data.boxes.push(b); idx.box.set(b.id, b);
-        Object.assign(pack, { box: b.id, stage: 'item', err: '', form: null, saved: `New box. Write ${bCode(b.id)} on it now.` });
-        render(); scrollTo(0, 0);
+        pack.last = { pallet: pack.pallet, box: b.id }; store.set('last', pack.last);
+        Object.assign(pack, { box: b.id, stage: 'item', err: '', form: wasItem, saved: `New box. Write ${bCode(b.id)} on it now.` });
+        render(); scrollTo(0, 0); if (pack.photo) showPhoto(pack.photo);
       } catch (e) { packFail(e); }
     });
   },
@@ -977,7 +981,7 @@ const act = {
           if (!again[0]) throw e; saved = again[0];
         }
         data.items.push(saved);
-        pack.last = { pallet: pack.pallet, box: pack.box };
+        pack.last = { pallet: pack.pallet, box: pack.box }; store.set('last', pack.last);
         Object.assign(pack, { id: uuid(), photo: null, err: '', form: { ...f, color: '', tag: '', qty: 1 },
           saved: `Saved: ${nf(f.qty)} x ${pack.style} ${f.color} in ${bCode(pack.box)} on ${pCode(pack.pallet)}. Add the next color, or start another style.` });
         render(); scrollTo(0, 0); toast('Saved', 'good');
