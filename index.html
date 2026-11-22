@@ -89,12 +89,15 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .trail{position:sticky;top:var(--toph,62px);z-index:15;background:var(--floor);display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-16px -16px 12px;padding:10px 16px;border-bottom:1px solid var(--line)}
 .trail span{background:var(--ink);color:#fff;border-radius:6px;padding:4px 10px;font:700 18px/1.2 var(--sign)}
 .trail span.p{background:var(--placard);color:var(--ink)}
+.trail .stylechip{border:0;background:var(--ink);color:#fff;border-radius:6px;padding:4px 8px 4px 10px;font:700 18px/1.2 var(--sign);display:inline-flex;align-items:center;gap:6px}
+.trail .stylechip i{font-style:normal;font-size:20px;line-height:1;opacity:.75}
 .trail .acts{margin-left:auto;display:flex;gap:6px}
 .trail .acts button{border:1.5px solid var(--ink);background:#fff;color:var(--ink);min-height:36px;border-radius:8px;padding:6px 10px;font-weight:600;font-size:14px;white-space:nowrap}
 .trail > .linkbtn{margin-left:auto}
 /* save bar stays above the bottom tabs */
 .savebar{position:sticky;bottom:var(--navh,64px);z-index:14;margin:0 -16px;padding:10px 16px 12px;background:var(--floor);border-top:1px solid var(--line)}
 .savebar .err{margin:0 0 10px}
+.restart{display:block;margin:0 auto 6px;color:var(--stop)}
 .samehead{display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline;justify-content:space-between;margin:18px 0 0;padding-top:14px;border-top:1px dashed var(--line)}
 .samehead span{font-size:14px;color:var(--ink2)}
 #help{border:1.5px solid rgba(255,255,255,.5);background:none;color:#fff;border-radius:50%;width:34px;height:34px;font-weight:700;font-size:17px;flex:none}
@@ -203,7 +206,7 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .big{width:100%;border-radius:10px;background:#E3E9EF;display:block;margin-bottom:12px;max-height:50vh;object-fit:contain}
 dl.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0 0 14px}
 dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
-#toast{position:fixed;left:16px;right:16px;top:calc(var(--toph,62px) + 8px);z-index:60;margin:auto;max-width:520px;background:var(--ink);color:#fff;border-radius:8px;padding:12px 14px;font-weight:500;display:none}
+#toast{position:fixed;left:16px;right:16px;bottom:calc(var(--navh,64px) + 92px);z-index:60;margin:auto;max-width:520px;background:var(--ink);color:#fff;border-radius:8px;padding:12px 14px;font-weight:500;display:none}
 #toast.on{display:block}#toast.bad{background:var(--stop)}#toast.good{background:var(--go)}
 #busy{position:fixed;inset:0;z-index:70;background:rgba(232,236,239,.82);display:none;place-items:center;text-align:center;font-weight:600}
 #busy.on{display:grid}
@@ -505,7 +508,7 @@ function whoHTML(){
 /* ---------- screens: pack ---------- */
 function trailHTML(){
   return `<div class="trail">
-    <span>${esc(pack.style)}</span>
+    ${pack.stage === 'item' ? `<button class="stylechip" data-act="restart-style" aria-label="Start over with style ${esc(pack.style)}">${esc(pack.style)}<i aria-hidden="true">&times;</i></button>` : `<span>${esc(pack.style)}</span>`}
     ${pack.pallet ? `<span class="p">${pCode(pack.pallet)}</span>` : ''}
     ${pack.box ? `<span>${bCode(pack.box)}</span>` : ''}
     ${pack.stage === 'item'
@@ -593,6 +596,7 @@ function packHTML(){
       <label class="f">Season</label>
       <div class="chips">${SEASONS.map(g => `<label><input type="radio" name="k-season" value="${g}" ${f.season === g ? 'checked' : ''}><span>${g}</span></label>`).join('')}</div>
     </div>
+    <button class="linkbtn restart" data-act="restart-style">Start over: delete style ${esc(pack.style)}</button>
     <div class="savebar">${err}<button class="btn" data-act="save-item">Save item</button></div>`;
 }
 function palPick(p){
@@ -1251,6 +1255,29 @@ const act = {
         const m = /STYLE_EXISTS/.test(e.message) ? `Style ${esc(num)} already exists (${esc((e.message.match(/pallet (\d+)/) || [])[1] ? 'on ' + pCode(e.message.match(/pallet (\d+)/)[1]) : 'on another pallet')}). Pick a different number.` : esc(needsUpdate(e) || e.message);
         if ($('#s-err')) $('#s-err').innerHTML = `<div class="err">${m}</div>`;
       }
+    });
+  },
+  'restart-style'(){
+    const st = pack.style, { its, pieces } = styleStats(st), boxes = [...new Set(its.map(i => i.box_id))].sort((a, b) => a - b);
+    const cur = pack.box && !itemsOf('box_id', pack.box).length ? pack.box : null;
+    openSheet(`<h2>Start over with ${esc(st)}?</h2>
+      <p class="lead">${its.length ? `This deletes the ${plural(pieces, 'piece')} already saved for ${esc(st)} (in ${boxes.map(bCode).join(', ')}), for everyone, with their photos.` : `Nothing is saved for ${esc(st)} yet.`}
+      ${cur ? ` The empty ${bCode(cur)} is removed too.` : ''} Then you enter the style again.${its.length ? " This can't be undone." : ''}</p>
+      <div class="row"><button class="btn alt" data-act="close-sheet">Keep it</button><button class="btn danger" data-act="restart-yes">Delete and start over</button></div>`);
+  },
+  async 'restart-yes'(){
+    const st = pack.style, cur = pack.box; closeSheet();
+    await withBusy('Deleting style ' + st, async () => {
+      try {
+        const photos = itemsOf('style_number', st).map(i => i.photo_path);
+        await rpc('delete_style', { p_style: st });
+        await removePhotos(photos);
+        await loadAll();
+        if (cur && idx.box.get(cur) && !itemsOf('box_id', cur).length) { try { await db.remove('boxes', 'id=' + eq(cur)); } catch {} await loadAll(); }
+        pack = newPack(pack.last, pack.last && { ...pack.last });
+        pack.saved = `Style ${st} was deleted. Enter the style again.`;
+        render(); scrollTo(0, 0); const i = $('#k-style'); if (i) i.focus();
+      } catch (e) { toast(needsUpdate(e) || e.message, 'bad'); render(); }
     });
   },
   'del-style'(el){
