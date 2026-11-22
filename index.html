@@ -166,8 +166,8 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .badge.closed{background:var(--ink);color:#fff}
 
 /* item form */
-.photo{position:relative;display:grid;place-items:center;aspect-ratio:4/3;border:2px dashed #8793A3;border-radius:10px;background:#F4F6F8;overflow:hidden;text-align:center;font-weight:600}
-.photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.photo{position:relative;display:grid;place-items:center;aspect-ratio:1/1;max-height:52vh;margin:0 auto;border:2px dashed #8793A3;border-radius:10px;background:#F4F6F8;overflow:hidden;text-align:center;font-weight:600}
+.photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff}
 .photo input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
 .photo .again{position:absolute;right:8px;bottom:8px;background:var(--ink);color:#fff;border-radius:6px;padding:4px 10px;font-size:14px;font-weight:500;pointer-events:none}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -1248,8 +1248,8 @@ async function readTag(file, where){
   status(`<div class="reading"><span class="dot"></span>Reading the tag. Count the pieces of each size meanwhile.</div>`);
   pack.tagFile = file;
   try {
-    const body = { tag: await blobToB64(await shrink(file, 1600, .9)), types: ALL_TYPES, sizes: [...SIZES, ...SIZESETS.women.list, ...SIZESETS.kids.list, ...SIZESETS.baby.list], style: where === 'item' ? pack.style : '' };
-    if (pack.photo) body.item = await blobToB64(await shrink(pack.photo, 900, .8));
+    const body = { tag: await blobToB64(await shrink(file, 1200, .85)), types: ALL_TYPES, sizes: [...SIZES, ...SIZESETS.women.list, ...SIZESETS.kids.list, ...SIZESETS.baby.list], style: where === 'item' ? pack.style : '' };
+    if (pack.photo) body.item = await blobToB64(await shrink(pack.photo, 512, .75));
     const t = await (await fnCall('read-tag', body)).json();
     if (run !== tagRun) return;
     t.style = normStyle(t.style);
@@ -2084,7 +2084,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.9';
+const APP_VERSION = '2026-11-22.10';
 let newVersion = false;
 async function checkVersion(){
   try {
