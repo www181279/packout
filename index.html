@@ -251,8 +251,8 @@ const SEASONS = ['Spring','Summer','Fall','Winter','All year'];
 /* ---------- helpers ---------- */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const pCode = id => 'P-' + String(id).padStart(3, '0');
-const bCode = id => 'B-' + String(id).padStart(4, '0');
+const pCode = id => 'P-' + id;      // pallet 4 is P-4
+const bCode = id => 'B-' + id;      // box 12 is B-12, numbered once across the whole store
 const normStyle = s => String(s || '').trim().replace(/\s+/g, ' ').toUpperCase();
 const nf = n => Number(n || 0).toLocaleString();
 const unit = (n, w) => n === 1 ? w : w + (w.endsWith('x') ? 'es' : 's');
@@ -280,7 +280,7 @@ async function withBusy(label, fn){
   try { return await fn(); }
   finally { if (--busyN === 0) $('#busy').classList.remove('on'); }
 }
-function openSheet(html){ $('#sheet .card').innerHTML = html; $('#sheet').classList.add('on'); const f = $('#sheet [autofocus]'); if (f) f.focus(); }
+function openSheet(html){ $('#toast').className = ''; $('#sheet .card').innerHTML = html; $('#sheet').classList.add('on'); const f = $('#sheet [autofocus]'); if (f) f.focus(); }
 function closeSheet(){ $('#sheet').classList.remove('on'); $('#sheet .card').innerHTML = ''; }
 const sheetOpen = () => $('#sheet').classList.contains('on');
 
@@ -316,6 +316,7 @@ const db = {
   remove: (table, query) => call(`/rest/v1/${table}?${query}`, { method: 'DELETE', headers: JSONH })
 };
 const eq = v => 'eq.' + encodeURIComponent(v);
+const rpc = (fn, args) => call('/rest/v1/rpc/' + fn, { method: 'POST', body: JSON.stringify(args), headers: { 'Content-Type': 'application/json' } });
 const isDup = e => e.code === '23505' || e.status === 409;
 async function uploadPhoto(path, blob){
   try {
@@ -347,7 +348,7 @@ function shrink(file, max, quality){
 }
 
 /* ---------- state ---------- */
-let me = store.get('me');                         // { name, area }
+let me = store.get('me');                         // { name }
 let data = { pallets: [], boxes: [], styles: [], items: [] };
 let idx = { pal: new Map(), box: new Map(), style: new Map() };
 let tab = 'pack';
@@ -376,7 +377,7 @@ const joined = () => data.items.map(i => ({ ...i, box: idx.box.get(i.box_id), pa
 
 /* ---------- screens: setup ---------- */
 function render(){
-  $('#who').innerHTML = me ? `<b>${esc(me.name)}</b>${esc(me.area || '')}` : '';
+  $('#who').innerHTML = me ? `<b>${esc(me.name)}</b>` : '';
   const v = $('#view'); v.classList.toggle('wide', tab === 'inventory' && !!cfg && !!me);
   if (!cfg) { $('#nav').hidden = true; return v.innerHTML = connectHTML(); }
   if (!me)  { $('#nav').hidden = true; return v.innerHTML = whoHTML(); }
@@ -406,8 +407,6 @@ function whoHTML(){
     <label class="f" for="w-name">Your name</label>
     <input id="w-name" type="text" list="w-names" autocomplete="off" value="${esc(me?.name || '')}">
     <datalist id="w-names">${names.map(n => `<option value="${esc(n)}">`).join('')}</datalist>
-    <label class="f" for="w-area">Your area of the store <small>(for example: Men's wall, Kids, Stockroom)</small></label>
-    <input id="w-area" type="text" autocomplete="off">
     <div id="w-err"></div>
     <button class="btn" data-act="save-who" style="margin-top:16px">Start packing</button>
   </div>`;
@@ -448,7 +447,7 @@ function packHTML(){
   }
 
   if (pack.stage === 'box') {
-    const p = idx.pal.get(pack.pallet) || { id: pack.pallet, area: '', created_by: '', status: 'open' };
+    const p = idx.pal.get(pack.pallet) || { id: pack.pallet, created_by: '', status: 'open' };
     const boxes = data.boxes.filter(b => b.pallet_id === p.id && b.status === 'open').sort((a, b) => (pack.last && a.id === pack.last.box ? -1 : 0) || b.id - a.id);
     const n = itemsOf('style_number', pack.style).length;
     const other = pack.known && pack.owner && pack.owner !== me.name;
@@ -456,10 +455,10 @@ function packHTML(){
       <div class="placard ${other ? 'stop' : ''}"><div class="stripes"></div><div class="in">
         <p>${other ? `Stop. ${esc(pack.owner)} already started style ${esc(pack.style)}.` : `Style ${esc(pack.style)} already has a pallet.`}</p>
         <div class="code">${pCode(p.id)}</div>
-        <p>${p.area ? `Find it in: ${esc(p.area)}. ` : ''}Take these pieces to ${pCode(p.id)}. You can't start another pallet for this style.</p>
+        <p>Take these pieces to ${pCode(p.id)}. You can't start another pallet for this style.</p>
       </div></div>` : `
       <div class="placard"><div class="in"><p>Style ${esc(pack.style)} now belongs to</p><div class="code">${pCode(p.id)}</div>
-        <p>${p.area ? esc(p.area) + '. ' : ''}Write ${pCode(p.id)} on the pallet if it is new.</p></div></div>`;
+        <p>Write ${pCode(p.id)} on the pallet if it is new.</p></div></div>`;
     return `${trailHTML()}${head}${err}
     ${p.status === 'closed' ? `<div class="note">${pCode(p.id)} is marked closed. <button class="linkbtn" data-act="reopen-pallet" data-id="${p.id}">Reopen it</button> to add pieces.</div>` : ''}
     <h2 style="font:600 17px var(--body);margin:16px 0 8px">Which box on ${pCode(p.id)}?</h2>
@@ -467,7 +466,8 @@ function packHTML(){
       <button class="pick" data-act="choose-box" data-id="${b.id}"><span class="tag box">${bCode(b.id)}</span>
         <span><b>${plural(sumQty(its), 'piece')} inside</b><small>Started by ${esc(b.created_by)}</small></span></button>`; }).join('')}
     <button class="pick new" data-act="new-box">Start a new box on ${pCode(p.id)}</button>
-    ${n === 0 ? `<p class="small muted" style="margin-top:14px">Picked the wrong pallet? Nothing is packed for this style yet. <button class="linkbtn" data-act="release-style">Undo this pallet choice</button></p>` : ''}`;
+    ${n === 0 ? `<p class="small muted" style="margin-top:14px">Picked the wrong pallet? Nothing is packed for this style yet. <button class="linkbtn" data-act="release-style">Undo this pallet choice</button></p>`
+      : `<p class="small muted" style="margin-top:14px">Pallet full, or a mistake in this style? <button class="linkbtn" data-act="open-style" data-style="${esc(pack.style)}">Move, edit or delete this style</button></p>`}`;
   }
 
   // item form
@@ -505,8 +505,8 @@ function palPick(p){
   const its = itemsOf('pallet_id', p.id);
   const last = pack.last && p.id === pack.last.pallet;
   return `<button class="pick ${last ? 'mine' : ''}" data-act="choose-pallet" data-id="${p.id}"><span class="tag">${pCode(p.id)}</span>
-    <span><b>${last ? 'Keep using this pallet' : esc(p.area || 'No area set')}</b>
-    <small>${last && p.area ? esc(p.area) + ', ' : ''}started by ${esc(p.created_by)}, ${plural(sumQty(its), 'piece')}</small></span></button>`;
+    <span><b>${last ? 'Keep using this pallet' : 'Started by ' + esc(p.created_by)}</b>
+    <small>${plural(data.boxes.filter(b => b.pallet_id === p.id).length, 'box')}, ${plural(sumQty(its), 'piece')}</small></span></button>`;
 }
 function readForm(){
   return { color: $('#k-color').value.trim(), brand: $('#k-brand').value.trim(), tag: $('#k-tag').value.trim(),
@@ -525,8 +525,8 @@ function palletsHTML(){
   ${list.length ? `<div class="pgrid">${list.map(p => { const its = itemsOf('pallet_id', p.id); return `
     <button class="ptile ${p.status === 'closed' ? 'closed' : ''}" data-act="open-pallet" data-id="${p.id}">
       <div class="code">${pCode(p.id)}</div>
-      <p>${esc(p.area || 'No area set')}${p.status === 'closed' ? ' <span class="badge closed">Closed</span>' : ''}</p>
-      <p class="muted" style="color:inherit;opacity:.8">${plural(data.boxes.filter(b => b.pallet_id === p.id).length, 'box')}, ${plural(sumQty(its), 'piece')}</p>
+      ${p.status === 'closed' ? '<p><span class="badge closed">Closed</span></p>' : ''}
+      <p>${plural(data.boxes.filter(b => b.pallet_id === p.id).length, 'box')}, ${plural(sumQty(its), 'piece')}</p>
     </button>`; }).join('')}</div>` : `<div class="empty"><b>No pallets yet</b>Pallets appear here when someone starts one from the Pack tab.</div>`}`;
 }
 function palletDetailHTML(p){
@@ -534,15 +534,17 @@ function palletDetailHTML(p){
   const styles = data.styles.filter(s => s.pallet_id === p.id);
   return `<button class="linkbtn" data-act="open-pallet" data-id="">Back to all pallets</button>
   <div class="placard"><div class="stripes"></div><div class="in">
-    <p>${esc(p.area || 'No area set')}${p.status === 'closed' ? ' <span class="badge closed">Closed</span>' : ''}</p>
+    ${p.status === 'closed' ? '<p><span class="badge closed">Closed</span></p>' : ''}
     <div class="code">${pCode(p.id)}</div>
     <p>${plural(boxes.length, 'box')}, ${plural(styles.length, 'style')}, ${plural(sumQty(its), 'piece')}. Started by ${esc(p.created_by)}.</p>
   </div></div>
   <div class="row" style="margin-bottom:12px">
     <button class="btn alt sm" data-act="toggle-pallet" data-id="${p.id}">${p.status === 'open' ? 'Close pallet' : 'Reopen pallet'}</button>
-    <button class="btn quiet sm" data-act="edit-area" data-id="${p.id}">Change area</button>
     ${!boxes.length && !styles.length ? `<button class="btn danger sm" data-act="del-pallet" data-id="${p.id}">Delete</button>` : ''}
   </div>
+  ${styles.length ? `<div class="panel"><h2>Styles on this pallet</h2><ul class="lines">${styles.map(s => { const si = itemsOf('style_number', s.style_number); return `
+    <li><span><b>${esc(s.style_number)}</b><br><span class="muted small">${plural(sumQty(si), 'piece')} in ${plural(new Set(si.map(i => i.box_id)).size, 'box')}</span></span>
+      <button class="btn quiet sm" style="margin-left:auto" data-act="open-style" data-style="${esc(s.style_number)}">Move or edit</button></li>`; }).join('')}</ul></div>` : ''}
   ${boxes.map(b => { const bi = itemsOf('box_id', b.id); return `
     <div class="panel"><div class="boxhead"><span class="code">${bCode(b.id)}</span>
       <span class="muted small">${plural(sumQty(bi), 'piece')}, by ${esc(b.created_by)}</span>
@@ -560,7 +562,7 @@ function filtered(){
     (!filt.pallet || String(i.pallet_id) === filt.pallet) && (!filt.box || String(i.box_id) === filt.box) &&
     (!filt.brand || i.brand === filt.brand) && (!filt.gender || i.gender === filt.gender) && (!filt.season || i.season === filt.season) &&
     (!filt.color || i.color === filt.color) && (!filt.by || i.created_by === filt.by) &&
-    (!q || [i.style_number, i.color, i.brand, i.tag_number, pCode(i.pallet_id), bCode(i.box_id), i.pallet?.area].join(' ').toLowerCase().includes(q)));
+    (!q || [i.style_number, i.color, i.brand, i.tag_number, pCode(i.pallet_id), bCode(i.box_id)].join(' ').toLowerCase().includes(q)));
   const by = { new: (a, b) => b.created_at.localeCompare(a.created_at), style: (a, b) => a.style_number.localeCompare(b.style_number, undefined, { numeric: true }) || a.color.localeCompare(b.color),
     where: (a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id || a.style_number.localeCompare(b.style_number) };
   return list.sort(by[invSort]);
@@ -596,7 +598,7 @@ function filterSheet(){
   const rows = joined(), opt = (k, vals, lab = v => v) => `<label class="f" for="f-${k}">${FLABEL[k]}</label><select id="f-${k}"><option value="">All</option>${vals.map(v => `<option value="${esc(v)}" ${String(filt[k]) === String(v) ? 'selected' : ''}>${esc(lab(v))}</option>`).join('')}</select>`;
   const u = k => [...new Set(rows.map(r => r[k]).filter(Boolean))].sort();
   openSheet(`<h2>Filter inventory</h2>
-    ${opt('pallet', data.pallets.map(p => p.id).sort((a, b) => a - b), v => pCode(v) + (idx.pal.get(v).area ? ', ' + idx.pal.get(v).area : ''))}
+    ${opt('pallet', data.pallets.map(p => p.id).sort((a, b) => a - b), v => pCode(v))}
     ${opt('box', data.boxes.map(b => b.id).sort((a, b) => a - b), v => bCode(v) + ' on ' + pCode(idx.box.get(v).pallet_id))}
     ${opt('brand', u('brand'))}${opt('gender', u('gender'))}${opt('season', u('season'))}${opt('color', u('color'))}${opt('by', u('created_by'))}
     <label class="f" for="f-sort">Sort by</label><select id="f-sort"><option value="new">Newest first</option><option value="style" ${invSort === 'style' ? 'selected' : ''}>Style number</option><option value="where" ${invSort === 'where' ? 'selected' : ''}>Pallet and box</option></select>
@@ -607,11 +609,12 @@ function itemSheet(id, edit){
   if (!edit) return openSheet(`
     ${i.photo_path ? `<img class="big" alt="Photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(photoUrl(i.photo_path))}">` : ''}
     <h2>${esc(i.style_number)}</h2>
-    <dl class="facts"><dt>Where</dt><dd>${pCode(i.pallet_id)}, ${bCode(i.box_id)}${i.pallet?.area ? ' (' + esc(i.pallet.area) + ')' : ''}</dd>
+    <dl class="facts"><dt>Where</dt><dd>${pCode(i.pallet_id)}, ${bCode(i.box_id)}</dd>
       <dt>Color</dt><dd>${esc(i.color)}</dd><dt>Brand</dt><dd>${esc(i.brand)}</dd><dt>Tag number</dt><dd>${esc(i.tag_number || 'None')}</dd>
       <dt>Quantity</dt><dd>${nf(i.quantity)}</dd><dt>Gender</dt><dd>${esc(i.gender)}</dd><dt>Season</dt><dd>${esc(i.season)}</dd>
       <dt>Packed by</dt><dd>${esc(i.created_by)}, ${new Date(i.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</dd></dl>
-    <div class="row"><button class="btn alt" data-act="edit-item" data-id="${i.id}">Edit</button><button class="btn" data-act="close-sheet">Done</button></div>`);
+    <div class="row"><button class="btn alt" data-act="edit-item" data-id="${i.id}">Edit</button><button class="btn" data-act="close-sheet">Done</button></div>
+    <button class="btn quiet" data-act="open-style" data-style="${esc(i.style_number)}" style="margin-top:10px">Move, edit or delete the whole style</button>`);
   const sel = (id, vals, cur) => `<select id="${id}">${vals.map(v => `<option ${v === cur ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
   openSheet(`<h2>Edit ${esc(i.style_number)}</h2>
     <label class="f" for="e-color">Color</label><input id="e-color" type="text" value="${esc(i.color)}">
@@ -624,6 +627,66 @@ function itemSheet(id, edit){
     <div class="row" style="margin-top:18px"><button class="btn alt" data-act="open-item" data-id="${i.id}">Cancel</button><button class="btn" data-act="save-edit" data-id="${i.id}">Save changes</button></div>
     <button class="btn danger" data-act="del-item" data-id="${i.id}" style="margin-top:10px">Delete this item</button>`);
 }
+
+/* ---------- style: move, edit, delete ---------- */
+const styleRow = st => data.styles.find(s => s.style_number === st);
+function styleStats(st){ const its = itemsOf('style_number', st); return { its, pieces: sumQty(its), boxes: new Set(its.map(i => i.box_id)).size }; }
+function styleSheet(st){
+  const s = styleRow(st); if (!s) return closeSheet();
+  const { its, pieces, boxes } = styleStats(st);
+  openSheet(`<h2>Style ${esc(st)}</h2>
+    <dl class="facts"><dt>Pallet</dt><dd>${pCode(s.pallet_id)}</dd><dt>Packed</dt><dd>${plural(pieces, 'piece')} in ${plural(boxes, 'box')}</dd>
+      <dt>Colors</dt><dd>${esc([...new Set(its.map(i => i.color))].join(', ') || 'None yet')}</dd><dt>Started by</dt><dd>${esc(s.created_by)}</dd></dl>
+    <button class="btn" data-act="move-style" data-style="${esc(st)}">Move to another pallet</button>
+    <button class="btn alt" data-act="edit-style" data-style="${esc(st)}">Edit style</button>
+    <button class="btn danger" data-act="del-style" data-style="${esc(st)}">Delete style</button>
+    <button class="btn quiet" data-act="close-sheet">Done</button>`);
+}
+function moveSheet(st){
+  const s = styleRow(st); if (!s) return closeSheet();
+  const { pieces, boxes } = styleStats(st);
+  const open = data.pallets.filter(p => p.status === 'open' && p.id !== s.pallet_id).sort((a, b) => a.id - b.id);
+  openSheet(`<h2>Move style ${esc(st)}</h2>
+    <p class="lead">Now on ${pCode(s.pallet_id)}: ${plural(pieces, 'piece')} in ${plural(boxes, 'box')}. The whole style moves together, for everyone.</p>
+    ${open.map(p => `<button class="pick" data-act="move-pick" data-style="${esc(st)}" data-id="${p.id}"><span class="tag">${pCode(p.id)}</span>
+      <span><b>Move to ${pCode(p.id)}</b><small>${plural(data.boxes.filter(b => b.pallet_id === p.id).length, 'box')}, ${plural(sumQty(itemsOf('pallet_id', p.id)), 'piece')} on it now</small></span></button>`).join('')}
+    <button class="pick new" data-act="move-pick" data-style="${esc(st)}" data-id="">Move to a new pallet</button>
+    <button class="btn quiet" data-act="open-style" data-style="${esc(st)}">Back</button>`);
+}
+function editStyleSheet(st){
+  const { its } = styleStats(st);
+  const same = k => { const v = [...new Set(its.map(i => i[k]))]; return v.length === 1 ? v[0] : ''; };
+  const sel = (id, vals, cur) => `<select id="${id}">${cur ? '' : '<option value="">Leave as is</option>'}${vals.map(v => `<option ${v === cur ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
+  openSheet(`<h2>Edit style ${esc(st)}</h2>
+    <p class="lead">Changes apply to all ${plural(its.length, 'entry').replace('entrys', 'entries')} of this style. To change one color or a quantity, open that item in Inventory.</p>
+    <label class="f" for="s-num">Style number</label><input id="s-num" type="text" autocapitalize="characters" autocomplete="off" value="${esc(st)}">
+    ${its.length ? `<label class="f" for="s-brand">Brand</label><input id="s-brand" type="text" value="${esc(same('brand'))}" placeholder="Leave empty to keep as is">
+    <label class="f" for="s-gender">Gender</label>${sel('s-gender', GENDERS, same('gender'))}
+    <label class="f" for="s-season">Season</label>${sel('s-season', SEASONS, same('season'))}` : ''}
+    <div id="s-err"></div>
+    <div class="row" style="margin-top:18px"><button class="btn alt" data-act="open-style" data-style="${esc(st)}">Cancel</button><button class="btn" data-act="save-style" data-style="${esc(st)}">Save changes</button></div>`);
+}
+async function doMove(st, target){
+  closeSheet();
+  await withBusy('Moving style ' + st, async () => {
+    try {
+      const r = await rpc('move_style', { p_style: st, p_target: target, p_area: '', p_by: me.name });
+      await loadAll();
+      if (pack.style === st && pack.stage !== 'style') Object.assign(pack, { stage: 'box', pallet: r.to_pallet, box: null, known: false, err: '', form: null, photo: null, saved: null });
+      if (pack.last && pack.last.pallet === r.from_pallet && !idx.box.get(pack.last.box)) pack.last = null;
+      render();
+      const to = pCode(r.to_pallet), steps = [
+        ...(target ? [] : [`Write <b>${to}</b> on the new pallet.`]),
+        ...r.moved_boxes.map(b => `Carry box <b>${bCode(b.box)}</b> (${plural(b.pieces, 'piece')}) from ${pCode(r.from_pallet)} to ${to}.`),
+        ...r.repack.map(b => `Box ${bCode(b.from_box)} also holds other styles, so it stays. Take the ${plural(b.pieces, 'piece')} of ${esc(st)} out of it, put them in a new box, write <b>${bCode(b.to_box)}</b> on it and place it on ${to}.`)];
+      openSheet(`<h2>Style ${esc(st)} now belongs on ${to}</h2>
+        <div class="placard"><div class="in"><p>Moved from ${pCode(r.from_pallet)} to</p><div class="code">${to}</div></div></div>
+        ${steps.length ? `<div class="panel"><h2>Do this now</h2><ul class="lines">${steps.map(t => `<li><span>${t}</span></li>`).join('')}</ul></div>` : '<p class="lead">Nothing to carry. No pieces of this style were packed yet.</p>'}
+        <button class="btn" data-act="close-sheet">Done</button>`);
+    } catch (e) { toast(needsUpdate(e) || e.message, 'bad'); }
+  });
+}
+const needsUpdate = e => (e.status === 404 || e.code === 'PGRST202') ? 'The database needs the latest setup script before styles can be changed.' : '';
 
 /* ---------- screens: export + setup ---------- */
 let exTitle = store.get('title') || 'Store inventory';
@@ -647,8 +710,8 @@ function moreHTML(){
     <p class="muted small" style="margin-bottom:12px">Send this link to each employee's phone. It opens the app already connected to your database. They only type their name.</p>
     <button class="btn alt" data-act="invite">Share invite link</button></div>
   <div class="panel"><h2>This phone</h2>
-    <dl class="facts"><dt>Name</dt><dd>${esc(me.name)}</dd><dt>Area</dt><dd>${esc(me.area || 'Not set')}</dd><dt>Database</dt><dd style="word-break:break-all">${esc(cfg.url.replace('https://', ''))}</dd></dl>
-    <button class="btn quiet" data-act="change-who">Change name or area</button>
+    <dl class="facts"><dt>Name</dt><dd>${esc(me.name)}</dd><dt>Database</dt><dd style="word-break:break-all">${esc(cfg.url.replace('https://', ''))}</dd></dl>
+    <button class="btn quiet" data-act="change-who">Change name</button>
     <button class="btn quiet" data-act="disconnect">Disconnect this phone</button></div>`;
 }
 function exportRows(){
@@ -662,8 +725,7 @@ function manifestHTML(rows, { title, img }){
   const tot = `<div class="mf-tot"><div><b>${nf(sumQty(rows))}</b>${unit(sumQty(rows), 'piece')}</div><div><b>${nf(new Set(rows.map(r => r.style_number)).size)}</b>${unit(new Set(rows.map(r => r.style_number)).size, 'style')}</div>
     <div><b>${nf(new Set(rows.map(r => r.box_id)).size)}</b>${unit(new Set(rows.map(r => r.box_id)).size, 'box')}</div><div><b>${nf(new Set(rows.map(r => r.pallet_id)).size)}</b>${unit(new Set(rows.map(r => r.pallet_id)).size, 'pallet')}</div></div>`;
   const pals = by(rows, 'pallet_id').map(([pid, pr]) => {
-    const p = idx.pal.get(pid) || {};
-    return `<section class="mf-pal"><div class="mf-plac"><b>${pCode(pid)}</b><span>${esc(p.area || '')}</span>
+        return `<section class="mf-pal"><div class="mf-plac"><b>${pCode(pid)}</b>
       <span class="r">${plural(new Set(pr.map(r => r.box_id)).size, 'box')}, ${plural(new Set(pr.map(r => r.style_number)).size, 'style')}<br>${plural(sumQty(pr), 'piece')}</span></div>
       ${by(pr, 'box_id').map(([bid, br]) => `<div class="mf-box"><h3>${bCode(bid)} <small>${plural(sumQty(br), 'piece')} on ${pCode(pid)}</small></h3>
         <table><thead><tr>${img ? '<th class="ph"></th>' : ''}<th class="st">Style</th><th>Color</th><th>Brand</th><th>Tag</th><th>Gender</th><th>Season</th><th class="q">Qty</th></tr></thead><tbody>
@@ -710,9 +772,9 @@ const act = {
     });
   },
   'save-who'(){
-    const name = $('#w-name').value.trim(), area = $('#w-area').value.trim();
+    const name = $('#w-name').value.trim();
     if (!name) return $('#w-err').innerHTML = '<div class="err">Type your name.</div>';
-    me = { name, area }; store.set('me', me); render();
+    me = { name }; store.set('me', me); render();
   },
   'change-who'(){ me = null; render(); },
   disconnect(){
@@ -741,19 +803,17 @@ const act = {
   async 'choose-pallet'(el){ await claim(+el.dataset.id); },
   'new-pallet'(){
     openSheet(`<h2>Start a new pallet</h2>
-      <label class="f" for="np-area">Where in the store is this pallet?</label>
-      <input id="np-area" type="text" value="${esc(me.area || '')}" autofocus>
-      <p class="note">The app gives the pallet its number. Write that number on the pallet in big letters.</p>
+      <p class="lead">The app gives the pallet the next number. Write that number on the pallet in big letters.</p>
       <div class="row"><button class="btn alt" data-act="close-sheet">Cancel</button><button class="btn" data-act="new-pallet-yes">Start pallet</button></div>`);
   },
   async 'new-pallet-yes'(){
-    const area = $('#np-area').value.trim(); closeSheet();
+    closeSheet();
     await withBusy('Starting pallet', async () => {
       try {
         // Last check before making a pallet: did someone claim this style a second ago?
         const found = await db.get('styles', 'select=*&style_number=' + eq(pack.style));
         if (found[0]) return blocked(found[0]);
-        const p = await db.insert('pallets', { area, created_by: me.name });
+        const p = await db.insert('pallets', { created_by: me.name });
         data.pallets.push(p); idx.pal.set(p.id, p);
         await claim(p.id, true);
       } catch (e) { packFail(e); }
@@ -813,12 +873,6 @@ const act = {
   'open-pallet'(el){ palView = el.dataset.id ? +el.dataset.id : null; render(); scrollTo(0, 0); },
   async 'toggle-pallet'(el){ const p = idx.pal.get(+el.dataset.id); await setStatus('pallets', p.id, p.status === 'open' ? 'closed' : 'open'); },
   async 'toggle-box'(el){ const b = idx.box.get(+el.dataset.id); await setStatus('boxes', b.id, b.status === 'open' ? 'closed' : 'open'); },
-  'edit-area'(el){
-    const p = idx.pal.get(+el.dataset.id);
-    openSheet(`<h2>Where is ${pCode(p.id)}?</h2><input id="ea" type="text" value="${esc(p.area || '')}" autofocus>
-      <div class="row" style="margin-top:16px"><button class="btn alt" data-act="close-sheet">Cancel</button><button class="btn" data-act="save-area" data-id="${p.id}">Save area</button></div>`);
-  },
-  async 'save-area'(el){ const area = $('#ea').value.trim(); closeSheet(); await mutate('Saving', () => db.update('pallets', 'id=' + eq(el.dataset.id), { area })); },
   async 'del-pallet'(el){ palView = null; await mutate('Deleting', () => db.remove('pallets', 'id=' + eq(el.dataset.id))); },
   async 'del-box'(el){ await mutate('Deleting', () => db.remove('boxes', 'id=' + eq(el.dataset.id))); },
 
@@ -841,6 +895,53 @@ const act = {
       <div class="row"><button class="btn alt" data-act="open-item" data-id="${el.dataset.id}">Keep it</button><button class="btn danger" data-act="del-item-yes" data-id="${el.dataset.id}">Delete</button></div>`);
   },
   async 'del-item-yes'(el){ closeSheet(); await mutate('Deleting', () => db.remove('items', 'id=' + eq(el.dataset.id)), 'Deleted'); },
+
+  /* styles */
+  'open-style'(el){ styleSheet(el.dataset.style); },
+  'move-style'(el){ moveSheet(el.dataset.style); },
+  'edit-style'(el){ editStyleSheet(el.dataset.style); },
+  'move-pick'(el){
+    const st = el.dataset.style, id = el.dataset.id, { pieces } = styleStats(st), to = id ? pCode(id) : 'a new pallet';
+    openSheet(`<h2>Move ${esc(st)} to ${to}?</h2>
+      <p class="lead">All ${plural(pieces, 'piece')} of this style will belong on ${to}. Next you get a list of what to carry over.</p>
+      <div class="row"><button class="btn alt" data-act="move-style" data-style="${esc(st)}">Back</button><button class="btn" data-act="move-yes" data-style="${esc(st)}" data-id="${id}">Move style</button></div>`);
+  },
+  async 'move-yes'(el){ await doMove(el.dataset.style, el.dataset.id ? +el.dataset.id : null); },
+  async 'save-style'(el){
+    const old = el.dataset.style, num = normStyle($('#s-num').value), patch = {}, { its } = styleStats(old);
+    if (!num) return $('#s-err').innerHTML = '<div class="err">Type the style number.</div>';
+    if ($('#s-brand')) {
+      const b = $('#s-brand').value.trim(), g = $('#s-gender').value, se = $('#s-season').value;
+      if (b && its.some(i => i.brand !== b)) patch.brand = b;
+      if (g && its.some(i => i.gender !== g)) patch.gender = g;
+      if (se && its.some(i => i.season !== se)) patch.season = se;
+    }
+    await withBusy('Saving changes', async () => {
+      try {
+        if (num !== old) await rpc('rename_style', { p_old: old, p_new: num });
+        if (Object.keys(patch).length) await db.update('items', 'style_number=' + eq(num), patch);
+        await loadAll(); if (pack.style === old) pack.style = num;
+        closeSheet(); render(); toast('Saved changes', 'good');
+      } catch (e) {
+        const m = /STYLE_EXISTS/.test(e.message) ? `Style ${esc(num)} already exists (${esc((e.message.match(/pallet (\d+)/) || [])[1] ? 'on ' + pCode(e.message.match(/pallet (\d+)/)[1]) : 'on another pallet')}). Pick a different number.` : esc(needsUpdate(e) || e.message);
+        if ($('#s-err')) $('#s-err').innerHTML = `<div class="err">${m}</div>`;
+      }
+    });
+  },
+  'del-style'(el){
+    const st = el.dataset.style, { its, pieces } = styleStats(st);
+    openSheet(`<h2>Delete style ${esc(st)}?</h2>
+      <p class="lead">${its.length ? `This removes all ${plural(pieces, 'piece')} recorded for this style, in every box, for everyone.` : 'Nothing is packed for this style yet.'} This can't be undone.</p>
+      <div class="row"><button class="btn alt" data-act="open-style" data-style="${esc(st)}">Keep it</button><button class="btn danger" data-act="del-style-yes" data-style="${esc(st)}">Delete style</button></div>`);
+  },
+  async 'del-style-yes'(el){
+    const st = el.dataset.style; closeSheet();
+    await withBusy('Deleting style ' + st, async () => {
+      try { await rpc('delete_style', { p_style: st }); await loadAll(); if (pack.style === st) pack = newPack(pack.last); toast('Deleted style ' + st, 'good'); }
+      catch (e) { toast(needsUpdate(e) || e.message, 'bad'); }
+      render();
+    });
+  },
 
   /* export */
   async 'export-pdf'(){
@@ -872,8 +973,8 @@ document.querySelectorAll('.mf-pal').forEach(function(p){p.hidden=!p.querySelect
   'export-csv'(){
     const { rows } = exportRows(); if (!rows.length) return toast('There is nothing to export yet.', 'bad');
     const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const lines = [['Pallet','Pallet area','Box','Style number','Color','Brand','Tag number','Quantity','Gender','Season','Packed by','Packed at','Photo']]
-      .concat(rows.sort((a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id).map(r => [pCode(r.pallet_id), r.pallet?.area, bCode(r.box_id), r.style_number, r.color, r.brand, r.tag_number, r.quantity, r.gender, r.season, r.created_by, r.created_at, photoUrl(r.photo_path)]));
+    const lines = [['Pallet','Box','Style number','Color','Brand','Tag number','Quantity','Gender','Season','Packed by','Packed at','Photo']]
+      .concat(rows.sort((a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id).map(r => [pCode(r.pallet_id), bCode(r.box_id), r.style_number, r.color, r.brand, r.tag_number, r.quantity, r.gender, r.season, r.created_by, r.created_at, photoUrl(r.photo_path)]));
     download(`inventory-${fileStamp()}.csv`, '﻿' + lines.map(l => l.map(cell).join(',')).join('\r\n'), 'text/csv');
     toast('Downloaded', 'good');
   },
