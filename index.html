@@ -137,6 +137,21 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 #zoom p{color:#C9D2DE;margin:12px 0 0;font-size:15px;text-align:center}
 #zoom-x{position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;width:48px;height:48px;border-radius:50%;border:0;background:#fff;color:var(--ink);font-size:30px;line-height:1;cursor:pointer}
 .inv img[data-act=zoom-photo],#big-photo{cursor:zoom-in}
+.photo .cleanstate{position:absolute;left:8px;bottom:8px;background:rgba(255,255,255,.92);color:var(--ink);border-radius:6px;padding:4px 10px;font-size:14px;font-weight:500;pointer-events:none}
+.reading{display:block}
+.reading .rtop{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.reading .rtext{font-size:17px}
+.spin{width:18px;height:18px;border-radius:50%;border:3px solid rgba(19,33,58,.18);border-top-color:var(--ink);animation:spin .8s linear infinite;flex:none;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.rbar{height:6px;border-radius:3px;background:rgba(19,33,58,.12);overflow:hidden;margin-bottom:8px}
+.rbar i{display:block;height:100%;width:40%;border-radius:3px;background:#E0A800;animation:slide 1.2s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
+.photo .scan{position:absolute;left:0;right:0;top:0;height:22%;background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.55),rgba(255,255,255,0));animation:scan 1.6s ease-in-out infinite;pointer-events:none}
+@keyframes scan{0%{transform:translateY(-100%)}100%{transform:translateY(460%)}}
+.photo .cleanstate{display:flex;align-items:center;gap:8px}
+.photo .cleanstate .spin{width:14px;height:14px;border-width:2px}
+.photo .cleanstate.ok{background:#E7F4EC;color:#1B6B3A}
+@media (prefers-reduced-motion:reduce){.spin,.rbar i,.photo .scan{animation:none}.photo .scan{display:none}}
 .morebox{margin-top:4px}.morerow{display:flex;gap:8px}.morerow input{flex:1;text-align:center;font:700 24px/1 var(--sign)}.morerow .btn{width:auto;flex:none;min-height:50px}
 .addmore{display:block;margin-top:10px}
 .savedacts{margin-top:10px}.savedacts .btn{flex:1;font-size:15px}
@@ -1046,7 +1061,7 @@ function detectColors(file){
     img.src = url;
   });
 }
-const colorHintHTML = () => pack.colors && pack.colors.length ? `<span class="small muted">From the photo:</span> ${pack.colors.map(c => `<button type="button" data-act="use-color" data-v="${esc(c)}"><i style="background:${COLOR_NAMES[c]}"></i>${esc(c)}</button>`).join('')}` : '';
+const colorHintHTML = () => pack.colors && pack.colors.length && !pack.aiColor ? `<span class="small muted">From the photo:</span> ${pack.colors.map(c => `<button type="button" data-act="use-color" data-v="${esc(c)}"><i style="background:${COLOR_NAMES[c]}"></i>${esc(c)}</button>`).join('')}` : '';
 
 /* ---------- barcode scanner (camera) ---------- */
 const SCAN_LIB = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
@@ -1217,6 +1232,51 @@ async function composePro(cutBlob, origBlob){
   return { full: await toJpeg(out, .9), thumb: await toJpeg(th2, .78) };
 }
 
+// the words under the spinner change while the tag is read, so it is clear the app is working
+let stepTimer = null;
+function readingSteps(){
+  const steps = ['Reading the tag', 'Finding the style number', 'Reading the size', 'Checking the color', 'Almost done'];
+  let i = 0; clearInterval(stepTimer);
+  stepTimer = setInterval(() => {
+    const el = $('#tag-status .rtext');
+    if (!el || !pack.tagStatus) { clearInterval(stepTimer); return; }
+    i = Math.min(i + 1, steps.length - 1); el.textContent = steps[i];
+  }, 1400);
+}
+
+/* ---------- clean the photo right after it is taken, so the packer sees the result before saving ---------- */
+function startEarlyPolish(file){
+  const path = uuid() + '.jpg';
+  const job = { path, file, done: false, failed: false, url: null, saved: false };
+  pack.early = job;
+  job.promise = (async () => {
+    try {
+      const [full, thumb] = await Promise.all([shrink(file, 1400, .82), shrink(file, 280, .72)]);
+      await Promise.all([uploadPhoto(path, full), uploadPhoto('thumb/' + path, thumb)]);
+      job.uploaded = true;
+      const cut = await (await fnCall('polish-photo', { path })).blob();
+      const orig = setting('color_correct') ? full : null;
+      const pro = await composePro(cut, orig);
+      await Promise.all([uploadPhoto('pro/' + path, pro.full), uploadPhoto('pro/thumb/' + path, pro.thumb)]);
+      job.done = true; job.url = URL.createObjectURL(pro.full);
+      if (job.saved) await markPro(path);
+      if (pack.early === job) showPhoto(file);
+      return true;
+    } catch (e) {
+      job.failed = true;
+      if (job.saved && job.uploaded) enqueuePolish([path]);
+      if (pack.early === job) showPhoto(file);
+      return false;
+    }
+  })();
+}
+async function markPro(path){
+  try {
+    await call('/rest/v1/items?photo_path=' + eq(path), { method: 'PATCH', body: JSON.stringify({ photo_pro: true }), headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' } });
+    data.items.forEach(i => { if (i.photo_path === path) i.photo_pro = true; });
+  } catch { enqueuePolish([path]); }
+}
+
 /* ---------- tag reading: the AI reader on the server, the on-phone text reader as a fallback ---------- */
 let tagRun = 0;
 function mergeTag(f, t){
@@ -1227,6 +1287,7 @@ function mergeTag(f, t){
   if (t.brand) f.brand = t.brand;
   if (t.gender) f.gender = t.gender;
   if (t.color && (!f.color || f.colorAuto)) { f.color = t.color; f.colorAuto = false; }
+  if (t.color) pack.aiColor = true;
   pack.colorCode = t.color_code && t.color === t.color_code ? t.color_code.toUpperCase() : null;
   const size = t.size && normSize(t.size);
   if (size && !f.sizes.some(z => z.size === size)) { f.sizes.push({ size, qty: 1, tag: '' }); f.sizes.sort((a, b) => bySize(a.size, b.size)); f.more = []; }
@@ -1245,7 +1306,8 @@ function tagFactsHTML(t){
 async function readTag(file, where){
   const run = ++tagRun;
   const status = html => { pack.tagStatus = html; const el = $('#tag-status'); if (el) el.innerHTML = html; };
-  status(`<div class="reading"><span class="dot"></span>Reading the tag. Count the pieces of each size meanwhile.</div>`);
+  status(`<div class="reading"><div class="rtop"><span class="spin"></span><b class="rtext">Reading the tag</b></div><div class="rbar"><i></i></div><span class="small">Count the pieces of each size meanwhile.</span></div>`);
+  readingSteps();
   pack.tagFile = file;
   try {
     const body = { tag: await blobToB64(await shrink(file, 1200, .85)), types: ALL_TYPES, sizes: [...SIZES, ...SIZESETS.women.list, ...SIZESETS.kids.list, ...SIZESETS.baby.list], style: where === 'item' ? pack.style : '' };
@@ -1722,8 +1784,12 @@ const act = {
     if (miss) return showErr(miss);
     await withBusy('Saving to the database', async () => {
       try {
-        const id = pack.id, reuse = !pack.photo && pack.reuse, path = reuse ? pack.reuse.path : id + '.jpg';
-        if (!reuse) {
+        const early = !pack.photo ? null : pack.early && pack.early.file === pack.photo ? pack.early : null;
+        const id = pack.id, reuse = !pack.photo && pack.reuse, path = reuse ? pack.reuse.path : early ? early.path : id + '.jpg';
+        if (early && !early.uploaded) {      // the early upload is still running or failed: make sure the original is there
+          const [full, thumb] = await Promise.all([shrink(pack.photo, 1400, .82), shrink(pack.photo, 280, .72)]);
+          await Promise.all([uploadPhoto(path, full), uploadPhoto('thumb/' + path, thumb)]); early.uploaded = true;
+        } else if (!reuse && !early) {
           const [full, thumb] = await Promise.all([shrink(pack.photo, 1400, .82), shrink(pack.photo, 280, .72)]);
           await Promise.all([uploadPhoto(path, full), uploadPhoto('thumb/' + path, thumb)]);
         }
@@ -1735,13 +1801,14 @@ const act = {
           p_sizes: f.sizes.map(z => ({ id: pack.ids[z.size], size: z.size, qty: z.qty, tag_number: f.sizes.length > 1 ? z.tag : f.tag })),
           p_more: [] });
         await loadAll();
-        if (!reuse) enqueuePolish([path]);
+        if (early) { early.saved = true; if (early.done) await markPro(path); else if (early.failed) enqueuePolish([path]); }
+        else if (!reuse) enqueuePolish([path]);
         const total = f.sizes.reduce((a, z) => a + z.qty, 0);
         const msg = `Saved ${pack.style} ${f.color} in ${bCode(pack.box)}: ${f.sizes.map(z => `${z.size} x ${nf(z.qty)}`).join(', ')}${f.sizes.length > 1 ? ` (${nf(total)} pieces)` : ''}.`;
         pack.last = { pallet: pack.pallet, box: pack.box }; store.set('last', pack.last);
         store.set('lastForm', { type: f.type, brand: f.brand, gender: f.gender, season: f.season });
         if (navigator.vibrate) navigator.vibrate(40);
-        Object.assign(pack, { id: uuid(), ids: null, photo: null, reuse: null, colors: null, err: '', justSaved: true, runPath: path, tagNote: '', tagStatus: '', colorCode: null,
+        Object.assign(pack, { id: uuid(), ids: null, photo: null, early: null, aiColor: false, reuse: null, colors: null, err: '', justSaved: true, runPath: path, tagNote: '', tagStatus: '', colorCode: null,
           lastEntry: { path, color: f.color, type: f.type, brand: f.brand, gender: f.gender, season: f.season },
           form: { ...f, color: '', tag: '', sizes: f.sizes.map(z => ({ size: z.size, qty: 1, tag: '' })), more: [] }, saved: msg });
         render(); scrollTo(0, 0);
@@ -1986,9 +2053,12 @@ async function mutate(label, fn, okMsg){
 const setStatus = (table, id, status) => mutate('Saving', () => db.update(table, 'id=' + eq(id), { status }));
 function showPhoto(file){
   const w = $('#k-photo-wrap'); if (!w) return;
-  w.querySelectorAll('img,.again').forEach(n => n.remove());
-  const img = new Image(); img.alt = 'Photo of the item'; img.src = URL.createObjectURL(file);
+  w.querySelectorAll('img,.again,.cleanstate,.scan').forEach(n => n.remove());
+  const e = pack.early && pack.early.file === file ? pack.early : null;
+  const img = new Image(); img.alt = 'Photo of the item'; img.src = e && e.url ? e.url : URL.createObjectURL(file);
   w.prepend(img); w.insertAdjacentHTML('beforeend', '<span class="again">Retake</span>');
+  if (e && !e.done && !e.failed) w.insertAdjacentHTML('beforeend', '<span class="cleanstate scanning" aria-live="polite"><span class="spin"></span>Cleaning the photo</span><span class="scan" aria-hidden="true"></span>');
+  else if (e) w.insertAdjacentHTML('beforeend', `<span class="cleanstate ${e.done ? 'ok' : ''}">${e.done ? '✓ Cleaned photo' : 'Photo will be cleaned after saving'}</span>`);
 }
 
 /* ---------- events ---------- */
@@ -2004,14 +2074,15 @@ document.addEventListener('change', e => {
   if (e.target.id === 'k-itemfirst' && e.target.files[0]) {
     const f = e.target.files[0]; e.target.value = '';
     pack.photo = f; if (pack.photoUrl) URL.revokeObjectURL(pack.photoUrl); pack.photoUrl = URL.createObjectURL(f);
+    if (canEdit()) startEarlyPolish(f);
     keepInputs(render);
-    detectColors(f).then(names => { if (pack.photo === f) pack.colors = names; });
+    detectColors(f).then(names => { if (pack.photo === f) pack.colors = names.filter(n => n !== 'White' || names.length === 1).slice(0, 1); });
   }
   if (e.target.id === 'k-photo' && e.target.files[0]) {
-    const f = e.target.files[0]; pack.photo = f; showPhoto(f); const r = $('#k-photo-wrap img[src^="http"]'); if (r) r.remove();
+    const f = e.target.files[0]; pack.photo = f; if (canEdit()) startEarlyPolish(f); showPhoto(f); const r = $('#k-photo-wrap img[src^="http"]'); if (r) r.remove();
     detectColors(f).then(names => {
       if (pack.photo !== f) return;
-      pack.colors = names;
+      pack.colors = names.filter(n => n !== 'White' || names.length === 1).slice(0, 1);
       const hint = $('#k-colorhint'), inp = $('#k-color');
       if (hint) hint.innerHTML = colorHintHTML();
       if (inp && names[0] && pack.colorCode && inp.value.trim().toUpperCase() === pack.colorCode) inp.value = `${pack.colorCode} (${names[0]})`;
@@ -2084,7 +2155,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.10';
+const APP_VERSION = '2026-11-22.11';
 let newVersion = false;
 async function checkVersion(){
   try {
