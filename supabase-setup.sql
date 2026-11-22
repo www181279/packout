@@ -50,6 +50,9 @@ create table if not exists public.items (
   updated_at   timestamptz not null default now()
 );
 
+-- Type of garment (Jeans, T-shirt, Hoodie...). Added later, so it is added to an existing table too.
+alter table public.items add column if not exists item_type text not null default '';
+
 create index if not exists items_style_idx  on public.items (style_number);
 create index if not exists items_box_idx    on public.items (box_id);
 create index if not exists items_pallet_idx on public.items (pallet_id);
@@ -293,8 +296,8 @@ declare
   v_boxes  jsonb := '[]'::jsonb;
   m        jsonb;
 begin
-  insert into public.items (id, style_number, box_id, color, brand, tag_number, quantity, gender, season, photo_path, created_by)
-  values ((p->>'id')::uuid, p->>'style_number', v_box, p->>'color', p->>'brand', coalesce(p->>'tag_number', ''),
+  insert into public.items (id, style_number, box_id, item_type, color, brand, tag_number, quantity, gender, season, photo_path, created_by)
+  values ((p->>'id')::uuid, p->>'style_number', v_box, coalesce(p->>'item_type', ''), p->>'color', p->>'brand', coalesce(p->>'tag_number', ''),
           (p->>'quantity')::int, p->>'gender', p->>'season', p->>'photo_path', p->>'created_by')
   on conflict (id) do nothing;
   select pallet_id into v_pallet from public.boxes where id = v_box;
@@ -303,8 +306,8 @@ begin
     select box_id into v_new from public.items where id = (m->>'id')::uuid;
     if v_new is null then
       insert into public.boxes (pallet_id, created_by) values (v_pallet, p->>'created_by') returning id into v_new;
-      insert into public.items (id, style_number, box_id, color, brand, tag_number, quantity, gender, season, photo_path, created_by)
-      values ((m->>'id')::uuid, p->>'style_number', v_new, p->>'color', p->>'brand', coalesce(p->>'tag_number', ''),
+      insert into public.items (id, style_number, box_id, item_type, color, brand, tag_number, quantity, gender, season, photo_path, created_by)
+      values ((m->>'id')::uuid, p->>'style_number', v_new, coalesce(p->>'item_type', ''), p->>'color', p->>'brand', coalesce(p->>'tag_number', ''),
               (m->>'qty')::int, p->>'gender', p->>'season', p->>'photo_path', p->>'created_by');
     end if;
     update public.boxes set status = 'closed' where id = v_prev;
