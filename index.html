@@ -121,6 +121,16 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .photosteps{display:grid;gap:10px}
 .photosteps .btn.done{background:#E7F4EC;color:var(--ink);border:1px solid #9FD3B2}
 .photosteps .mini{width:30px;height:30px;object-fit:cover;border-radius:5px;flex:none}
+.sizetabs{display:flex;gap:6px;overflow-x:auto;margin:2px 0 10px;-webkit-overflow-scrolling:touch}
+.sizetabs button{flex:none;border:1px solid var(--line);background:var(--paper);border-radius:20px;padding:6px 12px;font:500 14px var(--body);color:var(--ink2)}
+.sizetabs button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.sizechips.wl{margin-top:6px}
+.reading{display:flex;align-items:center;gap:10px;background:#FFF6D6;border:1px solid #F0D98A;border-radius:8px;padding:10px 12px;margin:10px 0;font-weight:500}
+.reading .dot{width:12px;height:12px;border-radius:50%;background:#E0A800;flex:none;animation:pulse 1s ease-in-out infinite alternate}
+@keyframes pulse{to{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.reading .dot{animation:none}}
+.boxnow{display:flex;justify-content:space-between;align-items:center;background:var(--ink);color:#fff;border-radius:10px;padding:10px 14px;margin-bottom:12px}
+.boxnow b{font:700 30px var(--sign);font-variant-numeric:tabular-nums}
 .morebox{margin-top:4px}.morerow{display:flex;gap:8px}.morerow input{flex:1;text-align:center;font:700 24px/1 var(--sign)}.morerow .btn{width:auto;flex:none;min-height:50px}
 .addmore{display:block;margin-top:10px}
 .savedacts{margin-top:10px}.savedacts .btn{flex:1;font-size:15px}
@@ -346,7 +356,29 @@ const TYPES = {
 };
 const ALL_TYPES = Object.values(TYPES).flat();
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'One size'];
-const sizeRank = z => { const i = SIZES.indexOf(z); if (i >= 0) return i; const n = parseFloat(z); return isNaN(n) ? 1000 : 100 + n; };
+// size sets: the app shows the set that fits the type and gender; the packer can switch
+const SIZESETS = {
+  letter: { name: 'Letters', list: SIZES },
+  women:  { name: 'Numbers', list: ['00', '0', '2', '4', '6', '8', '10', '12', '14', '16', '18', '20', '22', '24'] },
+  wl:     { name: 'Waist/Length', waists: ['28', '29', '30', '31', '32', '33', '34', '36', '38', '40', '42', '44'], lengths: ['28', '29', '30', '31', '32', '34', '36'] },
+  kids:   { name: 'Kids', list: ['4', '5', '6', '6X', '7', '8', '10', '12', '14', '16', '18', '20', '4/5', '6/7', '7/8', '10/12', '14/16', '18/20'] },
+  baby:   { name: 'Baby', list: ['NB', '0-3M', '3-6M', '6-9M', '6-12M', '12M', '18M', '24M', '2T', '3T', '4T', '5T'] }
+};
+const NUMBER_BOTTOMS = ['Jeans', 'Pants', 'Shorts', 'Skirt'];
+function sizeSetFor(type, gender){
+  if (gender === 'Baby') return 'baby';
+  if (NUMBER_BOTTOMS.includes(type)) return gender === 'Men' ? 'wl' : gender === 'Girls' || gender === 'Boys' ? 'kids' : 'women';
+  return 'letter';
+}
+const MONTHS = SIZESETS.baby.list;
+const normSize = z => { const t = String(z || '').trim().toUpperCase().replace(/\s+/g, ''); const m = t.match(/^W?(\d{2})[X\/]L?(\d{2})$/) || t.match(/^W(\d{2})L(\d{2})$/); return m ? m[1] + '/' + m[2] : t; };
+const sizeRank = z => {
+  const i = SIZES.indexOf(z); if (i >= 0) return i;
+  const b = MONTHS.indexOf(z); if (b >= 0) return 20 + b;
+  if (z === '00') return 99;
+  const wl = String(z).match(/^(\d{2})\/(\d{2})$/); if (wl) return 1000 + +wl[1] + +wl[2] / 100;
+  const n = parseFloat(z); return isNaN(n) ? 5000 : 100 + n + (/X$/.test(z) ? .5 : 0);
+};
 const bySize = (a, b) => sizeRank(a) - sizeRank(b) || String(a).localeCompare(String(b));
 const sizesOf = rows => [...new Set(rows.map(r => r.size).filter(Boolean))].sort(bySize);
 // <select> of types, grouped; types typed in by hand before are offered too
@@ -492,7 +524,7 @@ let tab = 'pack';
 let pack = newPack(store.get('last'), store.get('last'));   // keep filling the box this phone used last
 let palView = null, palMine = false;
 let filt = { q: '', pallet: '', box: '', item_type: '', size: '', brand: '', gender: '', season: '', color: '', by: '' }, invLimit = 150, invSort = 'new';
-function newPack(last, keep){ return { reuse: null, runPath: null, lastEntry: null, stage: 'style', style: '', pallet: null, box: null, known: false, owner: '', err: '', saved: null, photo: null, id: uuid(), last: last || null, keep: keep || null }; }
+function newPack(last, keep){ return { sizeSet: null, wlWaist: null, reuse: null, runPath: null, lastEntry: null, stage: 'style', style: '', pallet: null, box: null, known: false, owner: '', err: '', saved: null, photo: null, id: uuid(), last: last || null, keep: keep || null }; }
 // "keep" = the employee asked to put the next style into the same box
 // If the box or style this phone is working on was deleted (here or on another phone), start over cleanly.
 function validatePack(){
@@ -704,6 +736,7 @@ function packHTML(){
         <label class="btn ${pack.photo ? 'done' : 'alt'} filebtn tagbtn">${pack.photo ? `<img class="mini" alt="" src="${esc(pack.photoUrl || '')}">` : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>'}${pack.photo ? '1. Item photo taken. Tap to retake' : '1. Photo of the item'}<input id="k-itemfirst" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the item on the rack"></label>
         <label class="btn alt filebtn tagbtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>2. Photo of the tag<input id="k-tagphoto" data-where="style" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in the style and details"></label>
       </div>
+      <div id="tag-status">${pack.tagStatus || ''}</div>
       <p class="small muted" style="margin:8px 0 4px">With both photos, the app reads the style, color, size, type and brand, and names the color from the item. Check them before saving.</p>
       <label class="f" for="k-style">Style number <small>(filled in from the tag, or type it)</small></label>
       <input id="k-style" type="text" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(pack.style)}">
@@ -759,17 +792,19 @@ function packHTML(){
     ${pack.saved ? `<div class="saved">${esc(pack.saved)}${pack.runPath ? colorRunHTML(pack.runPath) : ''}${pack.justSaved && idx.box.get(pack.box)?.status === 'open' ? `
       <div class="row savedacts"><button class="btn sm" data-act="continue-box">Same color, next box</button><button class="btn alt sm" data-act="same-box">Next style</button></div>
       <p class="small" style="margin-top:8px">Next color of ${esc(pack.style)}: take a new photo below.</p>` : ''}</div>` : ''}
+    <div class="boxnow"><span>Packing into</span><b>${bCode(pack.box)}</b><span>${pCode(pack.pallet)}</span></div>
     <div class="panel">
       <div class="photo" id="k-photo-wrap">${pack.reuse && !pack.photo ? `<img alt="Same photo as the last box" src="${esc(photoUrl(pack.reuse.path))}"><span class="again">Same photo. Tap to retake</span>` : '<span>Tap to take a photo of the item</span>'}
         <input id="k-photo" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the item"></div>
       <label class="btn alt filebtn tagbtn2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Read the tag for this color<input id="k-tagphoto" data-where="item" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in this item"></label>
+      <div id="tag-status">${pack.tagStatus || ''}</div>
       ${pack.tagNote ? `<div class="note">${esc(pack.tagNote)}</div>` : ''}
       <label class="f" for="k-color">Color</label>
       <input id="k-color" type="text" list="l-color" autocomplete="off" enterkeyhint="next" value="${esc(f.color)}">
       <div id="k-colorhint" class="chint">${colorHintHTML()}</div>
       <datalist id="l-color">${uniq('color').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <label class="f">Size <small>(tap every size of this color you are packing)</small></label>
-      <div class="chips sizechips">${[...SIZES, ...sizes.map(z => z.size).filter(z => !SIZES.includes(z))].map(z => `<button type="button" data-act="toggle-size" data-size="${esc(z)}" aria-pressed="${sizes.some(x => x.size === z)}">${esc(z)}</button>`).join('')}<button type="button" data-act="other-size">Other size</button></div>
+      ${sizeChipsHTML(f, sizes)}
       ${sizes.length ? `<div class="szlist">${sizes.map((z, n) => `<div class="szrow" data-size="${esc(z.size)}">
         <div class="szhead"><span class="szname">${esc(z.size)}</span><span class="small muted">in ${bCode(pack.box)}</span></div>
         <div class="qty"><button type="button" data-act="qty" data-for="k-q-${n}" data-d="-1" aria-label="One less ${esc(z.size)}">&minus;</button>
@@ -794,6 +829,20 @@ function packHTML(){
     </div>
     <button class="linkbtn restart" data-act="restart-style">Start over: delete style ${esc(pack.style)}</button>
     <div class="savebar">${err}<button class="btn" data-act="save-item">Save item</button></div>`;
+}
+function sizeChipsHTML(f, sizes){
+  const set = pack.sizeSet || sizeSetFor(f.type, f.gender), S = SIZESETS[set];
+  const chip = z => `<button type="button" data-act="toggle-size" data-size="${esc(z)}" aria-pressed="${sizes.some(x => x.size === z)}">${esc(z)}</button>`;
+  const shown = set === 'wl' ? [] : S.list;
+  const extra = sizes.map(z => z.size).filter(z => !shown.includes(z));
+  const tabs = `<div class="sizetabs">${Object.entries(SIZESETS).map(([k, v]) => `<button type="button" data-act="size-set" data-set="${k}" aria-pressed="${k === set}">${v.name}</button>`).join('')}</div>`;
+  if (set === 'wl') return `${tabs}
+    ${extra.length ? `<div class="chips sizechips">${extra.map(chip).join('')}</div>` : ''}
+    <p class="small muted" style="margin:6px 0 4px">Tap the waist, then the length.</p>
+    <div class="chips sizechips wl">${S.waists.map(w => `<button type="button" data-act="wl-waist" data-w="${w}" aria-pressed="${pack.wlWaist === w}">W${w}</button>`).join('')}</div>
+    <div class="chips sizechips wl" ${pack.wlWaist ? '' : 'hidden'}>${S.lengths.map(l => `<button type="button" data-act="wl-length" data-l="${l}">L${l}</button>`).join('')}<button type="button" data-act="wl-length" data-l="">No length</button></div>
+    <div class="chips sizechips"><button type="button" data-act="other-size">Other size</button></div>`;
+  return `${tabs}<div class="chips sizechips">${[...shown, ...extra].map(chip).join('')}<button type="button" data-act="other-size">Other size</button></div>`;
 }
 function palPick(p){
   const its = itemsOf('pallet_id', p.id);
@@ -1169,7 +1218,7 @@ function mergeTag(f, t){
   if (t.gender) f.gender = t.gender;
   if (t.color && (!f.color || f.colorAuto)) { f.color = t.color; f.colorAuto = false; }
   pack.colorCode = t.color_code && t.color === t.color_code ? t.color_code.toUpperCase() : null;
-  const size = t.size && String(t.size).trim().toUpperCase();
+  const size = t.size && normSize(t.size);
   if (size && !f.sizes.some(z => z.size === size)) { f.sizes.push({ size, qty: 1, tag: '' }); f.sizes.sort((a, b) => bySize(a.size, b.size)); f.more = []; }
   if (t.upc) {
     if (f.sizes.length > 1) { const z = f.sizes.find(z => z.size === size); if (z && !z.tag) z.tag = t.upc; }
@@ -1182,36 +1231,39 @@ function tagFactsHTML(t){
   const rows = [['Style', t.style], ['Color', t.color], ['Size', t.size], ['Type', t.item_type], ['Brand', t.brand], ['Gender', t.gender], ['Barcode', t.upc], ['Description', t.description]].filter(r => r[1]);
   return rows.length ? `<dl class="facts">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>` : '';
 }
+// Reads the tag without a waiting screen: the packer keeps working, the form fills in when the answer arrives.
 async function readTag(file, where){
-  const run = ++tagRun, url = URL.createObjectURL(file);
-  const again = `<label class="btn alt filebtn">Take the photo again<input id="k-tagphoto" data-where="${where}" type="file" accept="image/*" capture="environment"></label>`;
-  openSheet(`<h2>Reading the tag</h2><img class="big" style="max-height:26vh" src="${url}" alt="Your photo of the tag">
-    <div id="tag-out"><p class="lead">Reading the style, color, size and brand. This takes a few seconds.</p></div>
-    <button class="btn quiet" data-act="close-sheet" style="margin-top:10px">Cancel</button>`);
+  const run = ++tagRun;
+  const status = html => { pack.tagStatus = html; const el = $('#tag-status'); if (el) el.innerHTML = html; };
+  status(`<div class="reading"><span class="dot"></span>Reading the tag. Count the pieces of each size meanwhile.</div>`);
+  pack.tagFile = file;
   try {
-    const body = { tag: await blobToB64(await shrink(file, 1600, .9)), types: ALL_TYPES, sizes: SIZES, style: where === 'item' ? pack.style : '' };
+    const body = { tag: await blobToB64(await shrink(file, 1600, .9)), types: ALL_TYPES, sizes: [...SIZES, ...SIZESETS.women.list, ...SIZESETS.kids.list, ...SIZESETS.baby.list], style: where === 'item' ? pack.style : '' };
     if (pack.photo) body.item = await blobToB64(await shrink(pack.photo, 900, .8));
     const t = await (await fnCall('read-tag', body)).json();
-    if (run !== tagRun || !$('#tag-out')) return;
+    if (run !== tagRun) return;
     t.style = normStyle(t.style);
     pack.lastTag = { t, file, where };
-    const other = where === 'item' && t.style && t.style !== pack.style;
-    const known = where === 'style' && t.style && styleRow(t.style);
-    $('#sheet h2').textContent = 'From the tag';
-    $('#tag-out').innerHTML = tagFactsHTML(t)
-      + (t.notes ? `<div class="note">Check: ${esc(t.notes)}</div>` : '')
-      + (other ? `<div class="err">This tag says style ${esc(t.style)}, but you are packing ${esc(pack.style)}. Make sure it is the right piece.</div>` : '')
-      + (known ? `<p class="small muted">Style ${esc(t.style)} is already on ${pCode(known.pallet_id)}.</p>` : '')
-      + (where === 'style'
-        ? (t.style ? `<button class="btn" data-act="tag-use">Use style ${esc(t.style)}</button>` : `<div class="err">The style number was not clear on this photo.</div>`)
-          + `<button class="btn alt" data-act="tag-ocr">Pick the style from the text myself</button>`
-        : `<button class="btn" data-act="tag-use">Fill in the form</button>`)
-      + again;
+    if (where === 'style') {
+      if (!t.style) return status(`<div class="err">The style number was not clear on the tag. Take the tag photo again, or type the style.</div><button class="linkbtn" data-act="tag-ocr">Pick the style from the text myself</button>`);
+      status(''); pack.tagRead = t;
+      if (pack.stage !== 'style') return;
+      const i = $('#k-style'); if (i) { i.value = t.style; act['check-style'](); }
+      return;
+    }
+    status('');
+    if (pack.stage !== 'item') return;
+    if (t.style && t.style !== pack.style) {
+      return openSheet(`<h2>Different style on this tag</h2>${tagFactsHTML(t)}
+        <div class="err">This tag says style ${esc(t.style)}, but you are packing ${esc(pack.style)}. Make sure it is the right piece.</div>
+        <div class="row"><button class="btn alt" data-act="close-sheet">Ignore this tag</button><button class="btn" data-act="tag-use">Fill in anyway</button></div>`);
+    }
+    act['tag-use']();
   } catch (e) {
-    if (run !== tagRun || !$('#tag-out')) return;
-    if (where === 'style' && (notSetUp(e) || e.code === 'NETWORK')) return runOcr(file);    // the AI reader is not available: use the text reader on the phone
-    $('#tag-out').innerHTML = `<div class="err">${esc(notSetUp(e) ? 'Tag reading is not switched on yet. Type the details.' : e.message)}</div>` + again;
-  } finally { URL.revokeObjectURL(url); }
+    if (run !== tagRun) return;
+    if (where === 'style' && (notSetUp(e) || e.code === 'NETWORK')) { status(''); return runOcr(file); }   // the AI reader is not available: use the text reader on the phone
+    status(`<div class="err">${esc(notSetUp(e) ? 'Tag reading is not switched on yet. Type the details.' : e.message)}</div>`);
+  }
 }
 async function runOcr(file){
   const run = ++ocrRun, url = URL.createObjectURL(file);
@@ -1552,7 +1604,7 @@ const act = {
     await withBusy('Checking style ' + s, async () => {
       try {
         const [found] = await Promise.all([db.get('styles', 'select=*&style_number=' + eq(s)), loadAll()]);
-        pack.err = '';
+        pack.err = ''; pack.tagStatus = '';
         const kb = pack.keep && idx.box.get(pack.keep.box);
         if (found[0]) { Object.assign(pack, { stage: 'box', pallet: found[0].pallet_id, known: true, owner: found[0].created_by }); applyKeep(); }
         else if (kb && kb.status === 'open') return await claim(kb.pallet_id, 'keep');
@@ -1632,13 +1684,22 @@ const act = {
     if (f.sizes.length !== 1) f.more = [];                    // more boxes only when one size is packed
     pack.form = f; pack.err = ''; const p = pack.photo; const y = scrollY; render(); if (p) showPhoto(p); scrollTo(0, y);
   },
+  'size-set'(el){ pack.form = readForm(); pack.sizeSet = el.dataset.set; pack.wlWaist = null; const y = scrollY; render(); scrollTo(0, y); },
+  'wl-waist'(el){ pack.form = readForm(); pack.wlWaist = pack.wlWaist === el.dataset.w ? null : el.dataset.w; const y = scrollY; render(); scrollTo(0, y); },
+  'wl-length'(el){
+    const w = pack.wlWaist; if (!w) return; pack.wlWaist = null;
+    const z = el.dataset.l ? w + '/' + el.dataset.l : w;
+    const f = readForm(); if (!f.sizes.some(x => x.size === z)) f.sizes.push({ size: z, qty: 1, tag: f.sizes.length ? '' : f.tag });
+    f.sizes.sort((a, b) => bySize(a.size, b.size)); if (f.sizes.length !== 1) f.more = []; if (f.sizes.length > 1) f.tag = '';
+    pack.form = f; pack.err = ''; const y = scrollY; render(); scrollTo(0, y);
+  },
   'other-size'(){
     openSheet(`<h2>Other size</h2><label class="f" for="os">Size, for example 32, 32x34, 4T or 10</label>
       <input id="os" type="text" autocomplete="off" autocapitalize="characters" autofocus>
       <div class="row" style="margin-top:16px"><button class="btn alt" data-act="close-sheet">Cancel</button><button class="btn" data-act="other-size-add">Add size</button></div>`);
   },
   'other-size-add'(){
-    const z = $('#os').value.trim().toUpperCase().replace(/\s+/g, ''); closeSheet(); if (!z) return;
+    const z = normSize($('#os').value); closeSheet(); if (!z) return;
     const f = readForm(); if (!f.sizes.some(x => x.size === z)) f.sizes.push({ size: z, qty: 1, tag: '' });
     f.sizes.sort((a, b) => bySize(a.size, b.size)); if (f.sizes.length !== 1) f.more = [];
     pack.form = f; const p = pack.photo; const y = scrollY; render(); if (p) showPhoto(p); scrollTo(0, y);
@@ -1670,7 +1731,7 @@ const act = {
         pack.last = { pallet: pack.pallet, box: pack.box }; store.set('last', pack.last);
         store.set('lastForm', { type: f.type, brand: f.brand, gender: f.gender, season: f.season });
         if (navigator.vibrate) navigator.vibrate(40);
-        Object.assign(pack, { id: uuid(), ids: null, photo: null, reuse: null, colors: null, err: '', justSaved: true, runPath: path, tagNote: '', colorCode: null,
+        Object.assign(pack, { id: uuid(), ids: null, photo: null, reuse: null, colors: null, err: '', justSaved: true, runPath: path, tagNote: '', tagStatus: '', colorCode: null,
           lastEntry: { path, color: f.color, type: f.type, brand: f.brand, gender: f.gender, season: f.season },
           form: { ...f, color: '', tag: '', sizes: f.sizes.map(z => ({ size: z.size, qty: 1, tag: '' })), more: [] }, saved: msg });
         render(); scrollTo(0, 0);
@@ -1716,10 +1777,10 @@ const act = {
   'join-code'(){ joinCodeSheet(); },
   'use-color'(el){ const i = $('#k-color'); if (i) { i.value = el.dataset.v; delete i.dataset.auto; } },
   'tag-use'(){
-    const L = pack.lastTag; closeSheet(); if (!L) return;
+    const L = pack.lastTag; if (sheetOpen()) closeSheet(); if (!L) return;
     if (L.where === 'style') { pack.tagRead = L.t; const i = $('#k-style'); if (i) { i.value = L.t.style; act['check-style'](); } return; }
     const ph = pack.photo; pack.form = mergeTag(readForm(), L.t); pack.err = ''; const y = scrollY; render(); if (ph) showPhoto(ph); scrollTo(0, y);
-    toast('Filled in from the tag. Check the quantity.', 'good');
+    toast('Filled in from the tag. Check the sizes and quantities.', 'good');
   },
   'flip-photo'(el){ const im = $('#big-photo'); if (!im) return; const showB = im.src === el.dataset.a; im.src = showB ? el.dataset.b : el.dataset.a; el.textContent = showB ? 'Show the polished photo' : 'Show the original photo'; },
   'polish-all'(){
@@ -1733,7 +1794,7 @@ const act = {
     try { if (navigator.share) return await navigator.share({ title: 'Packout, view only', text, url }); } catch (e) { if (e.name === 'AbortError') return; }
     try { await navigator.clipboard.writeText(url); toast('View-only link copied.', 'good'); } catch { openSheet(`<h2>View-only link</h2><p class="lead">Copy this link and send it.</p><textarea readonly style="width:100%;min-height:120px">${esc(url)}</textarea><button class="btn" data-act="close-sheet">Done</button>`); }
   },
-  'tag-ocr'(){ const L = pack.lastTag; if (L) runOcr(L.file); },
+  'tag-ocr'(){ const f = (pack.lastTag || {}).file || pack.tagFile; pack.tagStatus = ''; if (f) runOcr(f); },
   'ocr-pick'(el){
     const v = normStyle(el.dataset.v); closeSheet();
     const i = $('#k-style'); if (!i) return;
@@ -1942,6 +2003,10 @@ document.addEventListener('change', e => {
   if (e.target.id === 'k-tagphoto' && e.target.files[0]) { const f = e.target.files[0], w = e.target.dataset.where || 'style'; e.target.value = ''; readTag(f, w); }
 });
 document.addEventListener('change', e => {
+  if (tab === 'pack' && pack.stage === 'item' && !pack.sizeSet && (e.target.id === 'k-type' || e.target.name === 'k-gender') && e.target.value !== '__other') {
+    const f = readForm(); if (sizeSetFor(f.type, f.gender) !== sizeSetFor((pack.form || {}).type, (pack.form || {}).gender)) { pack.form = f; const y = scrollY; render(); scrollTo(0, y); return; }
+    pack.form = f;
+  }
   if (e.target.id === 'k-type' || e.target.id === 'e-type' || e.target.id === 's-type') {
     const o = $('#' + e.target.id + '-other'); if (o) { o.hidden = e.target.value !== '__other'; if (!o.hidden) o.focus(); }
   }
@@ -1997,6 +2062,21 @@ setInterval(async () => {
   if (await refresh(true) && !busyN && !sheetOpen()) softRender();
 }, 15000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
+
+/* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
+const APP_VERSION = '2026-11-22.4';
+let newVersion = false;
+async function checkVersion(){
+  try {
+    const t = await fetch(location.pathname + '?v=' + Date.now(), { cache: 'no-store' }).then(r => r.ok ? r.text() : '');
+    const m = t.match(/APP_VERSION = '([^']+)'/);
+    if (m && m[1] !== APP_VERSION) newVersion = true;
+  } catch {}
+}
+const safeToReload = () => !busyN && !sheetOpen() && !polishBusy && !(tab === 'pack' && (pack.stage !== 'style' || pack.photo || pack.tagStatus));
+setInterval(() => { if (!document.hidden) checkVersion(); }, 120000);
+setInterval(() => { if (newVersion && safeToReload()) location.reload(); }, 5000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkVersion(); });
 
 /* ---------- start ---------- */
 (async function start(){
