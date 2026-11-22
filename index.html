@@ -22,7 +22,7 @@
   --sign:"Barlow Condensed","Arial Narrow","Roboto Condensed",var(--body);
 }
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;scroll-padding-top:calc(var(--toph,62px) + 56px);scroll-padding-bottom:calc(var(--navh,64px) + 90px)}
 /* no double-tap zoom: fast repeated taps on + and - must only count */
 html,body,button,a,label,input,select,.pick,.irow{touch-action:manipulation}
 button,.chips span,#nav{-webkit-user-select:none;user-select:none}
@@ -85,11 +85,26 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .placard.stop{background:var(--stop);color:#fff}
 .placard.stop .stripes{background:repeating-linear-gradient(-45deg,#fff 0 14px,var(--stop) 14px 28px)}
 
-/* pack trail */
-.trail{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center}
+/* pack trail: always shows where the employee is packing */
+.trail{position:sticky;top:var(--toph,62px);z-index:15;background:var(--floor);display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-16px -16px 12px;padding:10px 16px;border-bottom:1px solid var(--line)}
 .trail span{background:var(--ink);color:#fff;border-radius:6px;padding:4px 10px;font:700 18px/1.2 var(--sign)}
 .trail span.p{background:var(--placard);color:var(--ink)}
-.trail button{margin-left:auto}
+.trail .acts{margin-left:auto;display:flex;gap:6px}
+.trail .acts button{border:1.5px solid var(--ink);background:#fff;color:var(--ink);min-height:36px;border-radius:8px;padding:6px 10px;font-weight:600;font-size:14px;white-space:nowrap}
+.trail > .linkbtn{margin-left:auto}
+/* save bar stays above the bottom tabs */
+.savebar{position:sticky;bottom:var(--navh,64px);z-index:14;margin:0 -16px;padding:10px 16px 12px;background:var(--floor);border-top:1px solid var(--line)}
+.savebar .err{margin:0 0 10px}
+.samehead{display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline;justify-content:space-between;margin:18px 0 0;padding-top:14px;border-top:1px dashed var(--line)}
+.samehead span{font-size:14px;color:var(--ink2)}
+#help{border:1.5px solid rgba(255,255,255,.5);background:none;color:#fff;border-radius:50%;width:34px;height:34px;font-weight:700;font-size:17px;flex:none}
+.guide{list-style:none;margin:0 0 14px;padding:0}
+.guide li{display:grid;grid-template-columns:40px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.guide li:first-child{border-top:0}
+.guide b.n{display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--placard);font:700 20px/1 var(--sign)}
+.guide strong{display:block;font-weight:600}
+.qrbox{background:#fff;border-radius:12px;padding:16px;display:grid;place-items:center;margin-bottom:12px}
+.qrbox svg,.qrbox img{width:100%;max-width:300px;height:auto;display:block}
 
 /* pick lists */
 .pick{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;min-height:64px}
@@ -122,7 +137,7 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .chint i{width:22px;height:22px;border-radius:50%;border:1px solid rgba(19,33,58,.25)}
 .withscan{display:flex;gap:8px}.withscan input{flex:1;min-width:0}.withscan .btn{width:auto;flex:none;min-height:50px;padding:8px 14px}
 .withscan svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
-.tools2{margin-top:8px}.tools2 .btn{font-size:16px;min-height:48px;padding:6px 8px}
+.tools2{margin-top:8px}.tools2 .btn{width:100%}.tools2 .btn{font-size:16px;min-height:48px;padding:6px 8px}
 .tools2 svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;flex:none}
 .filebtn{position:relative;overflow:hidden;cursor:pointer}.filebtn input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
 .ocrrow{margin-bottom:10px}.ocrrow .pick{margin-bottom:6px}.ocrrow .pick b{font:700 24px/1.15 var(--sign);word-break:break-all}
@@ -188,7 +203,7 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .big{width:100%;border-radius:10px;background:#E3E9EF;display:block;margin-bottom:12px;max-height:50vh;object-fit:contain}
 dl.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0 0 14px}
 dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
-#toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;margin:auto;max-width:520px;background:var(--ink);color:#fff;border-radius:8px;padding:12px 14px;font-weight:500;display:none}
+#toast{position:fixed;left:16px;right:16px;top:calc(var(--toph,62px) + 8px);z-index:60;margin:auto;max-width:520px;background:var(--ink);color:#fff;border-radius:8px;padding:12px 14px;font-weight:500;display:none}
 #toast.on{display:block}#toast.bad{background:var(--stop)}#toast.good{background:var(--go)}
 #busy{position:fixed;inset:0;z-index:70;background:rgba(232,236,239,.82);display:none;place-items:center;text-align:center;font-weight:600}
 #busy.on{display:grid}
@@ -266,6 +281,7 @@ dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
 <header id="top">
   <div><div class="name">Packout</div><div id="sync" class="small"><i></i><span>Not connected</span></div></div>
   <div class="who" id="who"></div>
+  <button id="help" data-act="guide" aria-label="How to use the app" hidden>?</button>
 </header>
 <main id="view"></main>
 <nav id="nav" hidden>
@@ -434,11 +450,18 @@ function render(){
   const v = $('#view'); v.classList.toggle('wide', tab === 'inventory' && !!cfg && !!me);
   if (!cfg) { $('#nav').hidden = true; return v.innerHTML = connectHTML(); }
   if (!me)  { $('#nav').hidden = true; return v.innerHTML = whoHTML(); }
-  $('#nav').hidden = false;
+  $('#nav').hidden = false; $('#help').hidden = false;
   document.querySelectorAll('#nav button').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   v.innerHTML = ({ pack: packHTML, pallets: palletsHTML, inventory: inventoryHTML, more: moreHTML })[tab]();
   if (tab === 'inventory') renderInvList();
+  setBars();
 }
+function setBars(){
+  const r = document.documentElement.style;
+  r.setProperty('--toph', $('#top').offsetHeight + 'px');
+  r.setProperty('--navh', ($('#nav').hidden ? 0 : $('#nav').offsetHeight) + 'px');
+}
+window.addEventListener('resize', setBars);
 function connectHTML(err = ''){
   return `<h1 class="h">Connect your database</h1>
   <p class="lead">One time on this phone. Paste the two values from your Supabase project (Project Settings, then API).</p>
@@ -471,7 +494,9 @@ function trailHTML(){
     <span>${esc(pack.style)}</span>
     ${pack.pallet ? `<span class="p">${pCode(pack.pallet)}</span>` : ''}
     ${pack.box ? `<span>${bCode(pack.box)}</span>` : ''}
-    <button class="linkbtn" data-act="pack-reset">Start another style</button>
+    ${pack.stage === 'item'
+      ? `<div class="acts"><button data-act="same-box">Next style</button><button data-act="new-box">Box full</button></div>`
+      : `<button class="linkbtn" data-act="pack-reset">Start another style</button>`}
   </div>`;
 }
 function packHTML(){
@@ -485,8 +510,7 @@ function packHTML(){
     <div class="panel">
       <label class="f" for="k-style">Style number</label>
       <input id="k-style" type="text" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(pack.style)}">
-      <div class="row tools2"><button type="button" class="btn alt" data-act="scan" data-target="style" aria-label="Scan a barcode with the camera"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>Scan barcode</button>
-        <label class="btn alt filebtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M8 9h8M12 9v7"/></svg>Read text<input id="k-ocr" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to read the style number"></label></div>
+      <div class="tools2"><label class="btn alt filebtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M8 9h8M12 9v7"/></svg>Read the style from the tag<input id="k-ocr" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to read the style number"></label></div>
       ${err}
       <button class="btn" data-act="check-style" style="margin-top:14px">Check style</button>
     </div>`;
@@ -527,39 +551,35 @@ function packHTML(){
       : `<p class="small muted" style="margin-top:14px">Pallet full, or a mistake in this style? <button class="linkbtn" data-act="open-style" data-style="${esc(pack.style)}">Move, edit or delete this style</button></p>`}`;
   }
 
-  // item form
-  const prev = data.items.filter(i => i.style_number === pack.style).slice(-1)[0] || {};
+  // item form: the fields that change every time come first; the ones that carry over sit below
+  const prev = data.items.filter(i => i.style_number === pack.style).slice(-1)[0] || store.get('lastForm') || {};
   const f = pack.form || { brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', qty: 1 };
   const uniq = k => [...new Set(data.items.map(i => i[k]).filter(Boolean))].sort();
   return `${trailHTML()}
     ${pack.saved ? `<div class="saved">${esc(pack.saved)}</div>` : ''}
-    <h1 class="h">Record the item</h1>
-    <p class="lead">One entry for each color of style ${esc(pack.style)} going into ${bCode(pack.box)}.</p>
     <div class="panel">
-      <div class="photo" id="k-photo-wrap"><span>Take a photo of the item</span>
+      <div class="photo" id="k-photo-wrap"><span>Tap to take a photo of the item</span>
         <input id="k-photo" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the item"></div>
       <label class="f" for="k-color">Color</label>
-      <input id="k-color" type="text" list="l-color" autocomplete="off" value="${esc(f.color)}">
+      <input id="k-color" type="text" list="l-color" autocomplete="off" enterkeyhint="next" value="${esc(f.color)}">
       <div id="k-colorhint" class="chint">${colorHintHTML()}</div>
       <datalist id="l-color">${uniq('color').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
-      <label class="f" for="k-brand">Brand</label>
-      <input id="k-brand" type="text" list="l-brand" autocomplete="off" value="${esc(f.brand)}">
-      <datalist id="l-brand">${uniq('brand').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
-      <label class="f" for="k-tag">Tag number <small>(optional)</small></label>
-      <div class="withscan"><input id="k-tag" type="text" autocomplete="off" autocapitalize="characters" value="${esc(f.tag)}"><button type="button" class="btn alt" data-act="scan" data-target="tag" aria-label="Scan a barcode with the camera"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>Scan</button></div>
       <label class="f" for="k-qty">Quantity</label>
       <div class="qty"><button type="button" data-act="qty" data-d="-1" aria-label="One less">&minus;</button>
-        <input id="k-qty" type="number" inputmode="numeric" min="1" value="${esc(f.qty)}">
+        <input id="k-qty" type="number" inputmode="numeric" min="1" enterkeyhint="done" value="${esc(f.qty)}">
         <button type="button" data-act="qty" data-d="1" aria-label="One more">+</button></div>
+      <label class="f" for="k-tag">Tag number <small>(optional)</small></label>
+      <div class="withscan"><input id="k-tag" type="text" autocomplete="off" autocapitalize="characters" enterkeyhint="done" value="${esc(f.tag)}"><button type="button" class="btn alt" data-act="scan" data-target="tag" aria-label="Scan a barcode with the camera"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>Scan</button></div>
+      <div class="samehead"><b>Same for the whole style</b><span>Kept from the last item</span></div>
+      <label class="f" for="k-brand">Brand</label>
+      <input id="k-brand" type="text" list="l-brand" autocomplete="off" enterkeyhint="done" value="${esc(f.brand)}">
+      <datalist id="l-brand">${uniq('brand').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <label class="f">Gender</label>
       <div class="chips">${GENDERS.map(g => `<label><input type="radio" name="k-gender" value="${g}" ${f.gender === g ? 'checked' : ''}><span>${g}</span></label>`).join('')}</div>
       <label class="f">Season</label>
       <div class="chips">${SEASONS.map(g => `<label><input type="radio" name="k-season" value="${g}" ${f.season === g ? 'checked' : ''}><span>${g}</span></label>`).join('')}</div>
-      ${err}
-      <button class="btn" data-act="save-item" style="margin-top:18px">Save item</button>
     </div>
-    <button class="btn alt" data-act="same-box">Next style, same box</button>
-    <button class="btn quiet" data-act="new-box">This box is full. Start a new box</button>`;
+    <div class="savebar">${err}<button class="btn" data-act="save-item">Save item</button></div>`;
 }
 function palPick(p){
   const its = itemsOf('pallet_id', p.id);
@@ -735,7 +755,7 @@ const SCAN_LIB = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
 let scanner = null;
 function loadScript(src){
   return new Promise((ok, no) => { const el = document.createElement('script'); el.src = src; el.onload = ok;
-    el.onerror = () => { el.remove(); no(new Error('The scanner could not load. Check the internet on this phone.')); }; document.head.appendChild(el); });
+    el.onerror = () => { el.remove(); no(new Error('This part of the app could not load. Check the internet on this phone.')); }; document.head.appendChild(el); });
 }
 function stopScanner(){
   const sc = scanner; scanner = null;
@@ -807,6 +827,30 @@ async function runOcr(file){
   } catch (e) {
     if ($('#ocr-out')) $('#ocr-out').innerHTML = `<div class="err">${esc(e.message || 'The reader could not start.')} You can still type the number.</div>` + again;
   } finally { URL.revokeObjectURL(url); }
+}
+
+/* ---------- quick guide for employees ---------- */
+function guideSheet(first){
+  openSheet(`<h2>${first ? 'How packing works' : 'How to use Packout'}</h2>
+    <ol class="guide">
+      <li><b class="n">1</b><span><strong>Enter the style number</strong>Type it, or tap Read the style from the tag and photograph the tag.</span></li>
+      <li><b class="n">2</b><span><strong>Follow the pallet the app shows</strong>A new style goes in your box. If the style was already started, the app shows its pallet. Take the pieces there.</span></li>
+      <li><b class="n">3</b><span><strong>One entry per color</strong>Take the photo, check the color, set the quantity, tap Save item. Then photograph the next color.</span></li>
+      <li><b class="n">4</b><span><strong>Use the two buttons at the top</strong><em>Next style</em> when this style is done. <em>Box full</em> when the box is full. Write the new box number on the box.</span></li>
+    </ol>
+    <p class="small muted" style="margin-bottom:12px">Tap the ? at the top to see this again.</p>
+    <button class="btn" data-act="close-sheet" autofocus>${first ? 'Start packing' : 'Got it'}</button>`);
+}
+const QR_LIB = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+async function joinCodeSheet(){
+  const link = location.origin + location.pathname + joinHash(false);
+  openSheet(`<h2>Join code</h2><p class="lead">The employee points their phone camera at this code and taps the link. The app opens connected; they type their name.</p>
+    <div class="qrbox" id="qr"><p class="muted">Making the code</p></div><button class="btn" data-act="close-sheet">Done</button>`);
+  try {
+    if (!window.qrcode) await loadScript(QR_LIB);
+    const q = qrcode(0, 'M'); q.addData(link); q.make();
+    if ($('#qr')) $('#qr').innerHTML = q.createSvgTag({ cellSize: 6, margin: 3, scalable: true });
+  } catch (e) { if ($('#qr')) $('#qr').innerHTML = `<div class="err">${esc(e.message)} Use Share invite link instead.</div>`; }
 }
 
 /* ---------- style: move, edit, delete ---------- */
@@ -903,7 +947,8 @@ function moreHTML(){
     <p class="muted small" style="margin-bottom:12px">A phone browser always shows its address bar on a web page. To hide it, add Packout to this phone's home screen and open it from there.</p>
     <button class="btn alt" data-act="install">Add to home screen</button></div>`}
   <div class="panel"><h2>Invite employees</h2>
-    <p class="muted small" style="margin-bottom:12px">Send this link to each employee's phone. It opens the app already connected to your database. They only type their name.</p>
+    <p class="muted small" style="margin-bottom:12px">Show the join code and let the employee scan it with their phone camera, or send them the link. Either way they only type their name.</p>
+    <button class="btn" data-act="join-code">Show join code</button>
     <button class="btn alt" data-act="invite">Share invite link</button></div>
   <div class="panel"><h2>This phone</h2>
     <dl class="facts"><dt>Name</dt><dd>${esc(me.name)}</dd><dt>Database</dt><dd style="word-break:break-all">${esc(cfg.url.replace('https://', ''))}</dd></dl>
@@ -1018,6 +1063,7 @@ const act = {
     const name = $('#w-name').value.trim();
     if (!name) return $('#w-err').innerHTML = '<div class="err">Type your name.</div>';
     me = { name }; store.set('me', me); render();
+    if (!store.get('seenGuide')) { store.set('seenGuide', 1); guideSheet(true); }
   },
   'change-who'(){ me = null; render(); },
   disconnect(){
@@ -1108,9 +1154,11 @@ const act = {
         }
         data.items.push(saved);
         pack.last = { pallet: pack.pallet, box: pack.box }; store.set('last', pack.last);
+        store.set('lastForm', { brand: f.brand, gender: f.gender, season: f.season });
+        if (navigator.vibrate) navigator.vibrate(40);
         Object.assign(pack, { id: uuid(), photo: null, colors: null, err: '', form: { ...f, color: '', tag: '', qty: 1 },
-          saved: `Saved: ${nf(f.qty)} x ${pack.style} ${f.color} in ${bCode(pack.box)} on ${pCode(pack.pallet)}. Add the next color, or start another style.` });
-        render(); scrollTo(0, 0); toast('Saved', 'good');
+          saved: `Saved ${nf(f.qty)} x ${pack.style} ${f.color} in ${bCode(pack.box)}. Next color: take the photo. New style: tap Next style.` });
+        render(); scrollTo(0, 0);
       } catch (e) {
         showErr(/STYLE_PALLET/.test(e.message) ? 'This style belongs on a different pallet. Start the style again to see where it goes.' : e.code === '23503' ? 'This box or style was removed by someone. Tap "Start another style" and enter the style again.' : e.message + ' Tap Save item to try again.');
       }
@@ -1146,6 +1194,8 @@ const act = {
   async 'del-item-yes'(el){ closeSheet(); const it = data.items.find(i => i.id === el.dataset.id); await mutate('Deleting', async () => { await db.remove('items', 'id=' + eq(el.dataset.id)); await removePhotos([it && it.photo_path]); }, 'Deleted'); },
 
   scan(el){ openScanner(el.dataset.target); },
+  guide(){ guideSheet(false); },
+  'join-code'(){ joinCodeSheet(); },
   'use-color'(el){ const i = $('#k-color'); if (i) { i.value = el.dataset.v; delete i.dataset.auto; } },
   'ocr-pick'(el){
     const v = normStyle(el.dataset.v); closeSheet();
@@ -1325,6 +1375,8 @@ document.addEventListener('input', e => { if (e.target.id === 'k-color') delete 
 document.addEventListener('input', e => { if (e.target.id === 'inv-q') { filt.q = e.target.value; invLimit = 150; renderInvList(); } });
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'k-style') act['check-style']();
+  if (e.key === 'Enter' && e.target.id === 'k-color') { e.preventDefault(); const q = $('#k-qty'); q.focus(); q.select(); }
+  if (e.key === 'Enter' && ['k-qty', 'k-tag', 'k-brand'].includes(e.target.id)) { e.preventDefault(); e.target.blur(); }
   if (e.key === 'Escape' && sheetOpen()) closeSheet();
 });
 window.addEventListener('afterprint', () => $('#print-root').innerHTML = '');
