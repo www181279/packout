@@ -257,6 +257,9 @@ create policy "packout photos upload" on storage.objects
 drop policy if exists "packout photos replace" on storage.objects;
 create policy "packout photos replace" on storage.objects
   for update to anon, authenticated using (bucket_id = 'item-photos') with check (bucket_id = 'item-photos');
+drop policy if exists "packout photos delete" on storage.objects;
+create policy "packout photos delete" on storage.objects
+  for delete to anon, authenticated using (bucket_id = 'item-photos');
 
 -- Tell the API about the new tables right away.
 notify pgrst, 'reload schema';

@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#13213A">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <meta name="apple-mobile-web-app-title" content="Packout">
 <title>Packout</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -76,7 +80,7 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .placard{background:var(--placard);color:var(--ink);border-radius:10px;overflow:hidden;margin-bottom:12px}
 .placard .stripes{height:14px;background:repeating-linear-gradient(-45deg,var(--ink) 0 14px,var(--placard) 14px 28px)}
 .placard .in{padding:14px 16px 16px}
-.placard .code{font:700 76px/.9 var(--sign);letter-spacing:.01em;margin:6px 0 8px}
+.placard .code{font:700 72px/.9 var(--sign);letter-spacing:.01em;margin:6px 0 8px}
 .placard p{font-weight:500}
 .placard.stop{background:var(--stop);color:#fff}
 .placard.stop .stripes{background:repeating-linear-gradient(-45deg,#fff 0 14px,var(--stop) 14px 28px)}
@@ -90,7 +94,7 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 /* pick lists */
 .pick{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;min-height:64px}
 .pick:active{border-color:var(--ink)}
-.pick .tag{flex:none;min-width:86px;text-align:center;background:var(--placard);border-radius:6px;padding:8px 8px;font:700 26px/1 var(--sign)}
+.pick .tag{flex:none;min-width:104px;white-space:nowrap;text-align:center;background:var(--placard);border-radius:6px;padding:9px 10px;font:700 24px/1 var(--sign)}
 .pick .tag.box{background:#E3E9EF}
 .pick b{display:block;font-weight:600}
 .pick small{color:var(--ink2);font-size:14px}
@@ -116,9 +120,9 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .saved{background:var(--go-bg);border-left:4px solid var(--go);border-radius:6px;padding:10px 12px;margin-bottom:12px;font-weight:500}
 
 /* pallets */
-.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:10px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
 .ptile{border:0;text-align:left;background:var(--placard);border-radius:10px;padding:12px 14px;color:var(--ink)}
-.ptile .code{font:700 44px/.95 var(--sign)}
+.ptile .code{font:700 38px/.95 var(--sign);white-space:nowrap}
 .ptile.closed{background:#fff;border:1.5px solid var(--ink)}
 .ptile p{font-size:14px;font-weight:500;margin-top:4px}
 .boxhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
@@ -146,12 +150,12 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .irow .d{font-size:14px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .irow .mid{min-width:0}
 .irow .mid>span{display:block}
-.irow .lc{display:block;font-size:15px;white-space:nowrap}
+.irow .lc{display:block;font-size:15px;line-height:1.15;white-space:nowrap}
 .irow .loc{text-align:right;font:700 17px/1.25 var(--sign)}
 .irow .loc em{display:block;font-style:normal;font-size:24px}
 .irow .wide{display:none}
 @media (min-width:980px){
-  .irow{grid-template-columns:64px 160px 1.2fr 1fr 1fr 1fr 1fr 110px 64px}
+  .irow{grid-template-columns:64px 160px 1.2fr 1fr 1fr 1fr 1fr 120px 64px}
   .irow .wide{display:block;font-size:15px}
   .irow .mid>.d{display:none}
   .irow .lc{display:none}
@@ -254,8 +258,8 @@ const SEASONS = ['Spring','Summer','Fall','Winter','All year'];
 /* ---------- helpers ---------- */
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const pCode = id => 'P-' + id;      // pallet 4 is P-4
-const bCode = id => 'B-' + id;      // box 12 is B-12, numbered once across the whole store
+const pCode = id => 'Pallet ' + id;
+const bCode = id => 'Box ' + id;       // box numbers run once across the whole store
 const normStyle = s => String(s || '').trim().replace(/\s+/g, ' ').toUpperCase();
 const nf = n => Number(n || 0).toLocaleString();
 const unit = (n, w) => n === 1 ? w : w + (w.endsWith('x') ? 'es' : 's');
@@ -331,6 +335,11 @@ async function uploadPhoto(path, blob){
     throw e;
   }
 }
+// Remove photo files for deleted items. Best effort: the inventory rows are already gone.
+async function removePhotos(paths){
+  const prefixes = paths.filter(Boolean).flatMap(p => [p, 'thumb/' + p]);
+  if (prefixes.length) try { await call(`/storage/v1/object/${BUCKET}`, { method: 'DELETE', body: JSON.stringify({ prefixes }), headers: { 'Content-Type': 'application/json' } }); } catch {}
+}
 const photoUrl = (path, c = cfg) => path ? `${c.url}/storage/v1/object/public/${BUCKET}/${path}` : '';
 const thumbUrl = it => it.photo_path ? photoUrl('thumb/' + it.photo_path) : '';
 
@@ -358,7 +367,12 @@ let tab = 'pack';
 let pack = newPack();
 let palView = null, palMine = false;
 let filt = { q: '', pallet: '', box: '', brand: '', gender: '', season: '', color: '', by: '' }, invLimit = 150, invSort = 'new';
-function newPack(keep){ return { stage: 'style', style: '', pallet: null, box: null, known: false, owner: '', err: '', saved: null, photo: null, id: uuid(), last: keep || null }; }
+function newPack(last, keep){ return { stage: 'style', style: '', pallet: null, box: null, known: false, owner: '', err: '', saved: null, photo: null, id: uuid(), last: last || null, keep: keep || null }; }
+// "keep" = the employee asked to put the next style into the same box
+function applyKeep(){
+  const k = pack.keep, b = k && idx.box.get(k.box);
+  if (k && b && b.status === 'open' && b.pallet_id === pack.pallet) Object.assign(pack, { box: k.box, stage: 'item', form: null, err: '' });
+}
 
 async function loadAll(){
   const [pallets, boxes, styles, items] = await Promise.all(['pallets','boxes','styles','items'].map(t => db.all(t)));
@@ -427,8 +441,10 @@ function trailHTML(){
 function packHTML(){
   const err = pack.err ? `<div class="err">${esc(pack.err)}</div>` : '';
   if (pack.stage === 'style') return `
-    <h1 class="h">Which style are you packing?</h1>
-    <p class="lead">Type the style number first. The app checks if this style already has a pallet.</p>
+    ${pack.keep ? `<h1 class="h">Next style for ${bCode(pack.keep.box)}</h1>
+    <p class="lead">It goes into ${bCode(pack.keep.box)} on ${pCode(pack.keep.pallet)}, unless this style already belongs on another pallet. <button class="linkbtn" data-act="pack-reset">Use a different box or pallet</button></p>`
+    : `<h1 class="h">Which style are you packing?</h1>
+    <p class="lead">Type the style number first. The app checks if this style already has a pallet.</p>`}
     ${pack.saved ? `<div class="saved">${esc(pack.saved)}</div>` : ''}
     <div class="panel">
       <label class="f" for="k-style">Style number</label>
@@ -502,7 +518,8 @@ function packHTML(){
       <div class="chips">${SEASONS.map(g => `<label><input type="radio" name="k-season" value="${g}" ${f.season === g ? 'checked' : ''}><span>${g}</span></label>`).join('')}</div>
       ${err}
       <button class="btn" data-act="save-item" style="margin-top:18px">Save item</button>
-    </div>`;
+    </div>
+    <button class="btn alt" data-act="same-box">Add a different style to this box</button>`;
 }
 function palPick(p){
   const its = itemsOf('pallet_id', p.id);
@@ -584,7 +601,7 @@ function renderInvList(){
   $('#inv-totals').innerHTML = `<div class="totals"><div><b>${nf(sumQty(list))}</b>${unit(sumQty(list), 'piece')}</div><div><b>${nf(new Set(list.map(i => i.style_number)).size)}</b>${unit(new Set(list.map(i => i.style_number)).size, 'style')}</div>
     <div><b>${nf(new Set(list.map(i => i.box_id)).size)}</b>${unit(new Set(list.map(i => i.box_id)).size, 'box')}</div><div><b>${nf(new Set(list.map(i => i.pallet_id)).size)}</b>${unit(new Set(list.map(i => i.pallet_id)).size, 'pallet')}</div></div>`;
   const val = k => k === 'pallet' ? pCode(filt[k]) : k === 'box' ? bCode(filt[k]) : filt[k];
-  $('#inv-chips').innerHTML = Object.keys(FLABEL).filter(k => filt[k]).map(k => `<button data-act="clear-filter" data-k="${k}" aria-label="Remove filter ${FLABEL[k]}">${FLABEL[k]}: ${esc(val(k))} &times;</button>`).join('');
+  $('#inv-chips').innerHTML = Object.keys(FLABEL).filter(k => filt[k]).map(k => `<button data-act="clear-filter" data-k="${k}" aria-label="Remove filter ${FLABEL[k]}">${k === 'pallet' || k === 'box' ? '' : FLABEL[k] + ': '}${esc(val(k))} &times;</button>`).join('');
   $('#inv-list').innerHTML = !data.items.length ? `<div class="empty"><b>Nothing packed yet</b>Items show up here the moment someone saves them.</div>`
     : !list.length ? `<div class="empty"><b>No items match</b>Change the search or remove a filter.</div>`
     : list.slice(0, invLimit).map(i => `
@@ -594,7 +611,7 @@ function renderInvList(){
           <span class="d">${esc(i.color)}, ${esc(i.brand)}</span><span class="d">${esc(i.gender)}, ${esc(i.season)}${i.tag_number ? ', tag ' + esc(i.tag_number) : ''}</span></span>
         <span class="wide">${esc(i.color)}</span><span class="wide">${esc(i.brand)}</span><span class="wide">${esc(i.gender)}</span><span class="wide">${esc(i.season)}</span><span class="wide">${esc(i.tag_number || '')}</span>
         <span class="loc wide" style="text-align:left">${pCode(i.pallet_id)}<br>${bCode(i.box_id)}</span>
-        <span class="loc"><span class="lc">${pCode(i.pallet_id)} ${bCode(i.box_id)}</span><em>${nf(i.quantity)}</em></span>
+        <span class="loc"><span class="lc">${pCode(i.pallet_id)}<br>${bCode(i.box_id)}</span><em>${nf(i.quantity)}</em></span>
       </button>`).join('') + (list.length > invLimit ? `<button class="btn quiet" data-act="inv-more">Show more (${nf(list.length - invLimit)} left)</button>` : '');
 }
 function filterSheet(){
@@ -680,8 +697,8 @@ async function doMove(st, target){
       render();
       const to = pCode(r.to_pallet), steps = [
         ...(target ? [] : [`Write <b>${to}</b> on the new pallet.`]),
-        ...r.moved_boxes.map(b => `Carry box <b>${bCode(b.box)}</b> (${plural(b.pieces, 'piece')}) from ${pCode(r.from_pallet)} to ${to}.`),
-        ...r.repack.map(b => `Box ${bCode(b.from_box)} also holds other styles, so it stays. Take the ${plural(b.pieces, 'piece')} of ${esc(st)} out of it, put them in a new box, write <b>${bCode(b.to_box)}</b> on it and place it on ${to}.`)];
+        ...r.moved_boxes.map(b => `Carry <b>${bCode(b.box)}</b> (${plural(b.pieces, 'piece')}) from ${pCode(r.from_pallet)} to ${to}.`),
+        ...r.repack.map(b => `${bCode(b.from_box)} also holds other styles, so it stays. Take the ${plural(b.pieces, 'piece')} of ${esc(st)} out of it, put them in a new box, write <b>${bCode(b.to_box)}</b> on it and place it on ${to}.`)];
       openSheet(`<h2>Style ${esc(st)} now belongs on ${to}</h2>
         <div class="placard"><div class="in"><p>Moved from ${pCode(r.from_pallet)} to</p><div class="code">${to}</div></div></div>
         ${steps.length ? `<div class="panel"><h2>Do this now</h2><ul class="lines">${steps.map(t => `<li><span>${t}</span></li>`).join('')}</ul></div>` : '<p class="lead">Nothing to carry. No pieces of this style were packed yet.</p>'}
@@ -709,6 +726,9 @@ function moreHTML(){
     <button class="btn quiet" data-act="export-csv">Download spreadsheet (CSV)</button>
     <p class="small muted" style="margin-top:10px">For PDF, the print window opens. Choose "Save as PDF" there.</p>
   </div>
+  ${isStandalone() ? '' : `<div class="panel"><h2>Open it full screen, like an app</h2>
+    <p class="muted small" style="margin-bottom:12px">A phone browser always shows its address bar on a web page. To hide it, add Packout to this phone's home screen and open it from there.</p>
+    <button class="btn alt" data-act="install">Add to home screen</button></div>`}
   <div class="panel"><h2>Invite employees</h2>
     <p class="muted small" style="margin-bottom:12px">Send this link to each employee's phone. It opens the app already connected to your database. They only type their name.</p>
     <button class="btn alt" data-act="invite">Share invite link</button></div>
@@ -745,6 +765,8 @@ function download(name, text, type){
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
+const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+const joinHash = withName => '#join=' + btoa(unescape(encodeURIComponent(JSON.stringify({ u: cfg.url, k: cfg.key, ...(withName && me ? { n: me.name } : {}) }))));
 const fileStamp = () => new Date().toISOString().slice(0, 10);
 async function embedThumbs(rows){
   const map = new Map(), todo = rows.filter(r => r.photo_path); let done = 0;
@@ -789,6 +811,7 @@ const act = {
 
   /* pack */
   'pack-reset'(){ pack = newPack(pack.last); render(); },
+  'same-box'(){ pack = newPack(pack.last, { pallet: pack.pallet, box: pack.box }); render(); scrollTo(0, 0); const i = $('#k-style'); if (i) i.focus(); },
   async 'check-style'(){
     const s = normStyle($('#k-style').value);
     pack.style = s; pack.saved = null;
@@ -797,7 +820,9 @@ const act = {
       try {
         const [found] = await Promise.all([db.get('styles', 'select=*&style_number=' + eq(s)), loadAll()]);
         pack.err = '';
-        if (found[0]) Object.assign(pack, { stage: 'box', pallet: found[0].pallet_id, known: true, owner: found[0].created_by });
+        const kb = pack.keep && idx.box.get(pack.keep.box);
+        if (found[0]) { Object.assign(pack, { stage: 'box', pallet: found[0].pallet_id, known: true, owner: found[0].created_by }); applyKeep(); }
+        else if (kb && kb.status === 'open') return await claim(kb.pallet_id, 'keep');
         else pack.stage = 'pallet';
         render(); scrollTo(0, 0);
       } catch (e) { packFail(e); }
@@ -828,7 +853,7 @@ const act = {
       try {
         const b = await db.insert('boxes', { pallet_id: pack.pallet, created_by: me.name });
         data.boxes.push(b); idx.box.set(b.id, b);
-        Object.assign(pack, { box: b.id, stage: 'item', err: '', form: null, saved: `New box ${bCode(b.id)}. Write ${bCode(b.id)} on the box now.` });
+        Object.assign(pack, { box: b.id, stage: 'item', err: '', form: null, saved: `New box. Write ${bCode(b.id)} on it now.` });
         render(); scrollTo(0, 0);
       } catch (e) { packFail(e); }
     });
@@ -897,7 +922,7 @@ const act = {
     openSheet(`<h2>Delete this item?</h2><p class="lead">It is removed from the inventory for everyone. This can't be undone.</p>
       <div class="row"><button class="btn alt" data-act="open-item" data-id="${el.dataset.id}">Keep it</button><button class="btn danger" data-act="del-item-yes" data-id="${el.dataset.id}">Delete</button></div>`);
   },
-  async 'del-item-yes'(el){ closeSheet(); await mutate('Deleting', () => db.remove('items', 'id=' + eq(el.dataset.id)), 'Deleted'); },
+  async 'del-item-yes'(el){ closeSheet(); const it = data.items.find(i => i.id === el.dataset.id); await mutate('Deleting', async () => { await db.remove('items', 'id=' + eq(el.dataset.id)); await removePhotos([it && it.photo_path]); }, 'Deleted'); },
 
   /* styles */
   'open-style'(el){ styleSheet(el.dataset.style); },
@@ -940,7 +965,7 @@ const act = {
   async 'del-style-yes'(el){
     const st = el.dataset.style; closeSheet();
     await withBusy('Deleting style ' + st, async () => {
-      try { await rpc('delete_style', { p_style: st }); await loadAll(); if (pack.style === st) pack = newPack(pack.last); toast('Deleted style ' + st, 'good'); }
+      try { const photos = itemsOf('style_number', st).map(i => i.photo_path); await rpc('delete_style', { p_style: st }); await removePhotos(photos); await loadAll(); if (pack.style === st) pack = newPack(pack.last); toast('Deleted style ' + st, 'good'); }
       catch (e) { toast(needsUpdate(e) || e.message, 'bad'); }
       render();
     });
@@ -981,8 +1006,19 @@ document.querySelectorAll('.mf-pal').forEach(function(p){p.hidden=!p.querySelect
     download(`inventory-${fileStamp()}.csv`, '﻿' + lines.map(l => l.map(cell).join(',')).join('\r\n'), 'text/csv');
     toast('Downloaded', 'good');
   },
+  install(){
+    // The home-screen icon remembers this exact address, so put the connection in it first.
+    try { history.replaceState(null, '', location.pathname + joinHash(true)); } catch {}
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    openSheet(`<h2>Add Packout to the home screen</h2>
+      <div class="panel"><ul class="lines" style="margin:0">${(ios
+        ? ['Open this page in <b>Safari</b> if you are in another browser.', 'Tap the <b>Share</b> button (the square with an arrow).', 'Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.']
+        : ['Tap the browser menu (the three dots).', 'Tap <b>Add to Home screen</b> or <b>Install app</b>.', 'Confirm with <b>Add</b> or <b>Install</b>.']).map(t => `<li style="border-top:0;padding:6px 0"><span>${t}</span></li>`).join('')}</ul></div>
+      <p class="lead">Then close this browser tab and open Packout from the new icon. It opens full screen, already connected.</p>
+      <button class="btn" data-act="close-sheet">Done</button>`);
+  },
   async invite(){
-    const link = location.origin + location.pathname + '#join=' + btoa(JSON.stringify({ u: cfg.url, k: cfg.key }));
+    const link = location.origin + location.pathname + joinHash(false);
     if (!/^https?:/.test(location.protocol)) toast('Put the app online first. A link to a file on this computer won\'t open on other phones.', 'bad');
     try { if (navigator.share) return await navigator.share({ title: 'Packout', text: 'Open this to start packing', url: link }); } catch (e) { if (e.name === 'AbortError') return; }
     try { await navigator.clipboard.writeText(link); toast('Invite link copied', 'good'); }
@@ -992,7 +1028,7 @@ document.querySelectorAll('.mf-pal').forEach(function(p){p.hidden=!p.querySelect
 async function blocked(row){
   await refresh(true);
   Object.assign(pack, { stage: 'box', pallet: row.pallet_id, known: true, owner: row.created_by, err: '' });
-  render(); scrollTo(0, 0);
+  applyKeep(); render(); scrollTo(0, 0);
 }
 async function claim(palletId, isNew){
   const run = async () => {
@@ -1000,8 +1036,8 @@ async function claim(palletId, isNew){
       await db.insert('styles', { style_number: pack.style, pallet_id: palletId, created_by: me.name });
       data.styles.push({ style_number: pack.style, pallet_id: palletId, created_by: me.name });
       Object.assign(pack, { stage: 'box', pallet: palletId, known: false, err: '' });
-      render(); scrollTo(0, 0);
-      if (isNew) toast(`New pallet ${pCode(palletId)}. Write it on the pallet.`, 'good');
+      applyKeep(); render(); scrollTo(0, 0);
+      if (isNew === true) toast(`New pallet. Write ${pCode(palletId)} on it.`, 'good');
     } catch (e) {
       if (!isDup(e)) return packFail(e);
       const found = await db.get('styles', 'select=*&style_number=' + eq(pack.style));   // someone else got there first
@@ -1053,7 +1089,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && cf
 /* ---------- start ---------- */
 (async function start(){
   const m = location.hash.match(/^#join=(.+)$/);
-  if (m) { try { const j = JSON.parse(atob(m[1])); if (j.u && j.k) { cfg = { url: j.u, key: j.k }; store.set('cfg', cfg); } } catch {} history.replaceState(null, '', location.pathname); }
+  if (m) { try { const j = JSON.parse(decodeURIComponent(escape(atob(m[1])))); if (j.u && j.k) { cfg = { url: j.u, key: j.k }; store.set('cfg', cfg); if (j.n && !me) { me = { name: j.n }; store.set('me', me); } } } catch {} if (!isStandalone()) history.replaceState(null, '', location.pathname); }
   render();
   if (cfg) { await withBusy('Loading inventory', () => refresh()); render(); }
 })();
