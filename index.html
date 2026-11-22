@@ -119,6 +119,12 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .qty input{text-align:center;font:700 26px/1 var(--sign)}
 .withscan{display:flex;gap:8px}.withscan input{flex:1;min-width:0}.withscan .btn{width:auto;flex:none;min-height:50px;padding:8px 14px}
 .withscan svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.tools2{margin-top:8px}.tools2 .btn{font-size:16px;min-height:48px;padding:6px 8px}
+.tools2 svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;flex:none}
+.filebtn{position:relative;overflow:hidden;cursor:pointer}.filebtn input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.ocrrow{margin-bottom:10px}.ocrrow .pick{margin-bottom:6px}.ocrrow .pick b{font:700 24px/1.15 var(--sign);word-break:break-all}
+.ocrw{display:flex;flex-wrap:wrap;gap:6px;padding-left:4px}
+.ocrw button{border:1.5px solid #AEB8C4;border-radius:8px;padding:7px 12px;background:#fff;font-weight:600}
 #scan-view{border-radius:10px;overflow:hidden;background:#0b1220;min-height:220px;margin-bottom:12px}
 #scan-view video{width:100%!important;display:block}
 .saved{background:var(--go-bg);border-left:4px solid var(--go);border-radius:6px;padding:10px 12px;margin-bottom:12px;font-weight:500}
@@ -452,7 +458,9 @@ function packHTML(){
     ${pack.saved ? `<div class="saved">${esc(pack.saved)}</div>` : ''}
     <div class="panel">
       <label class="f" for="k-style">Style number</label>
-      <div class="withscan"><input id="k-style" type="text" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(pack.style)}"><button type="button" class="btn alt" data-act="scan" data-target="style" aria-label="Scan a barcode with the camera"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>Scan</button></div>
+      <input id="k-style" type="text" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(pack.style)}">
+      <div class="row tools2"><button type="button" class="btn alt" data-act="scan" data-target="style" aria-label="Scan a barcode with the camera"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>Scan barcode</button>
+        <label class="btn alt filebtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M8 9h8M12 9v7"/></svg>Read text<input id="k-ocr" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to read the style number"></label></div>
       ${err}
       <button class="btn" data-act="check-style" style="margin-top:14px">Check style</button>
     </div>`;
@@ -690,6 +698,45 @@ async function openScanner(target){
     say(`<div class="err">${/NotAllowed|Permission/i.test(m) ? 'The camera is blocked for this app. Allow the camera in the browser settings, then try again. You can still type the number.'
       : /NotFound|Overconstrained/i.test(m) ? 'No camera was found on this device. Type the number instead.' : esc(e.message || 'The camera could not start.') + ' You can still type the number.'}</div>`);
   }
+}
+
+/* ---------- text reader (photo of the tag) ---------- */
+const OCR_LIB = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+let ocrWorker = null, ocrRun = 0;
+function ocrRows(text){
+  const seen = new Set();
+  return String(text || '').split(/\n+/).map(l => l.replace(/[^A-Za-z0-9 \-_\/.#]/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase())
+    .filter(l => l.replace(/[^A-Z0-9]/g, '').length >= 2 && !seen.has(l) && seen.add(l)).slice(0, 14);
+}
+async function runOcr(file){
+  const run = ++ocrRun, url = URL.createObjectURL(file);
+  const again = `<label class="btn alt filebtn">Take the photo again<input id="k-ocr" type="file" accept="image/*" capture="environment"></label>`;
+  openSheet(`<h2>Reading the tag</h2><img class="big" style="max-height:26vh" src="${url}" alt="Your photo of the tag">
+    <div id="ocr-out"><p class="lead" id="ocr-msg">Getting the reader ready</p></div>
+    <button class="btn quiet" data-act="close-sheet" style="margin-top:10px">Cancel</button>`);
+  const msg = t => { const m = $('#ocr-msg'); if (m) m.textContent = t; };
+  try {
+    if (!window.Tesseract) await loadScript(OCR_LIB);
+    if (!ocrWorker) {
+      ocrWorker = await Tesseract.createWorker('eng', 1, { logger: m => {
+        if (m.status === 'recognizing text') msg('Reading the text, ' + Math.round(m.progress * 100) + '%');
+        else msg('Getting the reader ready. The first time takes longer.'); } });
+      await ocrWorker.setParameters({ tessedit_pageseg_mode: '11' });     // scattered short lines, as on a tag
+    }
+    msg('Reading the text');
+    const { data } = await ocrWorker.recognize(await shrink(file, 1600, .92));
+    if (run !== ocrRun || !$('#ocr-out')) return;
+    const rows = ocrRows(data.text);
+    $('#sheet h2').textContent = rows.length ? 'Which one is the style number?' : 'No text found';
+    $('#ocr-out').innerHTML = rows.length ? rows.map(r => {
+      const words = r.split(' ').filter(w => w.replace(/[^A-Z0-9]/g, '').length >= 2), known = styleRow(normStyle(r));
+      return `<div class="ocrrow"><button class="pick" data-act="ocr-pick" data-v="${esc(r)}"><span><b>${esc(r)}</b>${known ? `<small>Known style, on ${pCode(known.pallet_id)}</small>` : ''}</span></button>
+        ${words.length > 1 ? `<div class="ocrw">${words.map(w => `<button data-act="ocr-pick" data-v="${esc(w)}">${esc(w)}${styleRow(w) ? ' (known)' : ''}</button>`).join('')}</div>` : ''}</div>`; }).join('')
+      + `<p class="small muted" style="margin:4px 0 10px">Tap a whole row, or one of its parts. You can correct it before checking.</p>` + again
+      : `<p class="lead">Move closer, keep the tag flat and upright, with good light.</p>` + again;
+  } catch (e) {
+    if ($('#ocr-out')) $('#ocr-out').innerHTML = `<div class="err">${esc(e.message || 'The reader could not start.')} You can still type the number.</div>` + again;
+  } finally { URL.revokeObjectURL(url); }
 }
 
 /* ---------- style: move, edit, delete ---------- */
@@ -969,6 +1016,13 @@ const act = {
   async 'del-item-yes'(el){ closeSheet(); const it = data.items.find(i => i.id === el.dataset.id); await mutate('Deleting', async () => { await db.remove('items', 'id=' + eq(el.dataset.id)); await removePhotos([it && it.photo_path]); }, 'Deleted'); },
 
   scan(el){ openScanner(el.dataset.target); },
+  'ocr-pick'(el){
+    const v = normStyle(el.dataset.v); closeSheet();
+    const i = $('#k-style'); if (!i) return;
+    i.value = v;
+    if (styleRow(v)) return act['check-style']();          // exact match with a style already packed
+    i.focus(); toast('Check the number is right, then tap Check style');
+  },
 
   /* styles */
   'open-style'(el){ styleSheet(el.dataset.style); },
@@ -1115,7 +1169,10 @@ document.addEventListener('click', e => {
   if (a && act[a.dataset.act]) return act[a.dataset.act](a);
   if (e.target.id === 'sheet') closeSheet();
 });
-document.addEventListener('change', e => { if (e.target.id === 'k-photo' && e.target.files[0]) { pack.photo = e.target.files[0]; showPhoto(pack.photo); } });
+document.addEventListener('change', e => {
+  if (e.target.id === 'k-photo' && e.target.files[0]) { pack.photo = e.target.files[0]; showPhoto(pack.photo); }
+  if (e.target.id === 'k-ocr' && e.target.files[0]) { const f = e.target.files[0]; e.target.value = ''; runOcr(f); }
+});
 document.addEventListener('input', e => { if (e.target.id === 'inv-q') { filt.q = e.target.value; invLimit = 150; renderInvList(); } });
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'k-style') act['check-style']();
