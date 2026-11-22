@@ -63,6 +63,10 @@ label.f:first-child{margin-top:0}
 label.f small{font-weight:400;color:var(--ink2)}
 input[type=text],input[type=url],input[type=number],input[type=search],select{
   width:100%;height:50px;border:1.5px solid #AEB8C4;border-radius:8px;background:#fff;padding:0 14px;font-size:17px}
+.typesel,select{-webkit-appearance:none;appearance:none;padding-right:44px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2313213A' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center/20px}
+.typesel{font-weight:600}
+#k-type-other{margin-top:8px}
+.irow .tp{display:block;font-size:14px;font-weight:600;color:var(--ink)}
 input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,41,.7);outline-offset:0}
 .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:52px;border-radius:8px;border:1.5px solid var(--ink);
   background:var(--ink);color:#fff;font-weight:600;font-size:17px;padding:8px 16px;text-align:center}
@@ -209,7 +213,7 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .big{width:100%;border-radius:10px;background:#E3E9EF;display:block;margin-bottom:12px;max-height:50vh;object-fit:contain}
 dl.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0 0 14px}
 dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
-#toast{position:fixed;left:16px;right:16px;bottom:calc(var(--navh,64px) + 92px);z-index:60;margin:auto;max-width:520px;background:var(--ink);color:#fff;border-radius:8px;padding:12px 14px;font-weight:500;display:none}
+#toast{position:fixed;left:16px;right:16px;bottom:calc(var(--navh,64px) + var(--saveh,0px) + 12px);z-index:60;margin:auto;max-width:520px;background:var(--ink);color:#fff;border-radius:8px;padding:12px 14px;font-weight:500;display:none}
 #toast.on{display:block}#toast.bad{background:var(--stop)}#toast.good{background:var(--go)}
 #busy{position:fixed;inset:0;z-index:70;background:rgba(232,236,239,.82);display:none;place-items:center;text-align:center;font-weight:600}
 #busy.on{display:grid}
@@ -312,6 +316,24 @@ const PRESET_KEY = '';   // the anon / publishable key
 const BUCKET = 'item-photos';
 const GENDERS = ['Women','Men','Girls','Boys','Baby','Unisex'];
 const SEASONS = ['Spring','Summer','Fall','Winter','All year'];
+const TYPES = {
+  'Tops': ['T-shirt', 'Tank top', 'Shirt', 'Blouse', 'Polo', 'Crop top', 'Bodysuit', 'Sweater', 'Cardigan', 'Hoodie', 'Sweatshirt'],
+  'Bottoms': ['Jeans', 'Pants', 'Shorts', 'Skirt', 'Leggings', 'Sweatpants', 'Joggers'],
+  'Dresses and sets': ['Dress', 'Jumpsuit', 'Romper', 'Set', 'Suit'],
+  'Outerwear': ['Jacket', 'Coat', 'Blazer', 'Vest'],
+  'Other': ['Activewear', 'Swimwear', 'Pajamas', 'Underwear', 'Socks', 'Shoes', 'Bag', 'Hat', 'Accessory']
+};
+const ALL_TYPES = Object.values(TYPES).flat();
+// <select> of types, grouped; types typed in by hand before are offered too
+function typeSelect(id, cur, { blank = 'Choose a type', other = true } = {}){
+  const mine = [...new Set(data.items.map(i => i.item_type).filter(t => t && !ALL_TYPES.includes(t)))].sort();
+  if (cur && !ALL_TYPES.includes(cur) && !mine.includes(cur)) mine.push(cur);
+  const o = v => `<option ${v === cur ? 'selected' : ''}>${esc(v)}</option>`;
+  return `<select id="${id}" class="typesel"><option value="">${blank}</option>
+    ${Object.entries(TYPES).map(([g, list]) => `<optgroup label="${g}">${list.map(o).join('')}</optgroup>`).join('')}
+    ${mine.length ? `<optgroup label="Added by you">${mine.map(o).join('')}</optgroup>` : ''}
+    ${other ? '<option value="__other">Something else (type it)</option>' : ''}</select>`;
+}
 
 /* ---------- helpers ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -424,7 +446,7 @@ let idx = { pal: new Map(), box: new Map(), style: new Map() };
 let tab = 'pack';
 let pack = newPack(store.get('last'), store.get('last'));   // keep filling the box this phone used last
 let palView = null, palMine = false;
-let filt = { q: '', pallet: '', box: '', brand: '', gender: '', season: '', color: '', by: '' }, invLimit = 150, invSort = 'new';
+let filt = { q: '', pallet: '', box: '', item_type: '', brand: '', gender: '', season: '', color: '', by: '' }, invLimit = 150, invSort = 'new';
 function newPack(last, keep){ return { stage: 'style', style: '', pallet: null, box: null, known: false, owner: '', err: '', saved: null, photo: null, id: uuid(), last: last || null, keep: keep || null }; }
 // "keep" = the employee asked to put the next style into the same box
 // If the box or style this phone is working on was deleted (here or on another phone), start over cleanly.
@@ -527,6 +549,7 @@ function setBars(){
   const r = document.documentElement.style;
   r.setProperty('--toph', $('#top').offsetHeight + 'px');
   r.setProperty('--navh', ($('#nav').hidden ? 0 : $('#nav').offsetHeight) + 'px');
+  r.setProperty('--saveh', ($('.savebar') ? $('.savebar').offsetHeight : 0) + 'px');
 }
 window.addEventListener('resize', setBars);
 function connectHTML(err = ''){
@@ -620,7 +643,8 @@ function packHTML(){
 
   // item form: the fields that change every time come first; the ones that carry over sit below
   const prev = data.items.filter(i => i.style_number === pack.style).slice(-1)[0] || store.get('lastForm') || {};
-  const f = pack.form || { brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', qty: 1, more: [] };
+  const f = pack.form || { type: prev.item_type || prev.type || '', brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', qty: 1, more: [] };
+  const typeOther = f.type === '__other' || (f.type && !ALL_TYPES.includes(f.type) && !data.items.some(i => i.item_type === f.type));
   const more = f.more || [];
   const uniq = k => [...new Set(data.items.map(i => i[k]).filter(Boolean))].sort();
   return `${trailHTML()}
@@ -645,6 +669,9 @@ function packHTML(){
       <label class="f" for="k-tag">Tag number <small>(optional)</small></label>
       <div class="withscan"><input id="k-tag" type="text" autocomplete="off" autocapitalize="characters" enterkeyhint="done" value="${esc(f.tag)}"><button type="button" class="btn alt" data-act="scan" data-target="tag" aria-label="Scan a barcode with the camera"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>Scan</button></div>
       <div class="samehead"><b>Same for the whole style</b><span>Kept from the last item</span></div>
+      <label class="f" for="k-type">Type</label>
+      ${typeSelect('k-type', typeOther ? '__other' : f.type)}
+      <input id="k-type-other" type="text" autocomplete="off" placeholder="For example: Overalls" value="${typeOther && f.type !== '__other' ? esc(f.type) : ''}" ${typeOther ? '' : 'hidden'}>
       <label class="f" for="k-brand">Brand</label>
       <input id="k-brand" type="text" list="l-brand" autocomplete="off" enterkeyhint="done" value="${esc(f.brand)}">
       <datalist id="l-brand">${uniq('brand').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
@@ -664,7 +691,8 @@ function palPick(p){
     <small>${plural(data.boxes.filter(b => b.pallet_id === p.id).length, 'box')}, ${plural(sumQty(its), 'piece')}</small></span></button>`;
 }
 function readForm(){
-  return { color: $('#k-color').value.trim(), brand: $('#k-brand').value.trim(), tag: $('#k-tag').value.trim(),
+  const ts = $('#k-type').value, type = ts === '__other' ? ($('#k-type-other').value.trim() || '__other') : ts;
+  return { type, color: $('#k-color').value.trim(), brand: $('#k-brand').value.trim(), tag: $('#k-tag').value.trim(),
     qty: parseInt($('#k-qty').value, 10), more: [...document.querySelectorAll('.k-more')].map(i => i.value === '' ? '' : parseInt(i.value, 10)), gender: $('input[name=k-gender]:checked')?.value || '', season: $('input[name=k-season]:checked')?.value || '' };
 }
 function packFail(e){ pack.err = e.message; render(); }
@@ -709,19 +737,19 @@ function palletDetailHTML(p){
       ${b.status === 'closed' ? '<span class="badge closed">Closed</span>' : ''}
       <button class="linkbtn small" style="margin-left:auto" data-act="${bi.length ? 'toggle-box' : 'del-box'}" data-id="${b.id}">${bi.length ? (b.status === 'open' ? 'Close box' : 'Reopen box') : 'Delete empty box'}</button>
       ${bi.length ? `<button class="linkbtn small" data-act="print-labels" data-box="${b.id}">Print label</button>` : ''}</div>
-      ${bi.length ? `<ul class="lines">${bi.map(i => `<li><span><b>${esc(i.style_number)}</b> ${esc(i.color)}<br><span class="muted small">${esc(i.brand)}</span></span><span class="n">${nf(i.quantity)}</span></li>`).join('')}</ul>` : ''}
+      ${bi.length ? `<ul class="lines">${bi.map(i => `<li><span><b>${esc(i.style_number)}</b> ${esc(i.color)}<br><span class="muted small">${esc([i.item_type, i.brand].filter(Boolean).join(', '))}</span></span><span class="n">${nf(i.quantity)}</span></li>`).join('')}</ul>` : ''}
     </div>`; }).join('') || `<div class="empty"><b>No boxes on this pallet yet</b></div>`}`;
 }
 
 /* ---------- screens: inventory ---------- */
-const FLABEL = { pallet: 'Pallet', box: 'Box', brand: 'Brand', gender: 'Gender', season: 'Season', color: 'Color', by: 'Packed by' };
+const FLABEL = { pallet: 'Pallet', box: 'Box', item_type: 'Type', brand: 'Brand', gender: 'Gender', season: 'Season', color: 'Color', by: 'Packed by' };
 function filtered(){
   const q = filt.q.trim().toLowerCase();
   let list = joined().filter(i =>
     (!filt.pallet || String(i.pallet_id) === filt.pallet) && (!filt.box || String(i.box_id) === filt.box) &&
-    (!filt.brand || i.brand === filt.brand) && (!filt.gender || i.gender === filt.gender) && (!filt.season || i.season === filt.season) &&
+    (!filt.item_type || i.item_type === filt.item_type) && (!filt.brand || i.brand === filt.brand) && (!filt.gender || i.gender === filt.gender) && (!filt.season || i.season === filt.season) &&
     (!filt.color || i.color === filt.color) && (!filt.by || i.created_by === filt.by) &&
-    (!q || [i.style_number, i.color, i.brand, i.tag_number, pCode(i.pallet_id), bCode(i.box_id)].join(' ').toLowerCase().includes(q)));
+    (!q || [i.style_number, i.item_type, i.color, i.brand, i.tag_number, pCode(i.pallet_id), bCode(i.box_id)].join(' ').toLowerCase().includes(q)));
   const by = { new: (a, b) => b.created_at.localeCompare(a.created_at), style: (a, b) => a.style_number.localeCompare(b.style_number, undefined, { numeric: true }) || a.color.localeCompare(b.color),
     where: (a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id || a.style_number.localeCompare(b.style_number) };
   return list.sort(by[invSort]);
@@ -746,7 +774,7 @@ function renderInvList(){
     : list.slice(0, invLimit).map(i => `
       <button class="irow" data-act="open-item" data-id="${i.id}">
         ${i.photo_path ? `<img loading="lazy" alt="" src="${esc(thumbUrl(i))}">` : '<span class="noimg"></span>'}
-        <span class="mid"><span class="st">${esc(i.style_number)}</span>
+        <span class="mid"><span class="st">${esc(i.style_number)}</span>${i.item_type ? `<span class="tp">${esc(i.item_type)}</span>` : ''}
           <span class="d">${esc(i.color)}, ${esc(i.brand)}</span><span class="d">${esc(i.gender)}, ${esc(i.season)}${i.tag_number ? ', tag ' + esc(i.tag_number) : ''}</span></span>
         <span class="wide">${esc(i.color)}</span><span class="wide">${esc(i.brand)}</span><span class="wide">${esc(i.gender)}</span><span class="wide">${esc(i.season)}</span><span class="wide">${esc(i.tag_number || '')}</span>
         <span class="loc wide" style="text-align:left">${pCode(i.pallet_id)}<br>${bCode(i.box_id)}</span>
@@ -759,7 +787,7 @@ function filterSheet(){
   openSheet(`<h2>Filter inventory</h2>
     ${opt('pallet', data.pallets.map(p => p.id).sort((a, b) => a - b), v => pCode(v))}
     ${opt('box', data.boxes.map(b => b.id).sort((a, b) => a - b), v => bCode(v) + ' on ' + pCode(idx.box.get(v).pallet_id))}
-    ${opt('brand', u('brand'))}${opt('gender', u('gender'))}${opt('season', u('season'))}${opt('color', u('color'))}${opt('by', u('created_by'))}
+    ${opt('item_type', u('item_type'))}${opt('brand', u('brand'))}${opt('gender', u('gender'))}${opt('season', u('season'))}${opt('color', u('color'))}${opt('by', u('created_by'))}
     <label class="f" for="f-sort">Sort by</label><select id="f-sort"><option value="new">Newest first</option><option value="style" ${invSort === 'style' ? 'selected' : ''}>Style number</option><option value="where" ${invSort === 'where' ? 'selected' : ''}>Pallet and box</option></select>
     <div class="row" style="margin-top:18px"><button class="btn alt" data-act="reset-filters">Clear all</button><button class="btn" data-act="apply-filters">Show items</button></div>`);
 }
@@ -769,13 +797,15 @@ function itemSheet(id, edit){
     ${i.photo_path ? `<img class="big" alt="Photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(photoUrl(i.photo_path))}">` : ''}
     <h2>${esc(i.style_number)}</h2>
     <dl class="facts"><dt>Where</dt><dd>${pCode(i.pallet_id)}, ${bCode(i.box_id)}</dd>
-      <dt>Color</dt><dd>${esc(i.color)}</dd><dt>Brand</dt><dd>${esc(i.brand)}</dd><dt>Tag number</dt><dd>${esc(i.tag_number || 'None')}</dd>
+      <dt>Type</dt><dd>${esc(i.item_type || 'Not set')}</dd><dt>Color</dt><dd>${esc(i.color)}</dd><dt>Brand</dt><dd>${esc(i.brand)}</dd><dt>Tag number</dt><dd>${esc(i.tag_number || 'None')}</dd>
       <dt>Quantity</dt><dd>${nf(i.quantity)}</dd><dt>Gender</dt><dd>${esc(i.gender)}</dd><dt>Season</dt><dd>${esc(i.season)}</dd>
       <dt>Packed by</dt><dd>${esc(i.created_by)}, ${new Date(i.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</dd></dl>
     <div class="row"><button class="btn alt" data-act="edit-item" data-id="${i.id}">Edit</button><button class="btn" data-act="close-sheet">Done</button></div>
     <button class="btn quiet" data-act="open-style" data-style="${esc(i.style_number)}" style="margin-top:10px">Move, edit or delete the whole style</button>`);
   const sel = (id, vals, cur) => `<select id="${id}">${vals.map(v => `<option ${v === cur ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
   openSheet(`<h2>Edit ${esc(i.style_number)}</h2>
+    <label class="f" for="e-type">Type</label>${typeSelect('e-type', i.item_type)}
+    <input id="e-type-other" type="text" autocomplete="off" placeholder="For example: Overalls" hidden>
     <label class="f" for="e-color">Color</label><input id="e-color" type="text" value="${esc(i.color)}">
     <label class="f" for="e-brand">Brand</label><input id="e-brand" type="text" value="${esc(i.brand)}">
     <label class="f" for="e-tag">Tag number</label><input id="e-tag" type="text" value="${esc(i.tag_number || '')}">
@@ -960,7 +990,9 @@ function editStyleSheet(st){
   openSheet(`<h2>Edit style ${esc(st)}</h2>
     <p class="lead">Changes apply to all ${plural(its.length, 'entry').replace('entrys', 'entries')} of this style. To change one color or a quantity, open that item in Inventory.</p>
     <label class="f" for="s-num">Style number</label><input id="s-num" type="text" autocapitalize="characters" autocomplete="off" value="${esc(st)}">
-    ${its.length ? `<label class="f" for="s-brand">Brand</label><input id="s-brand" type="text" value="${esc(same('brand'))}" placeholder="Leave empty to keep as is">
+    ${its.length ? `<label class="f" for="s-type">Type</label>${typeSelect('s-type', same('item_type'), { blank: 'Leave as is' })}
+    <input id="s-type-other" type="text" autocomplete="off" placeholder="For example: Overalls" hidden>
+    <label class="f" for="s-brand">Brand</label><input id="s-brand" type="text" value="${esc(same('brand'))}" placeholder="Leave empty to keep as is">
     <label class="f" for="s-gender">Gender</label>${sel('s-gender', GENDERS, same('gender'))}
     <label class="f" for="s-season">Season</label>${sel('s-season', SEASONS, same('season'))}` : ''}
     <div id="s-err"></div>
@@ -1042,22 +1074,22 @@ function manifestHTML(rows, { title, img, sheets }){
     <div><b>${nf(new Set(rows.map(r => r.box_id)).size)}</b>${unit(new Set(rows.map(r => r.box_id)).size, 'box')}</div><div><b>${nf(new Set(rows.map(r => r.pallet_id)).size)}</b>${unit(new Set(rows.map(r => r.pallet_id)).size, 'pallet')}</div></div>`;
   const pals = by(rows, 'pallet_id').map(([pid, pr]) => {
     const sum = !sheets ? '' : `<p class="ps-meta">Pallet breakdown, printed ${new Date().toLocaleString([], { dateStyle: 'long', timeStyle: 'short' })}${idx.pal.get(pid)?.status === 'closed' ? '. Pallet closed.' : '. Pallet still open: more may be added.'}</p>
-      <h3 class="ps-h">Styles on this pallet</h3><table class="mf-sum"><thead><tr><th class="st">Style</th><th>Brand</th><th>Colors</th><th>Boxes</th><th class="q">Pieces</th></tr></thead><tbody>
-      ${by(pr, 'style_number').sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true })).map(([st, sr]) => `<tr><td class="st">${esc(st)}</td><td>${esc([...new Set(sr.map(r => r.brand))].join(', '))}</td><td>${esc([...new Set(sr.map(r => r.color))].join(', '))}</td><td>${[...new Set(sr.map(r => r.box_id))].sort((a, b) => a - b).map(bCode).join(', ')}</td><td class="q">${nf(sumQty(sr))}</td></tr>`).join('')}
+      <h3 class="ps-h">Styles on this pallet</h3><table class="mf-sum"><thead><tr><th class="st">Style</th><th>Type</th><th>Brand</th><th>Colors</th><th>Boxes</th><th class="q">Pieces</th></tr></thead><tbody>
+      ${by(pr, 'style_number').sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true })).map(([st, sr]) => `<tr><td class="st">${esc(st)}</td><td>${esc([...new Set(sr.map(r => r.item_type).filter(Boolean))].join(', '))}</td><td>${esc([...new Set(sr.map(r => r.brand))].join(', '))}</td><td>${esc([...new Set(sr.map(r => r.color))].join(', '))}</td><td>${[...new Set(sr.map(r => r.box_id))].sort((a, b) => a - b).map(bCode).join(', ')}</td><td class="q">${nf(sumQty(sr))}</td></tr>`).join('')}
       </tbody></table><h3 class="ps-h">Box by box</h3>`;
     return `<section class="mf-pal"><div class="mf-plac"><b>${pCode(pid)}</b>
       <span class="r">${plural(new Set(pr.map(r => r.box_id)).size, 'box')}, ${plural(new Set(pr.map(r => r.style_number)).size, 'style')}<br>${plural(sumQty(pr), 'piece')}</span></div>${sum}
       ${by(pr, 'box_id').map(([bid, br]) => `<div class="mf-box"><h3>${bCode(bid)} <small>${plural(sumQty(br), 'piece')} on ${pCode(pid)}</small></h3>
-        <table><thead><tr>${img ? '<th class="ph"></th>' : ''}<th class="st">Style</th><th>Color</th><th>Brand</th><th>Tag</th><th>Gender</th><th>Season</th><th class="q">Qty</th></tr></thead><tbody>
-        ${br.sort(cmp).map(r => `<tr>${img ? `<td class="ph">${r.photo_path ? `<img alt="" src="${esc(img(r))}">` : ''}</td>` : ''}<td class="st">${esc(r.style_number)}</td><td>${esc(r.color)}</td><td>${esc(r.brand)}</td><td>${esc(r.tag_number || '')}</td><td>${esc(r.gender)}</td><td>${esc(r.season)}</td><td class="q">${nf(r.quantity)}</td></tr>`).join('')}
+        <table><thead><tr>${img ? '<th class="ph"></th>' : ''}<th class="st">Style</th><th>Type</th><th>Color</th><th>Brand</th><th>Tag</th><th>Gender</th><th>Season</th><th class="q">Qty</th></tr></thead><tbody>
+        ${br.sort(cmp).map(r => `<tr>${img ? `<td class="ph">${r.photo_path ? `<img alt="" src="${esc(img(r))}">` : ''}</td>` : ''}<td class="st">${esc(r.style_number)}</td><td>${esc(r.item_type || '')}</td><td>${esc(r.color)}</td><td>${esc(r.brand)}</td><td>${esc(r.tag_number || '')}</td><td>${esc(r.gender)}</td><td>${esc(r.season)}</td><td class="q">${nf(r.quantity)}</td></tr>`).join('')}
         </tbody></table></div>`).join('')}</section>`;
   }).join('');
-  const index = by(rows, 'style_number').sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true })).map(([s, sr]) => `<tr><td class="st">${esc(s)}</td><td>${esc([...new Set(sr.map(r => r.brand))].join(', '))}</td>
+  const index = by(rows, 'style_number').sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true })).map(([s, sr]) => `<tr><td class="st">${esc(s)}</td><td>${esc([...new Set(sr.map(r => r.item_type).filter(Boolean))].join(', '))}</td><td>${esc([...new Set(sr.map(r => r.brand))].join(', '))}</td>
     <td>${esc([...new Set(sr.map(r => r.color))].join(', '))}</td><td class="where">${[...new Set(sr.map(r => pCode(r.pallet_id)))].join(', ')}</td>
     <td>${[...new Set(sr.map(r => bCode(r.box_id)))].join(', ')}</td><td class="q">${nf(sumQty(sr))}</td></tr>`).join('');
   if (sheets) return `<div class="mf">${pals}</div>`;
   return `<div class="mf"><header class="mf-head"><h1>${esc(title)}</h1><p>Packed inventory as of ${new Date().toLocaleString([], { dateStyle: 'long', timeStyle: 'short' })}</p>${tot}</header>
-    ${pals}<section class="mf-index"><h2>Style index</h2><table><thead><tr><th class="st">Style</th><th>Brand</th><th>Colors</th><th>Pallet</th><th>Boxes</th><th class="q">Pieces</th></tr></thead><tbody>${index}</tbody></table></section></div>`;
+    ${pals}<section class="mf-index"><h2>Style index</h2><table><thead><tr><th class="st">Style</th><th>Type</th><th>Brand</th><th>Colors</th><th>Pallet</th><th>Boxes</th><th class="q">Pieces</th></tr></thead><tbody>${index}</tbody></table></section></div>`;
 }
 /* ---------- printing: pallet breakdowns and box labels ---------- */
 const LETTER = 'size:letter;margin:.5in';
@@ -1083,11 +1115,11 @@ function printSheets(ids, photos = true){
 function labelsHTML(boxes, size){
   const [, , per, max] = LABELS[size];
   const one = b => {
-    const m = new Map(); itemsOf('box_id', b.id).forEach(i => { const g = m.get(i.style_number) || m.set(i.style_number, { colors: new Set(), qty: 0 }).get(i.style_number); g.colors.add(i.color); g.qty += i.quantity; });
+    const m = new Map(); itemsOf('box_id', b.id).forEach(i => { const g = m.get(i.style_number) || m.set(i.style_number, { colors: new Set(), type: i.item_type, qty: 0 }).get(i.style_number); g.colors.add(i.color); g.qty += i.quantity; });
     const list = [...m].sort((a, c) => a[0].localeCompare(c[0], undefined, { numeric: true })), total = list.reduce((n, [, g]) => n + g.qty, 0);
     return `<div class="lbl"><div class="lb-top"><span class="lb-pal">${pCode(b.pallet_id)}</span><span>${list.length ? plural(total, 'piece') : 'Nothing recorded yet'}</span></div>
       <div class="lb-box">${bCode(b.id)}</div>
-      <table><tbody>${list.slice(0, max).map(([st, g]) => `<tr><td class="s">${esc(st)}</td><td>${esc([...g.colors].join(', '))}</td><td class="q">${nf(g.qty)}</td></tr>`).join('')}</tbody></table>
+      <table><tbody>${list.slice(0, max).map(([st, g]) => `<tr><td class="s">${esc(st)}</td><td>${esc([g.type, [...g.colors].join(', ')].filter(Boolean).join(': '))}</td><td class="q">${nf(g.qty)}</td></tr>`).join('')}</tbody></table>
       ${list.length > max ? `<div class="more">and ${plural(list.length - max, 'more style')}. See the pallet breakdown.</div>` : ''}</div>`;
   };
   const pages = []; for (let i = 0; i < boxes.length; i += per) pages.push(boxes.slice(i, i + per));
@@ -1217,7 +1249,7 @@ const act = {
   async 'save-item'(){
     const f = readForm(); pack.form = f;
     const miss = !pack.photo ? 'Take a photo of the item first.' : !f.color ? 'Type the color.' : !f.brand ? 'Type the brand.'
-      : !(f.qty >= 1) ? 'Quantity must be 1 or more.' : f.more.some(q => !(q >= 1)) ? 'Type the quantity for each new box, or remove it.' : !f.gender ? 'Pick a gender.' : !f.season ? 'Pick a season.' : '';
+      : !(f.qty >= 1) ? 'Quantity must be 1 or more.' : f.more.some(q => !(q >= 1)) ? 'Type the quantity for each new box, or remove it.' : !f.type ? 'Choose the type.' : f.type === '__other' ? 'Type what kind of item it is.' : !f.gender ? 'Pick a gender.' : !f.season ? 'Pick a season.' : '';
     const showErr = m => { pack.err = m; const p = pack.photo; render(); if (p) showPhoto(p); };
     if (miss) return showErr(miss);
     await withBusy('Saving to the database', async () => {
@@ -1225,7 +1257,7 @@ const act = {
         const id = pack.id, path = id + '.jpg';
         const [full, thumb] = await Promise.all([shrink(pack.photo, 1400, .82), shrink(pack.photo, 280, .72)]);
         await Promise.all([uploadPhoto(path, full), uploadPhoto('thumb/' + path, thumb)]);
-        const row = { id, style_number: pack.style, box_id: pack.box, color: f.color, brand: f.brand, tag_number: f.tag, quantity: f.qty,
+        const row = { id, style_number: pack.style, box_id: pack.box, item_type: f.type, color: f.color, brand: f.brand, tag_number: f.tag, quantity: f.qty,
           gender: f.gender, season: f.season, photo_path: path, created_by: me.name };
         let msg;
         if (f.more.length) {
@@ -1248,7 +1280,7 @@ const act = {
           msg = `Saved ${nf(f.qty)} x ${pack.style} ${f.color} in ${bCode(pack.box)}. Next color: take the photo.`;
         }
         pack.last = { pallet: pack.pallet, box: pack.box }; store.set('last', pack.last);
-        store.set('lastForm', { brand: f.brand, gender: f.gender, season: f.season });
+        store.set('lastForm', { type: f.type, brand: f.brand, gender: f.gender, season: f.season });
         if (navigator.vibrate) navigator.vibrate(40);
         Object.assign(pack, { id: uuid(), moreIds: null, photo: null, colors: null, err: '', justSaved: true, form: { ...f, color: '', tag: '', qty: 1, more: [] }, saved: msg });
         render(); scrollTo(0, 0);
@@ -1277,6 +1309,8 @@ const act = {
   async 'save-edit'(el){
     const patch = { color: $('#e-color').value.trim(), brand: $('#e-brand').value.trim(), tag_number: $('#e-tag').value.trim(),
       quantity: parseInt($('#e-qty').value, 10), gender: $('#e-gender').value, season: $('#e-season').value };
+    const et = $('#e-type').value, etype = et === '__other' ? $('#e-type-other').value.trim() : et;
+    if (etype) patch.item_type = etype;
     if (!patch.color || !patch.brand || !(patch.quantity >= 1)) return $('#e-err').innerHTML = '<div class="err">Color, brand and a quantity of 1 or more are needed.</div>';
     closeSheet(); await mutate('Saving changes', () => db.update('items', 'id=' + eq(el.dataset.id), patch), 'Saved changes');
   },
@@ -1314,6 +1348,8 @@ const act = {
     if (!num) return $('#s-err').innerHTML = '<div class="err">Type the style number.</div>';
     if ($('#s-brand')) {
       const b = $('#s-brand').value.trim(), g = $('#s-gender').value, se = $('#s-season').value;
+      const ts = $('#s-type').value, t = ts === '__other' ? $('#s-type-other').value.trim() : ts;
+      if (t && its.some(i => i.item_type !== t)) patch.item_type = t;
       if (b && its.some(i => i.brand !== b)) patch.brand = b;
       if (g && its.some(i => i.gender !== g)) patch.gender = g;
       if (se && its.some(i => i.season !== se)) patch.season = se;
@@ -1405,8 +1441,8 @@ document.querySelectorAll('.mf-pal').forEach(function(p){p.hidden=!p.querySelect
   'export-csv'(){
     const { rows } = exportRows(); if (!rows.length) return toast('There is nothing to export yet.', 'bad');
     const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const lines = [['Pallet','Box','Style number','Color','Brand','Tag number','Quantity','Gender','Season','Packed by','Packed at','Photo']]
-      .concat(rows.sort((a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id).map(r => [pCode(r.pallet_id), bCode(r.box_id), r.style_number, r.color, r.brand, r.tag_number, r.quantity, r.gender, r.season, r.created_by, r.created_at, photoUrl(r.photo_path)]));
+    const lines = [['Pallet','Box','Style number','Type','Color','Brand','Tag number','Quantity','Gender','Season','Packed by','Packed at','Photo']]
+      .concat(rows.sort((a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id).map(r => [pCode(r.pallet_id), bCode(r.box_id), r.style_number, r.item_type, r.color, r.brand, r.tag_number, r.quantity, r.gender, r.season, r.created_by, r.created_at, photoUrl(r.photo_path)]));
     download(`inventory-${fileStamp()}.csv`, '﻿' + lines.map(l => l.map(cell).join(',')).join('\r\n'), 'text/csv');
     toast('Downloaded', 'good');
   },
@@ -1485,6 +1521,11 @@ document.addEventListener('change', e => {
     });
   }
   if (e.target.id === 'k-ocr' && e.target.files[0]) { const f = e.target.files[0]; e.target.value = ''; runOcr(f); }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'k-type' || e.target.id === 'e-type' || e.target.id === 's-type') {
+    const o = $('#' + e.target.id + '-other'); if (o) { o.hidden = e.target.value !== '__other'; if (!o.hidden) o.focus(); }
+  }
 });
 document.addEventListener('change', e => { if (e.target.id === 'p-label') { labelSize = e.target.value; store.set('labels', labelSize); } });
 document.addEventListener('input', e => { if (e.target.id === 'k-color') delete e.target.dataset.auto; });
