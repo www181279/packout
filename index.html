@@ -118,6 +118,9 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .staffrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .staffrow .row{flex-wrap:nowrap;gap:6px}
 .pinbig{font:700 48px var(--sign);letter-spacing:.18em;text-align:center;padding:18px 0 24px;font-variant-numeric:tabular-nums}
+.photosteps{display:grid;gap:10px}
+.photosteps .btn.done{background:#E7F4EC;color:var(--ink);border:1px solid #9FD3B2}
+.photosteps .mini{width:30px;height:30px;object-fit:cover;border-radius:5px;flex:none}
 .morebox{margin-top:4px}.morerow{display:flex;gap:8px}.morerow input{flex:1;text-align:center;font:700 24px/1 var(--sign)}.morerow .btn{width:auto;flex:none;min-height:50px}
 .addmore{display:block;margin-top:10px}
 .savedacts{margin-top:10px}.savedacts .btn{flex:1;font-size:15px}
@@ -591,6 +594,7 @@ function render(){
   document.querySelectorAll('#nav button').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   validatePack();
   v.innerHTML = ({ pack: packHTML, pallets: palletsHTML, inventory: inventoryHTML, more: moreHTML })[tab]();
+  if (tab === 'pack' && pack.stage === 'item' && pack.photo && !$('#k-photo-wrap img')) showPhoto(pack.photo);
   if (tab === 'inventory') renderInvList();
   setBars();
 }
@@ -693,13 +697,16 @@ function packHTML(){
     ${pack.keep && idx.box.get(pack.keep.box) ? `<h1 class="h">Next style for ${bCode(pack.keep.box)}</h1>
     <p class="lead">It goes into ${bCode(pack.keep.box)} on ${pCode(pack.keep.pallet)}, unless this style already belongs on another pallet. <button class="linkbtn" data-act="pack-fresh">Use a different box or pallet</button></p>`
     : `<h1 class="h">Which style are you packing?</h1>
-    <p class="lead">Type the style number first. The app checks if this style already has a pallet.</p>`}
+    <p class="lead">Take the item photo, then the tag photo. The app fills in the details and finds the pallet for this style.</p>`}
     ${pack.saved ? `<div class="saved">${esc(pack.saved)}</div>` : ''}
     <div class="panel">
-      <label class="f" for="k-style">Style number</label>
+      <div class="photosteps">
+        <label class="btn ${pack.photo ? 'done' : 'alt'} filebtn tagbtn">${pack.photo ? `<img class="mini" alt="" src="${esc(pack.photoUrl || '')}">` : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>'}${pack.photo ? '1. Item photo taken. Tap to retake' : '1. Photo of the item'}<input id="k-itemfirst" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the item on the rack"></label>
+        <label class="btn alt filebtn tagbtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>2. Photo of the tag<input id="k-tagphoto" data-where="style" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in the style and details"></label>
+      </div>
+      <p class="small muted" style="margin:8px 0 4px">With both photos, the app reads the style, color, size, type and brand, and names the color from the item. Check them before saving.</p>
+      <label class="f" for="k-style">Style number <small>(filled in from the tag, or type it)</small></label>
       <input id="k-style" type="text" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="go" value="${esc(pack.style)}">
-      <div class="tools2"><label class="btn alt filebtn tagbtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Take a photo of the tag<input id="k-tagphoto" data-where="style" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in the style and details"></label></div>
-      <p class="small muted" style="margin-top:8px">The app reads the style, color, size, type and brand from the tag. Check them before saving.</p>
       ${err}
       <button class="btn" data-act="check-style" style="margin-top:14px">Check style</button>
     </div>`;
@@ -1183,7 +1190,7 @@ async function readTag(file, where){
     <button class="btn quiet" data-act="close-sheet" style="margin-top:10px">Cancel</button>`);
   try {
     const body = { tag: await blobToB64(await shrink(file, 1600, .9)), types: ALL_TYPES, sizes: SIZES, style: where === 'item' ? pack.style : '' };
-    if (where === 'item' && pack.photo) body.item = await blobToB64(await shrink(pack.photo, 900, .8));
+    if (pack.photo) body.item = await blobToB64(await shrink(pack.photo, 900, .8));
     const t = await (await fnCall('read-tag', body)).json();
     if (run !== tagRun || !$('#tag-out')) return;
     t.style = normStyle(t.style);
@@ -1241,7 +1248,7 @@ async function runOcr(file){
 function guideSheet(first){
   openSheet(`<h2>${first ? 'How packing works' : 'How to use Packout'}</h2>
     <ol class="guide">
-      <li><b class="n">1</b><span><strong>Enter the style number</strong>Type it, or tap Take a photo of the tag. The app fills in the style, color, size, type and brand.</span></li>
+      <li><b class="n">1</b><span><strong>Photo of the item, then the tag</strong>The app fills in the style, color, size, type and brand. You can also type the style.</span></li>
       <li><b class="n">2</b><span><strong>Follow the pallet the app shows</strong>A new style goes in your box. If the style was already started, the app shows its pallet. Take the pieces there.</span></li>
       <li><b class="n">3</b><span><strong>One entry per color</strong>Take the photo, check the color, set the quantity, tap Save item. Then photograph the next color.</span></li>
       <li><b class="n">4</b><span><strong>When a box is full</strong>After saving, tap <em>Same color, next box</em> to keep going with the same photo, or <em>Box full</em> at the top. Write the new box number on the box. <em>Next style</em> when the style is done.</span></li>
@@ -1914,6 +1921,12 @@ document.addEventListener('click', e => {
   if (e.target.id === 'sheet') closeSheet();
 });
 document.addEventListener('change', e => {
+  if (e.target.id === 'k-itemfirst' && e.target.files[0]) {
+    const f = e.target.files[0]; e.target.value = '';
+    pack.photo = f; if (pack.photoUrl) URL.revokeObjectURL(pack.photoUrl); pack.photoUrl = URL.createObjectURL(f);
+    keepInputs(render);
+    detectColors(f).then(names => { if (pack.photo === f) pack.colors = names; });
+  }
   if (e.target.id === 'k-photo' && e.target.files[0]) {
     const f = e.target.files[0]; pack.photo = f; showPhoto(f); const r = $('#k-photo-wrap img[src^="http"]'); if (r) r.remove();
     detectColors(f).then(names => {
