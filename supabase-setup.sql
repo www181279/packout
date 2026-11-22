@@ -277,6 +277,45 @@ create trigger items_tidy
   after delete on public.items
   for each row execute function public.tidy_after_item_delete();
 
+-- Save one item, optionally continuing into more boxes on the same pallet
+-- ("this color needs another box"). Each extra box is created, gets a copy of
+-- the item with its own quantity, and every box before the last is marked full.
+-- All or nothing. Safe to repeat after a lost reply: rows already saved are reused.
+create or replace function public.save_item(p jsonb, p_more jsonb default '[]'::jsonb)
+returns jsonb
+language plpgsql
+as $$
+declare
+  v_box    bigint := (p->>'box_id')::bigint;
+  v_pallet bigint;
+  v_prev   bigint;
+  v_new    bigint;
+  v_boxes  jsonb := '[]'::jsonb;
+  m        jsonb;
+begin
+  insert into public.items (id, style_number, box_id, color, brand, tag_number, quantity, gender, season, photo_path, created_by)
+  values ((p->>'id')::uuid, p->>'style_number', v_box, p->>'color', p->>'brand', coalesce(p->>'tag_number', ''),
+          (p->>'quantity')::int, p->>'gender', p->>'season', p->>'photo_path', p->>'created_by')
+  on conflict (id) do nothing;
+  select pallet_id into v_pallet from public.boxes where id = v_box;
+  v_prev := v_box;
+  for m in select * from jsonb_array_elements(p_more) loop
+    select box_id into v_new from public.items where id = (m->>'id')::uuid;
+    if v_new is null then
+      insert into public.boxes (pallet_id, created_by) values (v_pallet, p->>'created_by') returning id into v_new;
+      insert into public.items (id, style_number, box_id, color, brand, tag_number, quantity, gender, season, photo_path, created_by)
+      values ((m->>'id')::uuid, p->>'style_number', v_new, p->>'color', p->>'brand', coalesce(p->>'tag_number', ''),
+              (m->>'qty')::int, p->>'gender', p->>'season', p->>'photo_path', p->>'created_by');
+    end if;
+    update public.boxes set status = 'closed' where id = v_prev;
+    v_boxes := v_boxes || to_jsonb(v_new);
+    v_prev := v_new;
+  end loop;
+  return jsonb_build_object('boxes', v_boxes);
+end;
+$$;
+
+grant execute on function public.save_item(jsonb, jsonb) to anon, authenticated;
 grant execute on function public.move_style(text, bigint, text, text) to anon, authenticated;
 grant execute on function public.rename_style(text, text) to anon, authenticated;
 grant execute on function public.delete_style(text) to anon, authenticated;

@@ -97,6 +97,9 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 /* save bar stays above the bottom tabs */
 .savebar{position:sticky;bottom:var(--navh,64px);z-index:14;margin:0 -16px;padding:10px 16px 12px;background:var(--floor);border-top:1px solid var(--line)}
 .savebar .err{margin:0 0 10px}
+.morebox{margin-top:4px}.morerow{display:flex;gap:8px}.morerow input{flex:1;text-align:center;font:700 24px/1 var(--sign)}.morerow .btn{width:auto;flex:none;min-height:50px}
+.addmore{display:block;margin-top:10px}
+.savedacts{margin-top:10px}.savedacts .btn{flex:1}
 .restart{display:block;margin:0 auto 6px;color:var(--stop)}
 .samehead{display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline;justify-content:space-between;margin:18px 0 0;padding-top:14px;border-top:1px dashed var(--line)}
 .samehead span{font-size:14px;color:var(--ink2)}
@@ -570,10 +573,12 @@ function packHTML(){
 
   // item form: the fields that change every time come first; the ones that carry over sit below
   const prev = data.items.filter(i => i.style_number === pack.style).slice(-1)[0] || store.get('lastForm') || {};
-  const f = pack.form || { brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', qty: 1 };
+  const f = pack.form || { brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', qty: 1, more: [] };
+  const more = f.more || [];
   const uniq = k => [...new Set(data.items.map(i => i[k]).filter(Boolean))].sort();
   return `${trailHTML()}
-    ${pack.saved ? `<div class="saved">${esc(pack.saved)}</div>` : ''}
+    ${pack.saved ? `<div class="saved">${esc(pack.saved)}${pack.justSaved && idx.box.get(pack.box)?.status === 'open' ? `
+      <div class="row savedacts"><button class="btn alt sm" data-act="new-box">${bCode(pack.box)} is full</button><button class="btn alt sm" data-act="same-box">Next style</button></div>` : ''}</div>` : ''}
     <div class="panel">
       <div class="photo" id="k-photo-wrap"><span>Tap to take a photo of the item</span>
         <input id="k-photo" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the item"></div>
@@ -581,10 +586,15 @@ function packHTML(){
       <input id="k-color" type="text" list="l-color" autocomplete="off" enterkeyhint="next" value="${esc(f.color)}">
       <div id="k-colorhint" class="chint">${colorHintHTML()}</div>
       <datalist id="l-color">${uniq('color').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
-      <label class="f" for="k-qty">Quantity</label>
+      <label class="f" for="k-qty">${more.length ? `Quantity in ${bCode(pack.box)}` : 'Quantity'}</label>
       <div class="qty"><button type="button" data-act="qty" data-d="-1" aria-label="One less">&minus;</button>
         <input id="k-qty" type="number" inputmode="numeric" min="1" enterkeyhint="done" value="${esc(f.qty)}">
         <button type="button" data-act="qty" data-d="1" aria-label="One more">+</button></div>
+      ${more.map((q, n) => `<div class="morebox"><label class="f" for="k-more-${n}">Quantity in new box ${n + 1}</label>
+        <div class="morerow"><input id="k-more-${n}" class="k-more" type="number" inputmode="numeric" min="1" value="${esc(q)}">
+        <button type="button" class="btn quiet" data-act="del-more" data-n="${n}" aria-label="Remove new box ${n + 1}">Remove</button></div></div>`).join('')}
+      <button type="button" class="linkbtn addmore" data-act="add-more">+ This color needs ${more.length ? 'one more box' : 'another box'}</button>
+      ${more.length ? `<p class="small muted">${more.length > 1 ? `${bCode(pack.box)} and every new box except the last will be marked full.` : `${bCode(pack.box)} will be marked full. The new box stays open.`} Total ${nf((+f.qty || 0) + more.reduce((a, b) => a + (+b || 0), 0))} pieces.</p>` : ''}
       <label class="f" for="k-tag">Tag number <small>(optional)</small></label>
       <div class="withscan"><input id="k-tag" type="text" autocomplete="off" autocapitalize="characters" enterkeyhint="done" value="${esc(f.tag)}"><button type="button" class="btn alt" data-act="scan" data-target="tag" aria-label="Scan a barcode with the camera"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>Scan</button></div>
       <div class="samehead"><b>Same for the whole style</b><span>Kept from the last item</span></div>
@@ -608,7 +618,7 @@ function palPick(p){
 }
 function readForm(){
   return { color: $('#k-color').value.trim(), brand: $('#k-brand').value.trim(), tag: $('#k-tag').value.trim(),
-    qty: parseInt($('#k-qty').value, 10), gender: $('input[name=k-gender]:checked')?.value || '', season: $('input[name=k-season]:checked')?.value || '' };
+    qty: parseInt($('#k-qty').value, 10), more: [...document.querySelectorAll('.k-more')].map(i => i.value === '' ? '' : parseInt(i.value, 10)), gender: $('input[name=k-gender]:checked')?.value || '', season: $('input[name=k-season]:checked')?.value || '' };
 }
 function packFail(e){ pack.err = e.message; render(); }
 
@@ -1135,12 +1145,14 @@ const act = {
     if (pack.stage === 'item' && pack.box && !itemsOf('box_id', pack.box).length)
       return toast(`${bCode(pack.box)} is still empty. Save an item in it first.`, 'bad');
     const wasItem = pack.stage === 'item' ? readForm() : null;     // box filled up mid-style: keep what was typed
+    const full = pack.stage === 'item' && pack.box ? pack.box : null;
     await withBusy('Starting box', async () => {
       try {
+        if (full) { await db.update('boxes', 'id=' + eq(full), { status: 'closed' }); const fb = idx.box.get(full); if (fb) fb.status = 'closed'; }
         const b = await db.insert('boxes', { pallet_id: pack.pallet, created_by: me.name });
         data.boxes.push(b); idx.box.set(b.id, b);
         pack.last = { pallet: pack.pallet, box: b.id }; store.set('last', pack.last);
-        Object.assign(pack, { box: b.id, stage: 'item', err: '', form: wasItem, saved: `New box. Write ${bCode(b.id)} on it now.` });
+        Object.assign(pack, { box: b.id, stage: 'item', err: '', form: wasItem, justSaved: false, saved: `${full ? bCode(full) + ' is marked full. ' : ''}New box: write ${bCode(b.id)} on it now.` });
         render(); scrollTo(0, 0); if (pack.photo) showPhoto(pack.photo);
       } catch (e) { packFail(e); }
     });
@@ -1152,11 +1164,13 @@ const act = {
     });
   },
   async 'reopen-pallet'(el){ await setStatus('pallets', +el.dataset.id, 'open'); },
+  'add-more'(){ const f = readForm(); f.more.push(''); pack.form = f; pack.err = ''; const p = pack.photo; render(); if (p) showPhoto(p); const i = document.querySelectorAll('.k-more'); if (i.length) i[i.length - 1].focus(); },
+  'del-more'(el){ const f = readForm(); f.more.splice(+el.dataset.n, 1); pack.form = f; const p = pack.photo; render(); if (p) showPhoto(p); },
   qty(el){ const i = $('#k-qty'); i.value = Math.max(1, (parseInt(i.value, 10) || 0) + (+el.dataset.d)); },
   async 'save-item'(){
     const f = readForm(); pack.form = f;
     const miss = !pack.photo ? 'Take a photo of the item first.' : !f.color ? 'Type the color.' : !f.brand ? 'Type the brand.'
-      : !(f.qty >= 1) ? 'Quantity must be 1 or more.' : !f.gender ? 'Pick a gender.' : !f.season ? 'Pick a season.' : '';
+      : !(f.qty >= 1) ? 'Quantity must be 1 or more.' : f.more.some(q => !(q >= 1)) ? 'Type the quantity for each new box, or remove it.' : !f.gender ? 'Pick a gender.' : !f.season ? 'Pick a season.' : '';
     const showErr = m => { pack.err = m; const p = pack.photo; render(); if (p) showPhoto(p); };
     if (miss) return showErr(miss);
     await withBusy('Saving to the database', async () => {
@@ -1166,21 +1180,33 @@ const act = {
         await Promise.all([uploadPhoto(path, full), uploadPhoto('thumb/' + path, thumb)]);
         const row = { id, style_number: pack.style, box_id: pack.box, color: f.color, brand: f.brand, tag_number: f.tag, quantity: f.qty,
           gender: f.gender, season: f.season, photo_path: path, created_by: me.name };
-        let saved;
-        try { saved = await db.insert('items', row); }
-        catch (e) {             // a retry after a lost reply: the row may already be there
-          const again = e.code === '23505' ? await db.get('items', 'select=*&id=' + eq(id)) : [];
-          if (!again[0]) throw e; saved = again[0];
+        let msg;
+        if (f.more.length) {
+          // the same ids are reused if this is tapped again after a lost reply
+          if (!pack.moreIds || pack.moreIds.length !== f.more.length) pack.moreIds = f.more.map(() => uuid());
+          const r = await rpc('save_item', { p: row, p_more: f.more.map((q, n) => ({ id: pack.moreIds[n], qty: q })) });
+          await loadAll();
+          const boxes = [pack.box, ...r.boxes], qtys = [f.qty, ...f.more];
+          msg = `Saved ${nf(qtys.reduce((a, b) => a + b, 0))} x ${pack.style} ${f.color}: ` + boxes.map((b, n) => `${bCode(b)}: ${nf(qtys[n])}${n < boxes.length - 1 ? ' (full)' : ''}`).join(', ')
+            + `. Write ${r.boxes.map(bCode).join(' and ')} on the new ${r.boxes.length > 1 ? 'boxes' : 'box'}. You are now in ${bCode(boxes[boxes.length - 1])}.`;
+          pack.box = boxes[boxes.length - 1];
+        } else {
+          let saved;
+          try { saved = await db.insert('items', row); }
+          catch (e) {             // a retry after a lost reply: the row may already be there
+            const again = e.code === '23505' ? await db.get('items', 'select=*&id=' + eq(id)) : [];
+            if (!again[0]) throw e; saved = again[0];
+          }
+          data.items.push(saved);
+          msg = `Saved ${nf(f.qty)} x ${pack.style} ${f.color} in ${bCode(pack.box)}. Next color: take the photo.`;
         }
-        data.items.push(saved);
         pack.last = { pallet: pack.pallet, box: pack.box }; store.set('last', pack.last);
         store.set('lastForm', { brand: f.brand, gender: f.gender, season: f.season });
         if (navigator.vibrate) navigator.vibrate(40);
-        Object.assign(pack, { id: uuid(), photo: null, colors: null, err: '', form: { ...f, color: '', tag: '', qty: 1 },
-          saved: `Saved ${nf(f.qty)} x ${pack.style} ${f.color} in ${bCode(pack.box)}. Next color: take the photo. New style: tap Next style.` });
+        Object.assign(pack, { id: uuid(), moreIds: null, photo: null, colors: null, err: '', justSaved: true, form: { ...f, color: '', tag: '', qty: 1, more: [] }, saved: msg });
         render(); scrollTo(0, 0);
       } catch (e) {
-        showErr(/STYLE_PALLET/.test(e.message) ? 'This style belongs on a different pallet. Start the style again to see where it goes.' : e.code === '23503' ? 'This box or style was removed by someone. Tap "Start another style" and enter the style again.' : e.message + ' Tap Save item to try again.');
+        showErr(needsUpdate(e) ? 'The database needs the latest setup script before items can go into more than one box.' : /STYLE_PALLET/.test(e.message) ? 'This style belongs on a different pallet. Start the style again to see where it goes.' : e.code === '23503' ? 'This box or style was removed by someone. Tap "Start another style" and enter the style again.' : e.message + ' Tap Save item to try again.');
       }
     });
   },
@@ -1211,7 +1237,7 @@ const act = {
     openSheet(`<h2>Delete this item?</h2><p class="lead">It is removed from the inventory for everyone. This can't be undone.</p>
       <div class="row"><button class="btn alt" data-act="open-item" data-id="${el.dataset.id}">Keep it</button><button class="btn danger" data-act="del-item-yes" data-id="${el.dataset.id}">Delete</button></div>`);
   },
-  async 'del-item-yes'(el){ closeSheet(); const it = data.items.find(i => i.id === el.dataset.id); await mutate('Deleting', async () => { await db.remove('items', 'id=' + eq(el.dataset.id)); await removePhotos([it && it.photo_path]); }, 'Deleted'); },
+  async 'del-item-yes'(el){ closeSheet(); const it = data.items.find(i => i.id === el.dataset.id); await mutate('Deleting', async () => { await db.remove('items', 'id=' + eq(el.dataset.id)); if (it && !data.items.some(i => i.id !== it.id && i.photo_path === it.photo_path)) await removePhotos([it.photo_path]); }, 'Deleted'); },
 
   scan(el){ openScanner(el.dataset.target); },
   guide(){ guideSheet(false); },
