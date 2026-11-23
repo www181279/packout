@@ -1170,6 +1170,7 @@ async function loadAll(opts = {}){
   const since = itemsCursor;
   const [pallets, boxes, styles, items] = await Promise.all([db.all('pallets'), db.all('boxes'), db.all('styles'),
     full ? db.all('items') : db.all('items', '&updated_at=gte.' + encodeURIComponent(since))]);
+  items.forEach(i => { if (i.size) i.size = normSize(i.size); });   // older rows: 141/2PLUS shows as 14½ Plus
   let all = items;
   if (!full) { const m = new Map(data.items.map(i => [i.id, i])); items.forEach(i => m.set(i.id, i)); all = [...m.values()]; }
   else lastFull = Date.now();
@@ -1614,7 +1615,7 @@ function recentHTML(){
 
 /* ---------- screens: inventory ---------- */
 const FLABEL = { pallet: 'Pallet', box: 'Box', item_type: 'Type', size: 'Size', brand: 'Brand', gender: 'Gender', season: 'Season', color: 'Color', by: 'Packed by' };
-const FFIELD = { pallet: i => String(i.pallet_id), box: i => String(i.box_id), item_type: i => i.item_type, size: i => i.size, brand: i => i.brand, gender: i => i.gender, season: i => i.season, color: i => i.color, by: i => i.created_by };
+const FFIELD = { pallet: i => String(i.pallet_id), box: i => String(i.box_id), item_type: i => i.item_type, size: i => normSize(i.size), brand: i => i.brand, gender: i => i.gender, season: i => i.season, color: i => i.color, by: i => i.created_by };
 // Does an item pass filter set f? `skip` ignores one field (used to count what each choice would give).
 function passes(i, f, skip){
   for (const k in FFIELD) if (k !== skip && f[k] && FFIELD[k](i) !== String(f[k])) return false;
@@ -1742,7 +1743,7 @@ function groupItems(list){
   return gs;
 }
 function sizeTotals(g){
-  const t = new Map(); g.items.forEach(i => t.set(i.size || '', (t.get(i.size || '') || 0) + i.quantity));
+  const t = new Map(); g.items.forEach(i => { const z = normSize(i.size); t.set(z, (t.get(z) || 0) + i.quantity); });
   return [...t.entries()].sort((a, b) => bySize(a[0], b[0]));
 }
 const sizeLineHTML = g => sizeTotals(g).map(([z, q]) => `<span class="zc"><small>${esc(z || 'No size')}</small><b>${nf(q)}<u>pcs</u></b></span>`).join('');
@@ -3422,7 +3423,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.50';
+const APP_VERSION = '2026-11-23.51';
 let newVersion = false;
 async function checkVersion(){
   try {
