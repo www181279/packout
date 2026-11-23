@@ -253,9 +253,10 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
   .irow .lc{display:none}
   .irow .loc em{font-size:24px}
 }
-.irow .szl{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
-.irow .szl i,.irow .szw i{font-style:normal;font-size:13px;background:#EEF2F6;border-radius:5px;padding:2px 7px;white-space:nowrap}
-.irow .szl i b,.irow .szw i b{font-weight:700}
+.irow .szl{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.zc{display:inline-flex;flex-direction:column;align-items:center;min-width:46px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#fff}
+.zc small{display:block;width:100%;text-align:center;background:var(--ink);color:#fff;font-size:12px;font-weight:600;padding:2px 5px;white-space:nowrap}
+.zc b{display:block;font:700 17px/1.3 var(--sign);padding:1px 6px 2px}
 .irow .szw{display:none}
 .szgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;margin-top:8px}
 .szgrid div{background:#fff;border:1px solid var(--line);border-radius:8px;text-align:center;padding:6px 4px}
@@ -1037,7 +1038,7 @@ function sizeTotals(g){
   const t = new Map(); g.items.forEach(i => t.set(i.size || '', (t.get(i.size || '') || 0) + i.quantity));
   return [...t.entries()].sort((a, b) => bySize(a[0], b[0]));
 }
-const sizeLineHTML = g => sizeTotals(g).map(([z, q]) => `<i>${esc(z || 'No size')} <b>×${nf(q)}</b></i>`).join('');
+const sizeLineHTML = g => sizeTotals(g).map(([z, q]) => `<span class="zc"><small>${esc(z || 'No size')}</small><b>${nf(q)}</b></span>`).join('');
 function locText(g){
   const pals = [...new Set(g.items.map(i => i.pallet_id))].sort((a, b) => a - b), boxes = [...new Set(g.items.map(i => i.box_id))].sort((a, b) => a - b);
   return `${pals.map(pCode).join(', ')}<br>${boxes.length > 3 ? `${boxes.length} boxes` : boxes.map(bCode).join(', ')}`;
@@ -2242,7 +2243,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.14';
+const APP_VERSION = '2026-11-22.15';
 let newVersion = false;
 async function checkVersion(){
   try {
