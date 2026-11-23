@@ -153,33 +153,76 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .photo .cleanstate .spin{width:14px;height:14px;border-width:2px}
 .photo .cleanstate.ok{background:#E7F4EC;color:#1B6B3A}
 @media (prefers-reduced-motion:reduce){.spin,.rbar i,.photo .scan{animation:none}.photo .scan{display:none}}
-#lock{position:fixed;inset:0;z-index:70;background:var(--ink);display:flex;align-items:center;justify-content:center;padding:24px}
+#lock{position:fixed;inset:0;z-index:70;background:radial-gradient(120% 60% at 50% -10%,#1F3358 0%,#0E1830 70%);display:flex;align-items:center;justify-content:center;padding:24px;color:#F2F5FA}
 #lock[hidden]{display:none}
-#lock .lockcard{background:#fff;border-radius:16px;padding:28px 22px 18px;width:min(92vw,380px);text-align:center}
-#lock img{border-radius:16px;margin-bottom:12px}
-#lock h2{margin:0 0 4px}
-#lock #lock-who{color:var(--ink2);margin:0 0 18px;font-weight:600}
-#lock #lock-err{color:#B42318;margin:10px 0 0}
-#lock .faceb{display:flex;align-items:center;justify-content:center;gap:10px}
-#lock .faceb svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#lock .lockcard{width:min(92vw,360px);text-align:center;display:flex;flex-direction:column;align-items:center}
+#lock img{width:64px;height:64px;border-radius:16px;margin-bottom:18px}
+#lock h2{margin:0 0 4px;font:700 32px/1.1 var(--sign);color:#fff}
+#lock #lock-who{color:#93A2BB;margin:0 0 30px;font-weight:500}
+#lock .btn{width:100%;height:56px;border-radius:14px;margin:0 0 10px;font-weight:700;font-size:17px}
+#lock .faceb{background:var(--placard);color:var(--ink);border:0}
+#lock .btn.quiet{background:rgba(255,255,255,.09);color:#fff;border:0}
+#lock #lock-err{color:#FF9C8F;margin:10px 0 0}
+#lock .faceb,.faceb{display:flex;align-items:center;justify-content:center;gap:10px}
+#lock .faceb svg,.faceb svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #top .who b{cursor:pointer}
 .faceid{display:flex;gap:10px;align-items:center;justify-content:space-between;background:#F4F6F8;border-radius:8px;padding:10px 12px;margin-bottom:12px}
 .faceid span{font-size:14px}
 .faceid .btn{width:auto;flex:none;margin:0}
-.signin .names{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-bottom:6px}
-.signin .names button{min-height:48px;border:1.5px solid var(--line);background:#fff;border-radius:10px;font:600 16px var(--body);color:var(--ink)}
-.signin .names button[aria-checked=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
-.pinarea{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
-.dots{display:flex;justify-content:center;gap:14px;margin:6px 0 16px}
-.dots i{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink);transition:background .12s}
-.dots i.on{background:var(--ink)}
+/* sign-in: full-screen, dark like the loading dock at night; placard yellow marks what you touch */
+body.signing{background:#0E1830 radial-gradient(120% 50% at 50% -8%,#1F3358 0%,rgba(14,24,48,0) 70%) no-repeat;min-height:100svh}
+body.signing #top{display:none}
+body.signing #view{max-width:440px;padding:0 20px}
+.si{--s-ink:#0E1830;--s-card:rgba(255,255,255,.06);--s-edge:rgba(255,255,255,.12);--s-txt:#F2F5FA;--s-mute:#93A2BB;
+  min-height:100svh;display:flex;flex-direction:column;color:var(--s-txt);padding:calc(env(safe-area-inset-top) + 28px) 4px calc(env(safe-area-inset-bottom) + 18px);
+}
+.si-brand{display:flex;align-items:center;gap:12px;margin:0 4px 34px}
+.si-brand img{width:40px;height:40px;border-radius:11px}
+.si-brand b{font:700 26px/1 var(--sign);letter-spacing:.02em}
+.si h1{font:700 34px/1.05 var(--sign);margin:0 4px 6px;letter-spacing:.005em}
+.si .sub{color:var(--s-mute);margin:0 4px 26px;font-size:16px}
+.si-people{display:grid;grid-template-columns:repeat(3,1fr);gap:22px 10px;margin:0 0 auto}
+.si-person{background:none;border:0;padding:6px 0;display:flex;flex-direction:column;align-items:center;gap:9px;color:var(--s-txt);cursor:pointer;border-radius:14px}
+.si-person:focus-visible{outline:2px solid var(--placard);outline-offset:2px}
+.av{position:relative;width:68px;height:68px;border-radius:50%;display:grid;place-items:center;font:700 26px/1 var(--sign);letter-spacing:.03em;
+  background:linear-gradient(160deg,#2A3E63,#1B2B4A);box-shadow:inset 0 0 0 1px var(--s-edge);color:#fff;transition:transform .15s}
+.si-person:active .av{transform:scale(.94)}
+.si-person.last .av{box-shadow:inset 0 0 0 1px var(--s-edge),0 0 0 2px var(--s-ink),0 0 0 4px var(--placard)}
+.av .fbadge{position:absolute;right:-3px;bottom:-3px;width:24px;height:24px;border-radius:50%;background:var(--placard);color:var(--ink);display:grid;place-items:center;box-shadow:0 0 0 3px var(--s-ink)}
+.av .fbadge svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.si-person > span:last-child{font-size:15px;font-weight:500}
+.si-back{align-self:flex-start;background:none;border:0;color:var(--s-mute);font:500 16px var(--body);padding:8px 4px;margin:-8px 0 10px;display:flex;align-items:center;gap:4px;cursor:pointer}
+.si-back svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.si-me{display:flex;flex-direction:column;align-items:center;text-align:center}
+.si-me .av{width:84px;height:84px;font-size:32px;box-shadow:inset 0 0 0 1px var(--s-edge),0 0 0 3px var(--s-ink),0 0 0 5px var(--placard);margin-bottom:14px}
+.si-me h1{margin:0 0 18px}
+.simode{display:grid;grid-template-columns:1fr 1fr;background:var(--s-card);border-radius:12px;padding:4px;width:100%;max-width:300px;margin:0 auto 26px;box-shadow:inset 0 0 0 1px var(--s-edge)}
+.simode button{border:0;background:none;color:var(--s-mute);font:600 15px var(--body);height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer;transition:background .15s,color .15s}
+.simode button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.simode button[aria-checked=true]{background:var(--placard);color:var(--ink)}
+.si-face{display:flex;flex-direction:column;align-items:center;gap:26px;padding-top:6px;width:100%}
+.facering{position:relative;width:132px;height:132px;border-radius:50%;display:grid;place-items:center;background:var(--s-card);box-shadow:inset 0 0 0 1px var(--s-edge)}
+.facering::after{content:"";position:absolute;inset:-8px;border-radius:50%;border:2px solid var(--placard);opacity:0;animation:facepulse 2.4s ease-out infinite}
+.facering svg{width:64px;height:64px;fill:none;stroke:var(--placard);stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+@keyframes facepulse{0%{transform:scale(.92);opacity:.7}100%{transform:scale(1.12);opacity:0}}
+.si .go{width:100%;max-width:320px;height:56px;border:0;border-radius:14px;background:var(--placard);color:var(--ink);font:700 18px var(--body);cursor:pointer}
+.si .go:active{background:var(--placard-deep)}
+.si .err{background:none;border:0;color:#FF9C8F;text-align:center;font-size:15px;margin:-6px 0 12px;padding:0}
+.si .foot{color:var(--s-mute);font-size:14px;text-align:center;margin:22px 0 0}
+.pinarea{width:100%}
+.dots{display:flex;justify-content:center;gap:16px;margin:0 0 22px}
+.dots i{width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(255,255,255,.45);transition:background .12s,box-shadow .12s,transform .12s}
+.dots i.on{background:var(--placard);box-shadow:none;transform:scale(1.08)}
 .dots.shake{animation:shake .4s}
-@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
-.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:300px;margin:0 auto}
-.keypad button{height:64px;border-radius:50%;width:64px;justify-self:center;border:1.5px solid var(--line);background:#fff;font:600 26px var(--sign);color:var(--ink);-webkit-tap-highlight-color:transparent}
-.keypad button:active{background:var(--ink);color:#fff}
-.keypad button[data-k=del]{border:0;background:transparent;font-size:24px}
-@media (prefers-reduced-motion:reduce){.dots.shake{animation:none}}
+@keyframes shake{20%,60%{transform:translateX(-9px)}40%,80%{transform:translateX(9px)}}
+.keypad{display:grid;grid-template-columns:repeat(3,76px);gap:16px 26px;justify-content:center;margin:0 auto}
+.keypad button{width:76px;height:76px;border-radius:50%;border:0;background:rgba(255,255,255,.09);color:#fff;font:600 32px/1 var(--sign);cursor:pointer;transition:background .08s;-webkit-tap-highlight-color:transparent}
+.keypad button:active{background:rgba(255,255,255,.28)}
+.keypad button:focus-visible{outline:2px solid var(--placard);outline-offset:2px}
+.keypad button[data-k=del]{background:none;display:grid;place-items:center}
+.keypad button[data-k=del] svg{width:28px;height:28px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+@media (max-height:700px){.keypad{grid-template-columns:repeat(3,68px);gap:12px 24px}.keypad button{width:68px;height:68px}.si-me .av{width:64px;height:64px;font-size:24px;margin-bottom:8px}}
+@media (prefers-reduced-motion:reduce){.dots.shake,.facering::after{animation:none}}
 .morebox{margin-top:4px}.morerow{display:flex;gap:8px}.morerow input{flex:1;text-align:center;font:700 24px/1 var(--sign)}.morerow .btn{width:auto;flex:none;min-height:50px}
 .addmore{display:block;margin-top:10px}
 .savedacts{margin-top:10px}.savedacts .btn{flex:1;font-size:15px}
@@ -764,6 +807,7 @@ const joined = () => data.items.map(i => ({ ...i, box: idx.box.get(i.box_id), pa
 function render(){
   $('#who').innerHTML = me ? (staff === 'in' ? `<b data-act="account" role="button" tabindex="0">${esc(me.name)} ›</b>` : `<b>${esc(me.name)}</b>`) : '';
   const v = $('#view'); v.classList.toggle('wide', tab === 'inventory' && !!cfg && !!me);
+  document.body.classList.toggle('signing', !!cfg && !cfg.view && staff === 'out');
   if (!cfg) { $('#nav').hidden = true; return v.innerHTML = connectHTML(); }
   if (cfg.view) { if (!me || !me.view) { me = { name: 'View only', view: true }; store.set('me', me); } if (tab === 'pack') tab = 'inventory'; $('#who').innerHTML = '<b>View only</b>'; }
   if (!cfg.view && staff === 'checking') { $('#nav').hidden = true; return v.innerHTML = '<p class="lead" style="margin-top:30px">Checking who is signed in</p>'; }
@@ -817,25 +861,43 @@ function drawPinDots(){
   d.classList.remove('shake'); d.querySelectorAll('i').forEach((x, n) => x.classList.toggle('on', n < pinBuf.length));
   d.setAttribute('aria-label', pinBuf.length + ' of 6 digits'); $('#si-pin').value = pinBuf;
 }
+const FACE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M9 9v1M15 9v1M12 9v4h-1M9 16c1.8 1.3 4.2 1.3 6 0"/></svg>';
+const initials = n => n.trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+const BACK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+const KEY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.5"/><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="12" r="2.5"/></svg>';
+const DEL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1zM17 9l-5 6M12 9l5 6"/></svg>';
+let signinMode = '';
 function signinHTML(){
-  const last = signinPick || store.get('lastName') || '';
   pinBuf = '';
-  return `<h1 class="h">Sign in</h1>
-  <div class="panel signin">
-    <p class="f" id="si-label">Who are you?</p>
-    <div class="names" role="radiogroup" aria-labelledby="si-label">${staffNames.map(n => `<button type="button" role="radio" aria-checked="${n === last}" data-act="si-name" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>
-    <input id="si-name" type="hidden" value="${esc(staffNames.includes(last) ? last : '')}">
-    <input id="si-pin" type="hidden" value="">
-    <div class="pinarea" ${staffNames.includes(last) ? '' : 'hidden'}>
-      <p class="f" style="text-align:center">Your PIN</p>
-      <div class="dots ${signinErr ? 'shake' : ''}" aria-live="polite" aria-label="0 of 6 digits">${'<i></i>'.repeat(6)}</div>
-      ${signinErr ? `<div class="err" style="text-align:center">${esc(signinErr)}</div>` : ''}
-      <div class="keypad">${['1','2','3','4','5','6','7','8','9','','0','del'].map(k => k === '' ? '<span></span>'
-        : k === 'del' ? '<button type="button" data-act="pin-key" data-k="del" aria-label="Delete last digit">⌫</button>'
-        : `<button type="button" data-act="pin-key" data-k="${k}">${k}</button>`).join('')}</div>
+  const brand = `<div class="si-brand"><img src="icon-192.png" alt=""><b>Packout</b></div>`;
+  const f = faceSupported ? faceSaved() : null;
+  const pick = staffNames.includes(signinPick) ? signinPick : '';
+  if (!pick) {
+    const last = store.get('lastName');
+    return `<section class="si">${brand}
+      <h1>Who's packing?</h1><p class="sub">Tap your name to sign in.</p>
+      <div class="si-people">${staffNames.map(n => `<button type="button" class="si-person${n === last ? ' last' : ''}" data-act="si-name" data-n="${esc(n)}">
+        <span class="av" aria-hidden="true">${esc(initials(n))}${f && f.name === n ? `<i class="fbadge">${FACE_SVG}</i>` : ''}</span><span>${esc(n)}</span></button>`).join('')}</div>
+      <p class="foot">Forgot your PIN? Ask Avigdor for a new one.</p></section>`;
+  }
+  const hasFace = !!(f && f.name === pick);
+  const mode = hasFace && signinMode !== 'pin' ? 'face' : 'pin';
+  return `<section class="si">
+    <button type="button" class="si-back" data-act="si-back">${BACK_SVG}Not ${esc(pick)}?</button>
+    <div class="si-me"><span class="av" aria-hidden="true">${esc(initials(pick))}</span><h1>Hi, ${esc(pick)}</h1>
+    ${hasFace ? `<div class="simode" role="radiogroup" aria-label="How to sign in">
+      <button type="button" role="radio" aria-checked="${mode === 'face'}" data-act="si-mode" data-m="face">${FACE_SVG}Face ID</button>
+      <button type="button" role="radio" aria-checked="${mode === 'pin'}" data-act="si-mode" data-m="pin">${KEY_SVG}PIN</button></div>` : ''}
+    <input id="si-name" type="hidden" value="${esc(pick)}"><input id="si-pin" type="hidden" value="">
+    ${signinErr ? `<div class="err" role="alert">${esc(signinErr)}</div>` : ''}
+    ${mode === 'face'
+      ? `<div class="si-face"><div class="facering">${FACE_SVG}</div><button type="button" class="go" data-act="faceid-signin">Sign in with Face ID</button></div>`
+      : `<div class="pinarea"><div class="dots ${signinErr ? 'shake' : ''}" role="status" aria-label="0 of 6 digits">${'<i></i>'.repeat(6)}</div>
+        <div class="keypad">${['1','2','3','4','5','6','7','8','9','','0','del'].map(k => k === '' ? '<span></span>'
+          : k === 'del' ? `<button type="button" data-act="pin-key" data-k="del" aria-label="Delete last digit">${DEL_SVG}</button>`
+          : `<button type="button" data-act="pin-key" data-k="${k}">${k}</button>`).join('')}</div></div>`}
     </div>
-  </div>
-  <p class="small muted" style="text-align:center">Forgot your PIN? Ask Avigdor for a new one.</p>`;
+    <p class="foot">${mode === 'pin' ? 'Forgot your PIN? Ask Avigdor for a new one.' : hasFace ? '' : ''}</p></section>`;
 }
 async function staffSheet(){
   openSheet(`<h2>Employees</h2><div id="st-list"><p class="lead">Loading</p></div>
@@ -1447,17 +1509,21 @@ const faceIdAvailable = async () => !!(window.PublicKeyCredential && navigator.c
 const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 const rnd = n => crypto.getRandomValues(new Uint8Array(n));
-const faceId = () => { const f = store.get('faceid'); return f && me && f.name === me.name ? f : null; };
+const faceSaved = () => { const f = store.get('faceid'); return f && f.server ? f : null; };     // Face ID that can sign in (key saved on the server)
+const faceId = () => { const f = faceSaved(); return f && me && f.name === me.name ? f : null; };
 let lockedAt = 0, hiddenAt = 0;
 async function faceIdTurnOn(){
   try {
     const c = await navigator.credentials.create({ publicKey: {
       challenge: rnd(32), rp: { name: 'Packout', id: location.hostname },
       user: { id: rnd(16), name: me.name, displayName: me.name },
-      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
       authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' }, timeout: 60000 } });
-    store.set('faceid', { name: me.name, id: b64u(c.rawId) });
-    closeSheet(); toast('Face ID is on. Next time, sign in with your face.', 'good'); render();
+    const pk = c.response.getPublicKey && c.response.getPublicKey();
+    if (!pk || (c.response.getPublicKeyAlgorithm && c.response.getPublicKeyAlgorithm() !== -7)) throw new Error('this browser cannot save Face ID. Open Packout from its home-screen icon or in Safari.');
+    await rpc('packout_passkey_add', { p_cred_id: b64u(c.rawId), p_public_key: b64u(pk) });
+    store.set('faceid', { name: me.name, id: b64u(c.rawId), server: true });
+    closeSheet(); toast('Face ID is on. Next time, tap Sign in with Face ID.', 'good'); render();
   } catch (e) { if (e && e.name !== 'NotAllowedError') toast('Face ID could not be turned on: ' + e.message, 'bad'); }
 }
 function lockNow(){
@@ -1603,6 +1669,37 @@ async function runOcr(file){
 }
 
 /* ---------- Face ID sign-in on this phone ---------- */
+async function faceIdSignIn(auto){
+  const f = faceSaved(); if (!f || staff !== 'out') return;
+  signinErr = '';
+  let a;
+  try {
+    const ch = await rpc('packout_passkey_challenge', {});
+    a = await navigator.credentials.get({ publicKey: { challenge: unb64u(ch), rpId: location.hostname,
+      allowCredentials: [{ type: 'public-key', id: unb64u(f.id) }], userVerification: 'required', timeout: 60000 } });
+  } catch (e) {
+    if (auto) return;      // the automatic try may be blocked until the person taps; the button stays
+    signinErr = e && e.name === 'NotAllowedError' ? 'Face ID was cancelled. Tap it to try again, or use your PIN.' : 'Face ID did not work. Use your PIN.'; return render();
+  }
+  await withBusy('Signing in', async () => {
+    try {
+      const r = await fnCall('passkey-login', { credId: b64u(a.rawId), clientDataJSON: b64u(a.response.clientDataJSON),
+        authenticatorData: b64u(a.response.authenticatorData), signature: b64u(a.response.signature) }).then(x => x.json());
+      await signedIn(r);
+    } catch (e) {
+      if (e.code === 'NO_KEY') store.del('faceid');
+      signinErr = e.code === 'NO_FUNCTION' ? 'Face ID sign-in is not ready yet. Use your PIN.' : e.message; render();
+    }
+  });
+}
+async function signedIn(r){
+  cfg.session = r.token; store.set('cfg', cfg); store.set('lastName', r.name);
+  const fid = store.get('faceid'); if (fid && fid.name !== r.name) store.del('faceid');
+  me = { name: r.name, owner: !!r.owner }; store.set('me', me); staff = 'in'; signinErr = ''; signinPick = '';
+  await refresh(); render(); startLive();
+  if (!store.get('seenGuide')) { store.set('seenGuide', 1); guideSheet(true); }
+  else if (faceSupported && !faceId() && !store.get('faceidAsk:' + r.name)) { store.set('faceidAsk:' + r.name, 1); faceOffer(); }
+}
 function faceOffer(){
   openSheet(`<h2>Sign in with Face ID?</h2>
     <p class="lead">Next time you open Packout on this phone, sign in with your face instead of typing your PIN.</p>
@@ -1915,11 +2012,9 @@ const act = {
     if (!store.get('seenGuide')) { store.set('seenGuide', 1); guideSheet(true); }
   },
   'change-who'(){ me = null; render(); },
-  'si-name'(el){
-    signinPick = el.dataset.n; signinErr = ''; $('#si-name').value = signinPick; pinBuf = ''; drawPinDots();
-    document.querySelectorAll('.names button').forEach(b => b.setAttribute('aria-checked', b === el));
-    $('.pinarea').hidden = false; $('.pinarea').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  },
+  'si-name'(el){ signinPick = el.dataset.n; signinErr = ''; signinMode = ''; render(); window.scrollTo(0, 0); },
+  'si-back'(){ signinPick = ''; signinErr = ''; signinMode = ''; render(); },
+  'si-mode'(el){ signinMode = el.dataset.m; signinErr = ''; render(); },
   'pin-key'(el){
     if (pack.signingIn) return;
     const k = el.dataset.k;
@@ -1935,12 +2030,7 @@ const act = {
       try {
         const r = await rpc('packout_login', { p_name: name, p_pin: pin });
         if (!r.ok) { signinErr = r.left ? `Wrong PIN. ${r.left} ${r.left === 1 ? 'try' : 'tries'} left.` : 'Wrong PIN. This name is now locked. Ask Avigdor to unlock it.'; render(); const i = $('#si-pin'); if (i) i.focus(); return; }
-        cfg.session = r.token; store.set('cfg', cfg); store.set('lastName', r.name);
-        const fid = store.get('faceid'); if (fid && fid.name !== r.name) store.del('faceid');
-        me = { name: r.name, owner: !!r.owner }; store.set('me', me); staff = 'in'; signinErr = '';
-        await refresh(); render(); startLive();
-        if (!store.get('seenGuide')) { store.set('seenGuide', 1); guideSheet(true); }
-        else if (faceSupported && !faceId() && !store.get('faceidAsked:' + r.name)) { store.set('faceidAsked:' + r.name, 1); faceOffer(); }
+        await signedIn(r);
       } catch (e) {
         signinErr = /LOCKED/.test(e.message) ? 'This name is locked after 5 wrong PINs. Ask Avigdor to unlock it.' : /NO_NAME/.test(e.message) ? 'This name is turned off. Ask Avigdor.' : /NOT_TEAM/.test(e.message) ? 'This phone needs the team link from Avigdor first.' : e.message;
         render();
@@ -1948,12 +2038,13 @@ const act = {
     });
   },
   'faceid-on'(){ faceIdTurnOn(); },
-  'faceid-off'(){ store.del('faceid'); closeSheet(); toast('Face ID is off on this phone.', 'good'); render(); },
+  async 'faceid-off'(){ const f = store.get('faceid'); if (f) try { await rpc('packout_passkey_remove', { p_cred_id: f.id }); } catch {} store.del('faceid'); closeSheet(); toast('Face ID is off on this phone.', 'good'); render(); },
   'faceid-unlock'(){ faceIdUnlock(); },
-  async 'faceid-usepin'(){ const f = store.get('faceid'); $('#lock').hidden = true; signinPick = me && me.name || ''; await act['sign-out'](); if (f) store.set('faceid', f); render(); },
+  'faceid-signin'(){ faceIdSignIn(false); },
+  async 'faceid-usepin'(){ $('#lock').hidden = true; await act['sign-out'](); signinMode = 'pin'; render(); },
   async 'sign-out'(){
     try { await rpc('packout_logout', {}); } catch {}
-    store.del('faceid'); closeSheet(); delete cfg.session; store.set('cfg', cfg); me = null; store.del('me'); await checkStaff(); render();
+    signinPick = me && me.name || ''; signinMode = ''; closeSheet(); delete cfg.session; store.set('cfg', cfg); me = null; store.del('me'); await checkStaff(); render();
   },
   'account'(){ if (staff === 'in') accountSheet(); },
   'staff-open': staffSheet,
@@ -2451,7 +2542,7 @@ document.addEventListener('input', e => { if (e.target.id === 'inv-q') { filt.q 
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'os') { e.preventDefault(); act['other-size-add'](); }
   if (e.key === 'Enter' && e.target.id === 'k-style') act['check-style']();
-  if ($('.keypad') && !$('.pinarea').hidden && /^[0-9]$|^Backspace$/.test(e.key) && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { e.preventDefault(); act['pin-key']({ dataset: { k: e.key === 'Backspace' ? 'del' : e.key } }); }
+  if ($('.keypad') && /^[0-9]$|^Backspace$/.test(e.key) && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { e.preventDefault(); act['pin-key']({ dataset: { k: e.key === 'Backspace' ? 'del' : e.key } }); }
   if (e.key === 'Enter' && e.target.id === 'k-color') { e.preventDefault(); const q = $('.szq'); if (q) { q.focus(); q.select(); } else e.target.blur(); }
   if (e.key === 'Enter' && (['k-tag', 'k-brand'].includes(e.target.id) || e.target.classList.contains('szq') || e.target.classList.contains('szt'))) { e.preventDefault(); e.target.blur(); }
   if (e.key === 'Escape' && !$('#zoom').hidden) { act['zoom-close'](); return; }
@@ -2493,7 +2584,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.24';
+const APP_VERSION = '2026-11-22.26';
 let newVersion = false;
 async function checkVersion(){
   try {
@@ -2517,7 +2608,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
       if (cfg && cfg.team) setTimeout(() => toast('This phone already has the team link, so the view-only link was not applied.', 'bad'), 800);
       else { cfg = { url: j.u, key: j.k, view: true }; store.set('cfg', cfg); }
     } } catch {} if (!isStandalone()) history.replaceState(null, '', location.pathname); }
-  if (cfg && !cfg.view) { faceSupported = await faceIdAvailable(); staff = 'checking'; render(); await checkStaff(); if (staff === 'in') lockNow(); }
+  if (cfg && !cfg.view) { faceSupported = await faceIdAvailable(); staff = 'checking'; render(); await checkStaff(); if (staff === 'in') lockNow(); else if (staff === 'out') signinPick = store.get('lastName') || ''; }
   render();
   if (cfg && staff !== 'out') {
     if (await loadCache()) { render(); refresh(true).then(ok => { if (ok && !sheetOpen()) softRender(); }); }   // open instantly, then catch up quietly

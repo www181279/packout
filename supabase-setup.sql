@@ -673,3 +673,91 @@ $$;
 
 -- Tell the API about the new tables right away.
 notify pgrst, 'reload schema';
+-- 8. Face ID sign-in (passkeys). The phone keeps a private key behind Face ID; the database keeps only the public key.
+create table if not exists packout_private.passkeys (
+  cred_id    text primary key,
+  name       text not null references packout_private.staff(name) on delete cascade on update cascade,
+  public_key text not null,            -- base64 SPKI, P-256 (ES256)
+  created_at timestamptz not null default now(),
+  last_used  timestamptz
+);
+create table if not exists packout_private.passkey_challenges (
+  challenge  text primary key,
+  created_at timestamptz not null default now()
+);
+revoke all on packout_private.passkeys, packout_private.passkey_challenges from public, anon, authenticated;
+
+create or replace function packout_private.b64u(b bytea)
+returns text language sql immutable set search_path = '' as $$
+  select rtrim(translate(encode(b, 'base64'), E'+/\n', '-_'), '=');
+$$;
+
+-- The signed-in person turns on Face ID for this phone.
+create or replace function public.packout_passkey_add(p_cred_id text, p_public_key text)
+returns void language plpgsql volatile security definer set search_path = '' as $$
+declare v_name text := packout_private.session_name();
+begin
+  if v_name is null or not packout_private.team_ok() then raise exception 'NOT_SIGNED_IN' using errcode = '42501'; end if;
+  if p_cred_id !~ '^[A-Za-z0-9_-]{16,512}$' or length(p_public_key) not between 60 and 400 then raise exception 'BAD_KEY'; end if;
+  insert into packout_private.passkeys (cred_id, name, public_key) values (p_cred_id, v_name, p_public_key)
+  on conflict (cred_id) do update set name = excluded.name, public_key = excluded.public_key, created_at = now();
+end;
+$$;
+
+create or replace function public.packout_passkey_remove(p_cred_id text)
+returns void language sql volatile security definer set search_path = '' as $$
+  delete from packout_private.passkeys where cred_id = p_cred_id and name = packout_private.session_name();
+$$;
+
+-- A one-time challenge for a Face ID sign-in (good for 5 minutes).
+create or replace function public.packout_passkey_challenge()
+returns text language plpgsql volatile security definer set search_path = '' as $$
+declare v text := packout_private.b64u(extensions.gen_random_bytes(32));
+begin
+  if not packout_private.team_ok() then raise exception 'NOT_TEAM' using errcode = '42501'; end if;
+  delete from packout_private.passkey_challenges where created_at < now() - interval '5 minutes';
+  insert into packout_private.passkey_challenges (challenge) values (v);
+  return v;
+end;
+$$;
+
+-- Used only by the passkey-login function (service role): the public key to check the signature against ...
+create or replace function public.packout_passkey_key(p_cred_id text)
+returns text language sql stable security definer set search_path = '' as $$
+  select public_key from packout_private.passkeys where cred_id = p_cred_id;
+$$;
+-- ... and, once the signature is good, a new session for that person.
+create or replace function public.packout_passkey_finish(p_cred_id text, p_challenge text)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare st packout_private.staff; v_token text;
+begin
+  delete from packout_private.passkey_challenges where challenge = p_challenge and created_at > now() - interval '5 minutes';
+  if not found then raise exception 'EXPIRED'; end if;
+  select s.* into st from packout_private.passkeys k join packout_private.staff s on s.name = k.name where k.cred_id = p_cred_id;
+  if not found then raise exception 'NO_KEY'; end if;
+  if not st.active then raise exception 'NO_NAME'; end if;
+  if st.failed >= 5 then raise exception 'LOCKED'; end if;
+  update packout_private.passkeys set last_used = now() where cred_id = p_cred_id;
+  v_token := encode(extensions.gen_random_bytes(32), 'hex');
+  insert into packout_private.sessions (token_hash, name) values (encode(extensions.digest(v_token, 'sha256'), 'hex'), st.name);
+  return jsonb_build_object('ok', true, 'token', v_token, 'name', st.name, 'owner', st.is_owner);
+end;
+$$;
+
+revoke all on function public.packout_passkey_add(text, text), public.packout_passkey_remove(text), public.packout_passkey_challenge(),
+  public.packout_passkey_key(text), public.packout_passkey_finish(text, text) from public, anon, authenticated;
+grant execute on function public.packout_passkey_add(text, text), public.packout_passkey_remove(text), public.packout_passkey_challenge() to anon, authenticated;
+grant execute on function public.packout_passkey_key(text), public.packout_passkey_finish(text, text) to service_role;
+
+-- A new PIN or turning someone off also removes their Face ID on every phone.
+create or replace function packout_private.passkeys_follow_staff()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if new.pin_hash is distinct from old.pin_hash or (old.active and not new.active) then
+    delete from packout_private.passkeys where name = new.name;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists passkeys_follow_staff on packout_private.staff;
+create trigger passkeys_follow_staff after update on packout_private.staff for each row execute function packout_private.passkeys_follow_staff();
