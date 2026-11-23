@@ -131,11 +131,12 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 @media (prefers-reduced-motion:reduce){.reading .dot{animation:none}}
 .boxnow{display:flex;justify-content:space-between;align-items:center;background:var(--ink);color:#fff;border-radius:10px;padding:10px 14px;margin-bottom:12px}
 .boxnow b{font:700 30px var(--sign);font-variant-numeric:tabular-nums}
-#zoom{position:fixed;inset:0;z-index:60;background:rgba(10,16,28,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:56px 10px 20px}
+#zoom{position:fixed;inset:0;z-index:60;background:rgba(10,16,28,.55);display:flex;align-items:center;justify-content:center;padding:20px}
 #zoom[hidden]{display:none}
-#zoom img{max-width:100%;max-height:calc(100vh - 120px);object-fit:contain;background:#fff;border-radius:6px;touch-action:pinch-zoom}
-#zoom p{color:#C9D2DE;margin:12px 0 0;font-size:15px;text-align:center}
-#zoom-x{position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;width:48px;height:48px;border-radius:50%;border:0;background:#fff;color:var(--ink);font-size:30px;line-height:1;cursor:pointer}
+#zoom .zcard{position:relative;background:#fff;border-radius:14px;padding:14px 14px 10px;width:min(92vw,520px);box-shadow:0 18px 50px rgba(0,0,0,.35)}
+#zoom img{display:block;width:100%;max-height:68vh;object-fit:contain;border-radius:8px;background:#fff;touch-action:pinch-zoom}
+#zoom p{color:var(--ink2);margin:10px 4px 2px;font-size:15px;text-align:center}
+#zoom-x{position:absolute;top:-14px;right:-14px;width:44px;height:44px;border-radius:50%;border:0;background:var(--ink);color:#fff;font-size:28px;line-height:1;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,.3)}
 .inv img[data-act=zoom-photo],#big-photo{cursor:zoom-in}
 .photo .cleanstate{position:absolute;left:8px;bottom:8px;background:rgba(255,255,255,.92);color:var(--ink);border-radius:6px;padding:4px 10px;font-size:14px;font-weight:500;pointer-events:none}
 .reading{display:block}
@@ -353,7 +354,7 @@ dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
   <button data-tab="more"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Export</span></button>
 </nav>
 <div id="sheet"><div class="card" role="dialog" aria-modal="true"></div></div>
-<div id="zoom" hidden role="dialog" aria-modal="true" aria-label="Photo"><button id="zoom-x" data-act="zoom-close" aria-label="Close photo">&times;</button><img id="zoom-img" alt=""><p id="zoom-cap"></p></div>
+<div id="zoom" hidden role="dialog" aria-modal="true" aria-label="Photo"><div class="zcard"><button id="zoom-x" data-act="zoom-close" aria-label="Close photo">&times;</button><img id="zoom-img" alt=""><p id="zoom-cap"></p></div></div>
 <div id="toast" role="status"></div>
 <div id="busy"><div><i></i><span></span></div></div>
 <div id="print-root"></div>
@@ -470,11 +471,15 @@ async function call(path, { method = 'GET', body, headers = {}, timeout = 20000,
 const JSONH = { 'Content-Type': 'application/json', Prefer: 'return=representation' };
 const db = {
   get: (table, query) => call(`/rest/v1/${table}?${query}`),
-  async all(table){
-    const out = [];
-    for (let off = 0; ; off += 1000){
-      const page = await call(`/rest/v1/${table}?select=*&order=created_at.asc&limit=1000&offset=${off}`);
-      out.push(...page); if (page.length < 1000) return out;
+  // all rows, 1,000 per page; when there are more, the next pages are fetched several at once
+  async all(table, filter = ''){
+    const P = 1000, BATCH = 6, url = off => call(`/rest/v1/${table}?select=*${filter}&order=created_at.asc,${PK[table]}.asc&limit=${P}&offset=${off}`);
+    const out = await url(0);
+    if (out.length < P) return out;
+    for (let off = P; ; off += P * BATCH){
+      const pages = await Promise.all(Array.from({ length: BATCH }, (_, k) => url(off + k * P)));
+      for (const pg of pages) out.push(...pg);
+      if (pages.some(pg => pg.length < P)) return out;
     }
   },
   insert: (table, row) => call(`/rest/v1/${table}`, { method: 'POST', body: JSON.stringify(row), headers: JSONH }).then(r => r[0]),
@@ -575,13 +580,44 @@ function applyKeep(){
   if (k && b && b.status === 'open' && b.pallet_id === pack.pallet) Object.assign(pack, { box: k.box, stage: 'item', form: null, err: '' });
 }
 
-async function loadAll(){
-  const [pallets, boxes, styles, items] = await Promise.all(['pallets','boxes','styles','items'].map(t => db.all(t)));
-  data = { pallets, boxes, styles, items }; loaded = true;
+// Pallets, boxes and styles are small and always loaded whole. Items can be many thousands, so after the
+// first load only the items changed since then are fetched; deletions arrive through live updates, and a
+// full load still runs every few minutes, after a delete, and whenever live updates are off.
+let itemsCursor = null, lastFull = 0;
+async function loadAll(opts = {}){
+  const full = opts.full || !itemsCursor || !liveOn || Date.now() - lastFull > 5 * 60000;
+  const since = itemsCursor;
+  const [pallets, boxes, styles, items] = await Promise.all([db.all('pallets'), db.all('boxes'), db.all('styles'),
+    full ? db.all('items') : db.all('items', '&updated_at=gte.' + encodeURIComponent(since))]);
+  let all = items;
+  if (!full) { const m = new Map(data.items.map(i => [i.id, i])); items.forEach(i => m.set(i.id, i)); all = [...m.values()]; }
+  else lastFull = Date.now();
+  itemsCursor = all.reduce((mx, i) => i.updated_at > mx ? i.updated_at : mx, itemsCursor && !full ? itemsCursor : '');
+  if (!itemsCursor) itemsCursor = new Date(Date.now() - 60000).toISOString();
+  data = { pallets, boxes, styles, items: all }; loaded = true;
+  saveCache();
   if (!settingsLoaded) { settingsLoaded = true; loadSettings(); }
   rebuildIdx();
   setTimeout(polishTick, 1500);
   setSync(true);
+}
+/* ---------- a copy of the data on the phone, so the app opens instantly ---------- */
+const CACHE_DB = 'packout-cache';
+function idb(){ return new Promise((ok, no) => { const r = indexedDB.open(CACHE_DB, 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); }); }
+let cacheTimer = 0;
+function saveCache(){
+  clearTimeout(cacheTimer);
+  cacheTimer = setTimeout(async () => {
+    try { const d = await idb(); d.transaction('kv', 'readwrite').objectStore('kv').put({ url: cfg.url, at: Date.now(), data }, 'data'); } catch {}
+  }, 800);
+}
+async function loadCache(){
+  try {
+    const d = await idb();
+    const v = await new Promise((ok, no) => { const r = d.transaction('kv').objectStore('kv').get('data'); r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error); });
+    if (v && v.url === cfg.url && v.data && v.data.items) { data = v.data; loaded = true; rebuildIdx(); return true; }
+  } catch {}
+  return false;
 }
 function rebuildIdx(){
   idx = { pal: new Map(data.pallets.map(p => [p.id, p])), box: new Map(data.boxes.map(b => [b.id, b])), style: new Map(data.styles.map(s => [s.style_number, s])) };
@@ -594,6 +630,8 @@ let live = null, liveOn = false, liveTimer = 0, softPending = false;
 function applyChange(table, ch){
   const key = PK[table], list = data[table];
   if (!list) return;
+  saveCache();
+  if (table === 'items' && ch.new && ch.new.updated_at && (!itemsCursor || ch.new.updated_at > itemsCursor)) itemsCursor = ch.new.updated_at;
   if (ch.eventType === 'DELETE') {
     const k = ch.old && ch.old[key]; if (k === undefined) return;
     const i = list.findIndex(r => r[key] === k); if (i >= 0) list.splice(i, 1);
@@ -1738,7 +1776,7 @@ const act = {
   },
   async 'release-style'(){
     await withBusy('Undoing', async () => {
-      try { await rpc('delete_style', { p_style: pack.style }); await loadAll(); Object.assign(pack, { stage: 'pallet', pallet: null, known: false, err: '' }); render(); }
+      try { await rpc('delete_style', { p_style: pack.style }); await loadAll({ full: true }); Object.assign(pack, { stage: 'pallet', pallet: null, known: false, err: '' }); render(); }
       catch (e) { packFail(new Error('This style already has items, so its pallet can\'t change.')); }
     });
   },
@@ -1938,7 +1976,7 @@ const act = {
         await rpc('delete_style', { p_style: st });
         await removePhotos(photos);
         await loadAll();
-        if (cur && idx.box.get(cur) && !itemsOf('box_id', cur).length) { try { await db.remove('boxes', 'id=' + eq(cur)); } catch {} await loadAll(); }
+        if (cur && idx.box.get(cur) && !itemsOf('box_id', cur).length) { try { await db.remove('boxes', 'id=' + eq(cur)); } catch {} await loadAll({ full: true }); }
         pack = newPack(pack.last, pack.last && { ...pack.last });
         pack.saved = `Style ${st} was deleted. Enter the style again.`;
         render(); scrollTo(0, 0); const i = $('#k-style'); if (i) i.focus();
@@ -1954,7 +1992,7 @@ const act = {
   async 'del-style-yes'(el){
     const st = el.dataset.style; closeSheet();
     await withBusy('Deleting style ' + st, async () => {
-      try { const photos = itemsOf('style_number', st).map(i => i.photo_path); await rpc('delete_style', { p_style: st }); await removePhotos(photos); await loadAll(); if (pack.style === st) pack = newPack(pack.last); toast('Deleted style ' + st, 'good'); }
+      try { const photos = itemsOf('style_number', st).map(i => i.photo_path); await rpc('delete_style', { p_style: st }); await removePhotos(photos); await loadAll({ full: true }); if (pack.style === st) pack = newPack(pack.last); toast('Deleted style ' + st, 'good'); }
       catch (e) { toast(needsUpdate(e) || e.message, 'bad'); }
       render();
     });
@@ -2045,7 +2083,7 @@ async function claim(palletId, isNew){
 }
 async function mutate(label, fn, okMsg){
   await withBusy(label, async () => {
-    try { await fn(); await loadAll(); if (okMsg) toast(okMsg, 'good'); }
+    try { await fn(); await loadAll({ full: true }); if (okMsg) toast(okMsg, 'good'); }
     catch (e) { if (isDenied(e)) recheckSignin(); toast(isDenied(e) ? DENIED_MSG : e.code === '23503' ? 'This still has things on it, so it can\'t be deleted.' : e.message, 'bad'); }
     render();
   });
@@ -2064,7 +2102,7 @@ function showPhoto(file){
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-tab]');
-  if (t) { tab = t.dataset.tab; if (tab === 'pallets') palView = null; render(); scrollTo(0, 0); if (tab !== 'pack') refresh(true).then(ok => ok && !sheetOpen() && softRender()); return; }
+  if (t) { tab = t.dataset.tab; if (tab === 'pallets') palView = null; render(); scrollTo(0, 0); if (tab !== 'pack' && !liveOn) refresh(true).then(ok => ok && !sheetOpen() && softRender()); return; }
   const a = e.target.closest('[data-act]');
   if (a && act[a.dataset.act]) return act[a.dataset.act](a);
   if (e.target.id === 'sheet') closeSheet();
@@ -2155,7 +2193,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.11';
+const APP_VERSION = '2026-11-22.13';
 let newVersion = false;
 async function checkVersion(){
   try {
@@ -2180,7 +2218,11 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
     } } catch {} if (!isStandalone()) history.replaceState(null, '', location.pathname); }
   if (cfg && !cfg.view) { staff = 'checking'; render(); await checkStaff(); }
   render();
-  if (cfg && staff !== 'out') { await withBusy('Loading inventory', () => refresh()); render(); startLive(); }
+  if (cfg && staff !== 'out') {
+    if (await loadCache()) { render(); refresh(true).then(ok => { if (ok && !sheetOpen()) softRender(); }); }   // open instantly, then catch up quietly
+    else { await withBusy('Loading inventory', () => refresh()); render(); }
+    startLive();
+  }
 })();
 </script>
 </body>

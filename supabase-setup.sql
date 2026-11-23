@@ -59,6 +59,7 @@ create index if not exists items_style_idx  on public.items (style_number);
 create index if not exists items_box_idx    on public.items (box_id);
 create index if not exists items_pallet_idx on public.items (pallet_id);
 create index if not exists boxes_pallet_idx on public.boxes (pallet_id);
+create index if not exists items_updated_idx on public.items (updated_at);
 
 -- 2. Rules enforced by the database ---------------------------
 
