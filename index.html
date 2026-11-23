@@ -47,7 +47,7 @@ h1,h2,h3,p{margin:0}
 #view{max-width:720px;margin:0 auto;padding:16px 16px calc(96px + env(safe-area-inset-bottom))}
 #view.wide{max-width:1180px}
 #nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--paper);border-top:1px solid var(--line);
-  display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom)}
+  display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom)}
 #nav[hidden],#nav button[hidden]{display:none}
 #nav button{border:0;background:none;padding:9px 4px 8px;display:grid;justify-items:center;gap:2px;font-size:13px;font-weight:500;color:var(--ink2)}
 #nav svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
@@ -358,6 +358,40 @@ body.signing #view{max-width:440px;padding:0 20px}
 .dw-list span{color:var(--ink2);font-size:15px;line-height:1.4}
 .dw-note{display:flex;align-items:center;gap:8px;color:var(--ink2);font-size:14px;margin:0 0 16px}
 .dw-note i{width:8px;height:8px;border-radius:50%;background:var(--go);flex:none}
+/* settings: grouped rows, like a phone's settings app */
+.sset{margin:0 0 22px}
+.sset header h2{font:700 20px/1.2 var(--sign);margin:0 0 2px}
+.sset header p{color:var(--ink2);font-size:14px;margin:0 0 10px;max-width:520px}
+.scard{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.srow{display:flex;align-items:center;gap:14px;padding:14px 16px;border-top:1px solid #EDF0F3;min-height:64px}
+.scard>.srow:first-child,.stlist>.srow:first-child{border-top:0}
+.stlist+.srow{border-top:1px solid #EDF0F3}
+.sic{flex:none;width:36px;height:36px;border-radius:10px;background:#EEF1F5;display:grid;place-items:center;color:var(--ink)}
+.sic svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.stx{flex:1;min-width:0}
+.stx b{display:block;font-weight:600;font-size:16px}
+.stx small{display:block;color:var(--ink2);font-size:13.5px;line-height:1.4;margin-top:2px}
+.stx .url{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--ink);word-break:break-all}
+.sact{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;flex:none}
+.sact .btn{width:auto;margin:0;min-height:38px;padding:0 14px;font-size:14px}
+.srow .av{flex:none;width:44px;height:44px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font:700 18px/1 var(--sign)}
+.srow .av.sm{width:36px;height:36px;font-size:15px;background:#E3E8EF;color:var(--ink)}
+.srow.me .av{background:var(--placard);color:var(--ink)}
+.srow.st.off{opacity:.55}
+.srow .badge{font-size:11px;vertical-align:2px;margin-left:4px}
+.srow .badge.g{background:#FFF4D6;color:#7A5A00}
+.srow.add input{flex:1;min-height:42px}
+.srow.switchrow{cursor:pointer}
+.srow.switchrow input{width:22px;height:22px;flex:none;accent-color:var(--ink)}
+.btn.danger-t{color:var(--stop)}
+@media (max-width:640px){
+  .srow{flex-wrap:wrap}
+  .srow .sact{width:100%;justify-content:flex-start;padding-left:50px}
+  .srow.me .sact,.srow.add .sact{width:auto;padding:0}
+  .srow.add{flex-wrap:wrap}
+  .srow.add input{flex-basis:100%}
+  .srow.add .btn{width:100%}
+}
 /* ===== desktop: sidebar app layout (phones keep the layout above) ===== */
 .deskonly{display:none}
 .ihead{display:none}
@@ -458,6 +492,9 @@ body.signing #view{max-width:440px;padding:0 20px}
   body.shell #inv-list > .btn{margin:12px;width:calc(100% - 24px)}
   body.shell #inv-list .empty{margin:0;border:0}
 
+  /* settings: title on the left, rows on the right */
+  body.shell .sset{display:grid;grid-template-columns:minmax(200px,300px) minmax(0,920px);gap:32px;margin-bottom:34px;align-items:start}
+  body.shell .sset header{padding-top:6px}
   /* export: panels side by side */
   body.shell .xgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:18px;align-items:start}
   body.shell .xgrid .panel{margin:0}
@@ -596,6 +633,7 @@ dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
   <button data-tab="pallets"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="10" rx="1"/><path d="M3 17h18M5 17v3M12 17v3M19 17v3"/></svg><span>Pallets</span></button>
   <button data-tab="inventory"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Inventory</span></button>
   <button data-tab="more"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Export</span></button>
+  <button data-tab="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Settings</span></button>
 </nav>
 <div id="sheet"><div class="card" role="dialog" aria-modal="true"></div></div>
 <div id="lock" hidden role="dialog" aria-modal="true" aria-label="Sign in"><div class="lockcard">
@@ -932,12 +970,13 @@ function render(){
   if (!me)  { $('#nav').hidden = true; return v.innerHTML = whoHTML(); }
   $('#nav').hidden = false; $('#help').hidden = !!cfg.view; document.body.classList.add('shell');
   const wb = $('#who b'); if (wb) wb.dataset.i = initials(me.name || '?');
-  $('#nav').style.gridTemplateColumns = cfg.view ? 'repeat(3,1fr)' : ''; $('#nav [data-tab=pack]').hidden = !!cfg.view;
+  $('#nav').style.gridTemplateColumns = cfg.view ? 'repeat(4,1fr)' : ''; $('#nav [data-tab=pack]').hidden = !!cfg.view;
   document.querySelectorAll('#nav button').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   validatePack();
   if (tab === 'pack' && isDesk()) tab = 'inventory';      // packing happens on phones; the computer is for looking things up
   document.querySelectorAll('#nav button').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
-  v.innerHTML = ({ pack: packHTML, pallets: palletsHTML, inventory: inventoryHTML, more: moreHTML })[tab]();
+  v.innerHTML = ({ pack: packHTML, pallets: palletsHTML, inventory: inventoryHTML, more: moreHTML, settings: settingsHTML })[tab]();
+  if (tab === 'settings') settingsAfter();
   if (tab === 'pack' && pack.stage === 'item' && pack.photo && !$('#k-photo-wrap img')) showPhoto(pack.photo);
   if (tab === 'inventory') renderInvList();
   setBars();
@@ -1984,7 +2023,7 @@ function moreHTML(){
   const nClosed = data.pallets.filter(p => p.status === 'closed').length;
   const nF = filtered().length, any = Object.keys(FLABEL).some(k => filt[k]) || filt.q;
   return `<h1 class="h">Export</h1>
-  <p class="lead">A full list of every pallet, every box and every item, with a style index at the end.</p>
+  <p class="lead">Reports and labels: a full list of every pallet, box and item with photos, and printouts for the floor.</p>
   <div class="xgrid"><div class="panel">
     <label class="f" for="x-title">Title on the report</label><input id="x-title" type="text" value="${esc(exTitle)}">
     <label class="f">What to include</label>
@@ -2008,28 +2047,63 @@ function moreHTML(){
     <button class="btn alt" data-act="print-labels">Print box labels</button>
     <p class="small muted" style="margin-top:10px">Breakdowns follow the "Photos" choice above. To print one pallet only, open it on the Pallets tab.</p>
   </div>
-  ${isStandalone() ? '' : `<div class="panel"><h2>Open it full screen, like an app</h2>
-    <p class="muted small" style="margin-bottom:12px">A phone browser always shows its address bar on a web page. To hide it, add Packout to this phone's home screen and open it from there.</p>
-    <button class="btn alt" data-act="install">Add to home screen</button></div>`}
-  ${canEdit() ? `<div class="panel"><h2>Item photos</h2>
-    <p class="muted small" style="margin-bottom:10px">Each saved photo is cleaned up on its own: background and hanger hook removed, straightened and centered on white. The garment itself is never changed, and the original is kept.</p>
-    <dl class="facts"><dt>Polished</dt><dd id="pol-count">${polishCountText()}</dd></dl>
-    <label class="switchrow"><input type="checkbox" id="set-cc" ${setting('color_correct') ? 'checked' : ''}><span><b>Correct the color tint</b><br><span class="muted small">Uses the white backdrop to remove a yellow or blue tint from the camera. Off keeps colors exactly as the camera took them.</span></span></label>
-    <button class="btn alt" data-act="polish-all" style="margin-top:12px">Polish the remaining photos</button></div>
-  ${me && me.owner ? `<div class="panel"><h2>Employees</h2>
-    <p class="muted small" style="margin-bottom:12px">Add people, give a new PIN, unlock a locked name, or turn someone off. Turning someone off signs them out on every phone.</p>
-    <button class="btn alt" data-act="staff-open">Manage employees</button></div>` : ''}
-  <div class="panel"><h2>Manager view</h2>
-    <p class="muted small" style="margin-bottom:12px">A link that shows pallets, boxes, inventory and exports, but cannot add, change or delete anything.</p>
-    <button class="btn alt" data-act="share-view">Share the view-only link</button></div>
-  <div class="panel"><h2>Invite employees</h2>
-    <p class="muted small" style="margin-bottom:12px">Show the join code and let the employee scan it with their phone camera, or send them the link. Then they sign in with their name and PIN.</p>
-    <button class="btn" data-act="join-code">Show join code</button>
-    <button class="btn alt" data-act="invite">Share invite link</button></div>` : ''}
-  <div class="panel"><h2>This phone</h2>
-    <dl class="facts"><dt>Name</dt><dd>${esc(me.name)}</dd><dt>Access</dt><dd>${cfg.view ? 'View only' : cfg.team ? 'Team (can pack)' : 'Team'}</dd><dt>Database</dt><dd style="word-break:break-all">${esc(cfg.url.replace('https://', ''))}</dd></dl>
-    ${!canEdit() ? '' : staff === 'in' ? '<button class="btn quiet" data-act="sign-out">Sign out</button>' : '<button class="btn quiet" data-act="change-who">Change name</button>'}
-    <button class="btn quiet" data-act="disconnect">Disconnect this phone</button></div></div>`;
+  </div>`;
+}
+/* ---------- settings ---------- */
+const ROLE = () => cfg.view ? 'View only' : me.owner ? 'Owner' : me.del === false ? 'Guest · cannot delete' : 'Team member';
+const ic = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+function settingsHTML(){
+  const owner = !!(me && me.owner), phone = matchMedia('(pointer:coarse)').matches;
+  const sec = (title, sub, body) => `<section class="sset"><header><h2>${title}</h2>${sub ? `<p>${sub}</p>` : ''}</header><div class="scard">${body}</div></section>`;
+  const row = (icon, title, sub, right) => `<div class="srow"><span class="sic">${icon}</span><div class="stx"><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</div>${right ? `<div class="sact">${right}</div>` : ''}</div>`;
+  let h = `<h1 class="h">Settings</h1><p class="lead">Your account, your team and this device.</p>`;
+  h += sec('Your account', '', `<div class="srow me"><span class="av">${esc(initials(me.name || '?'))}</span><div class="stx"><b>${esc(me.name)}</b><small>${ROLE()}</small></div>
+      ${canEdit() && staff === 'in' ? `<div class="sact"><button class="btn quiet sm" data-act="sign-out">Sign out</button></div>` : ''}</div>
+    ${staff === 'in' && faceSupported ? row(FACE_SVG, 'Face ID', faceId() ? 'On for this phone. You can sign in with your face.' : 'Sign in on this phone with your face instead of your PIN.',
+      faceId() ? `<button class="btn quiet sm" data-act="faceid-off">Turn off</button>` : `<button class="btn sm" data-act="faceid-on">Turn on</button>`) : ''}`);
+  if (owner) {
+    h += sec('Team', 'People who can sign in. A new PIN or turning someone off signs them out everywhere.',
+      `<div id="st-list" class="stlist"><p class="muted small" style="padding:14px 16px">Loading</p></div>
+       <div class="srow add"><input id="st-new" type="text" autocomplete="off" placeholder="Add a person, e.g. Maria" aria-label="New person's name"><button class="btn sm" data-act="staff-add">Add and make a PIN</button></div>`);
+    h += sec('Links', 'Send these to give someone access. Anyone with a link can use it, so share them only with your team.',
+      row(ic('M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M22 11h-6'), 'Invite link', '<span id="inv-url" class="url">…</span><br>Employees and the Guest login open this, then sign in with their name and PIN.',
+        `<button class="btn alt sm" data-act="copy-invite">Copy</button><button class="btn quiet sm" data-act="join-code">QR code</button>`)
+      + row(ic('M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'), 'View-only link', `<span class="url">${esc(viewLink())}</span><br>Sees pallets, boxes, inventory and exports. Cannot change anything.`,
+        `<button class="btn alt sm" data-act="copy-view">Copy</button>`));
+  }
+  if (canEdit()) h += sec('Item photos', 'Every saved photo is cleaned up on its own. The garment itself is never changed, and the original is kept.',
+    row(ic('M3 8h4l2-3h6l2 3h4v11H3zM12 16.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z'), 'Polished photos', `<span id="pol-count">${polishCountText()}</span>`, `<button class="btn alt sm" data-act="polish-all">Polish the rest</button>`)
+    + `<label class="srow switchrow"><span class="sic">${ic('M12 3v18M3 12h18')}</span><span class="stx"><b>Correct the color tint</b><small>Uses the white backdrop to remove a yellow or blue tint from the camera.</small></span><input type="checkbox" id="set-cc" ${setting('color_correct') ? 'checked' : ''}></label>`);
+  h += sec('This device', '',
+    (phone && !isStandalone() ? row(ic('M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2'), 'Add to home screen', 'Opens full screen like an app, without the address bar.', `<button class="btn alt sm" data-act="install">Show me how</button>`) : '')
+    + row(ic('M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'), 'Access', cfg.view ? 'View only' : cfg.team ? 'Team: can pack' : 'Team', '')
+    + row(ic('M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7'), 'Disconnect', 'Removes the team link from this device. Nothing is deleted.', `<button class="btn quiet sm" data-act="disconnect">Disconnect</button>`));
+  return h;
+}
+async function settingsAfter(){
+  if (!(me && me.owner) || cfg.view) return;
+  inviteLink().then(u => { const e = $('#inv-url'); if (e) e.textContent = u; });
+  loadStaffInline();
+}
+function staffRowsHTML(rows){
+  return rows.map(r => `<div class="srow st ${r.active ? '' : 'off'}"><span class="av sm">${esc(initials(r.name))}</span>
+    <div class="stx"><b>${esc(r.name)}${r.is_owner ? ' <span class="badge">Owner</span>' : ''}${r.can_delete === false ? ' <span class="badge g">Cannot delete</span>' : ''}</b>
+      <small>${!r.active ? 'Turned off' : r.locked ? 'Locked after 5 wrong PINs' : r.phones ? `Signed in on ${plural(r.phones, 'device')}` : 'Not signed in yet'}</small></div>
+    <div class="sact">
+      ${r.locked && r.active ? `<button class="btn sm" data-act="staff-unlock" data-n="${esc(r.name)}">Unlock</button>` : ''}
+      <button class="btn alt sm" data-act="staff-pin" data-n="${esc(r.name)}">New PIN</button>
+      ${r.is_owner || r.can_delete == null ? '' : `<button class="btn quiet sm" data-act="staff-del" data-n="${esc(r.name)}" data-v="${r.can_delete ? '0' : '1'}">${r.can_delete ? 'No deleting' : 'Allow deleting'}</button>`}
+      ${r.is_owner ? '' : `<button class="btn ${r.active ? 'quiet danger-t' : 'alt'} sm" data-act="staff-active" data-n="${esc(r.name)}" data-v="${r.active ? '0' : '1'}">${r.active ? 'Turn off' : 'Turn on'}</button>`}
+    </div></div>`).join('');
+}
+async function loadStaffInline(){
+  try { const rows = await rpc('packout_staff_list', {}); const el = $('#view #st-list'); if (el) el.innerHTML = staffRowsHTML(rows); }
+  catch (e) { const el = $('#view #st-list'); if (el) el.innerHTML = `<div class="err" style="margin:12px">${esc(e.message)}</div>`; }
+}
+const refreshStaff = () => (tab === 'settings' && $('#view #st-list')) ? (closeSheet(), loadStaffInline()) : staffSheet();
+async function copyText(text, msg){
+  try { await navigator.clipboard.writeText(text); toast(msg, 'good'); }
+  catch { openSheet(`<h2>Copy this link</h2><input type="text" readonly value="${esc(text)}" onfocus="this.select()" autofocus><button class="btn" data-act="close-sheet" style="margin-top:14px">Done</button>`); }
 }
 function exportRows(){
   exTitle = $('#x-title').value.trim() || 'Store inventory'; store.set('title', exTitle);
@@ -2232,21 +2306,23 @@ const act = {
     try { await rpc('packout_logout', {}); } catch {}
     signinPick = me && me.name || ''; signinMode = ''; closeSheet(); delete cfg.session; store.set('cfg', cfg); me = null; store.del('me'); await checkStaff(); render();
   },
-  'account'(){ if (staff === 'in') accountSheet(); },
+  'account'(){ tab = 'settings'; render(); scrollTo(0, 0); },
   'staff-open': staffSheet,
-  'staff-back': staffSheet,
+  'staff-back'(){ refreshStaff(); },
+  async 'copy-invite'(){ copyText(await inviteLink(), 'Invite link copied'); },
+  'copy-view'(){ copyText(viewLink(), 'View-only link copied'); },
   async 'staff-add'(){
     const name = $('#st-new').value.trim().replace(/\s+/g, ' '); if (!name) return toast('Type the name first.', 'bad');
     const pin = newPin();
-    try { await rpc('packout_staff_save', { p_name: name, p_pin: pin }); showPin(name, pin); } catch (e) { toast(e.message, 'bad'); }
+    try { await rpc('packout_staff_save', { p_name: name, p_pin: pin }); $('#st-new').value = ''; showPin(name, pin); } catch (e) { toast(e.message, 'bad'); }
   },
   async 'staff-pin'(el){
     const pin = newPin();
     try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_pin: pin }); showPin(el.dataset.n, pin); } catch (e) { toast(e.message, 'bad'); }
   },
-  async 'staff-unlock'(el){ try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_unlock: true }); staffSheet(); } catch (e) { toast(e.message, 'bad'); } },
-  async 'staff-del'(el){ try { await rpc('packout_staff_delete_rights', { p_name: el.dataset.n, p_can: el.dataset.v === '1' }); staffSheet(); } catch (e) { toast(e.message, 'bad'); } },
-  async 'staff-active'(el){ try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_active: el.dataset.v === '1' }); staffSheet(); } catch (e) { toast(e.message, 'bad'); } },
+  async 'staff-unlock'(el){ try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_unlock: true }); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
+  async 'staff-del'(el){ try { await rpc('packout_staff_delete_rights', { p_name: el.dataset.n, p_can: el.dataset.v === '1' }); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
+  async 'staff-active'(el){ try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_active: el.dataset.v === '1' }); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
   disconnect(){
     openSheet(`<h2>Disconnect this phone?</h2><p class="lead">Nothing is deleted from the database. This phone will need the invite link again.</p>
       <div class="row"><button class="btn alt" data-act="close-sheet">Cancel</button><button class="btn danger" data-act="disconnect-yes">Disconnect</button></div>`);
@@ -2751,6 +2827,7 @@ function softRender(){            // show changes from other phones without dist
   if (tab === 'inventory') return renderInvList();
   if (tab === 'pallets') return keepInputs(render);
   if (tab === 'more') return keepInputs(render);
+  if (tab === 'settings') return;
   // pack tab
   const v = validatePack();
   if (v === true) return render();
@@ -2772,7 +2849,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.33';
+const APP_VERSION = '2026-11-22.34';
 let newVersion = false;
 async function checkVersion(){
   try {
