@@ -346,6 +346,18 @@ body.signing #view{max-width:440px;padding:0 20px}
 #sheet.on{display:flex}
 #sheet .card{background:var(--floor);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));animation:up .18s ease-out}
 
+.dw-top{display:flex;gap:16px;align-items:flex-start;margin:4px 0 20px}
+.dw-mark{flex:none;width:52px;height:52px;border-radius:14px;background:var(--ink);display:grid;place-items:center}
+.dw-mark svg{width:28px;height:28px;fill:none;stroke:var(--placard);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.dw h2{font:700 30px/1.05 var(--sign);margin:2px 0 6px}
+.dw-top p{color:var(--ink2);margin:0;font-size:16px;line-height:1.45}
+.dw-list{list-style:none;margin:0 0 16px;padding:0;background:#fff;border:1px solid var(--line);border-radius:12px}
+.dw-list li{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:14px 16px;border-top:1px solid #EDF0F3}
+.dw-list li:first-child{border-top:0}
+.dw-list b{font:700 19px/1.2 var(--sign)}
+.dw-list span{color:var(--ink2);font-size:15px;line-height:1.4}
+.dw-note{display:flex;align-items:center;gap:8px;color:var(--ink2);font-size:14px;margin:0 0 16px}
+.dw-note i{width:8px;height:8px;border-radius:50%;background:var(--go);flex:none}
 /* ===== desktop: sidebar app layout (phones keep the layout above) ===== */
 .deskonly{display:none}
 .ihead{display:none}
@@ -1844,8 +1856,7 @@ async function signedIn(r){
   const fid = store.get('faceid'); if (fid && fid.name !== r.name) store.del('faceid');
   me = { name: r.name, owner: !!r.owner, del: r.del !== false }; store.set('me', me); staff = 'in'; signinErr = ''; signinPick = '';
   await refresh(); render(); startLive();
-  if (!store.get('seenGuide')) { store.set('seenGuide', 1); guideSheet(true); }
-  else if (faceSupported && !faceId() && !store.get('faceidAsk:' + r.name)) { store.set('faceidAsk:' + r.name, 1); faceOffer(); }
+  if (!firstGuide() && faceSupported && !faceId() && !store.get('faceidAsk:' + r.name)) { store.set('faceidAsk:' + r.name, 1); faceOffer(); }
 }
 function faceOffer(){
   openSheet(`<h2>Sign in with Face ID?</h2>
@@ -1863,6 +1874,24 @@ function accountSheet(){
 }
 
 /* ---------- quick guide for employees ---------- */
+// On a computer: a welcome that explains what the desktop view is for (packing happens on phones).
+function deskWelcome(){
+  const n = me && me.name ? esc(me.name) : '';
+  openSheet(`<div class="dw">
+    <div class="dw-top"><span class="dw-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></span>
+      <div><h2>Welcome${n ? ', ' + n : ''}</h2><p>You're signed in on a computer. This view is for reviewing and reporting. Packing is done on the phones.</p></div></div>
+    <ul class="dw-list">
+      <li><b>Inventory</b><span>Search and filter every style, color, size and UPC. Click a photo to see it larger.</span></li>
+      <li><b>Pallets</b><span>See what is on each pallet and box, and print breakdowns and box labels.</span></li>
+      <li><b>Export</b><span>Download the inventory as a PDF catalog, a web page or a spreadsheet.</span></li>
+    </ul>
+    <p class="dw-note"><i></i>Everything updates live as the team packs. No need to refresh.</p>
+    <button class="btn" data-act="close-sheet" autofocus>Open inventory</button></div>`);
+}
+function firstGuide(){   // true when a welcome was shown
+  if (isDesk()) { if (store.get('seenDesk')) return false; store.set('seenDesk', 1); deskWelcome(); return true; }
+  if (store.get('seenGuide')) return false; store.set('seenGuide', 1); guideSheet(true); return true;
+}
 function guideSheet(first){
   openSheet(`<h2>${first ? 'How packing works' : 'How to use Packout'}</h2>
     <ol class="guide">
@@ -2166,7 +2195,7 @@ const act = {
     const name = $('#w-name').value.trim();
     if (!name) return $('#w-err').innerHTML = '<div class="err">Type your name.</div>';
     me = { name }; store.set('me', me); render();
-    if (!store.get('seenGuide')) { store.set('seenGuide', 1); guideSheet(true); }
+    firstGuide();
   },
   'change-who'(){ me = null; render(); },
   'si-name'(el){ signinPick = el.dataset.n; signinErr = ''; signinMode = store.get('signinMode:' + signinPick) || ''; render(); window.scrollTo(0, 0); autoFace(); },
@@ -2743,7 +2772,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.32';
+const APP_VERSION = '2026-11-22.33';
 let newVersion = false;
 async function checkVersion(){
   try {
