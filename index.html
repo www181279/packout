@@ -305,6 +305,45 @@ body.signing #view{max-width:440px;padding:0 20px}
 .tools .btn{width:auto;min-height:50px;flex:none;margin:0;padding:0 14px}
 .fchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .fchips button{border:0;background:var(--ink);color:#fff;border-radius:20px;padding:5px 12px;font-size:14px}
+@media (max-width:430px){.fbtn .ft{display:none}.fbtn{padding:0 12px}}
+.fbtn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
+.fbadge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--placard);color:var(--ink);font:700 12px/1 var(--body);margin-left:2px}
+/* filter sheet */
+#sheet .card:has(.fsx){max-width:640px;padding-top:0;padding-bottom:0}
+.fhead{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:6px;background:var(--floor);padding:16px 0 12px;margin-bottom:2px;border-bottom:1px solid var(--line)}
+.fhead h2{flex:1;margin:0!important;display:flex;align-items:center;gap:8px}
+.fhead .fbadge{font-size:13px;height:22px;min-width:22px}
+.flink{border:0;background:none;color:var(--ink);font:600 14.5px/1 var(--body);text-decoration:underline;text-underline-offset:3px;padding:8px 6px;cursor:pointer}
+.flink:disabled{color:#A3ADBB;text-decoration:none;cursor:default}
+.fx{width:40px;height:40px;border-radius:50%;border:0;background:var(--paper);display:grid;place-items:center;cursor:pointer;margin-left:4px}
+.fx svg{width:20px;height:20px;fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round}
+.fsec{padding:16px 0;border-bottom:1px solid var(--line)}
+.fsec header{display:flex;align-items:center;justify-content:space-between;min-height:24px;margin-bottom:10px}
+.fsec h3{font:700 15px/1.2 var(--body);color:var(--ink)}
+.fsec .flink{padding:4px 0;font-size:13.5px}
+.fnone{color:var(--ink2);font-size:14px}
+.fchipset{display:flex;flex-wrap:wrap;gap:8px}
+.fc{display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink);font:500 15px/1 var(--body);cursor:pointer;transition:border-color .12s,background .12s}
+.fc small{font-size:12.5px;color:var(--ink2);font-weight:500}
+.fc:hover:not(:disabled){border-color:#8C97A8}
+.fc.on{background:var(--ink);border-color:var(--ink);color:#fff}.fc.on small{color:#C9D3E0}
+.fc svg{width:16px;height:16px;fill:none;stroke:var(--placard);stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;margin-left:-3px}
+.fc:disabled{opacity:.42;cursor:default}
+.fc.fmore{border-style:dashed;color:var(--ink2);font-weight:600}
+.fc:focus-visible,.fseg button:focus-visible,.flink:focus-visible,.fx:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
+.fseg{display:grid;grid-template-columns:repeat(3,1fr);background:#DCE2E8;border-radius:12px;padding:4px;gap:4px}
+.fseg button{border:0;background:none;border-radius:9px;min-height:40px;font:600 14.5px/1.1 var(--body);color:var(--ink2);cursor:pointer;padding:0 6px}
+.fseg button.on{background:var(--paper);color:var(--ink);box-shadow:0 1px 2px rgba(19,33,58,.14)}
+.fpair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fsel{display:flex;flex-direction:column;gap:6px}
+.fsel span{font-size:13px;font-weight:600;color:var(--ink2)}
+.fsel select{min-height:46px;width:100%;margin:0}
+.fduo{display:grid;grid-template-columns:1fr 1fr;gap:0 20px;border-bottom:1px solid var(--line)}
+.fduo .fsec{border-bottom:0}
+.ffoot{position:sticky;bottom:0;z-index:2;background:var(--floor);padding:14px 0 calc(16px + env(safe-area-inset-bottom));margin-top:2px;box-shadow:0 -10px 16px -12px rgba(19,33,58,.25)}
+.ffoot .btn{margin:0}.ffoot .btn:disabled{opacity:.5}
+@media (max-width:480px){.fduo{grid-template-columns:1fr;gap:0}.fduo .fsec+.fsec{border-top:1px solid var(--line)}}
+@media (prefers-reduced-motion:reduce){.fc{transition:none}}
 .irow{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px 8px 8px;margin-bottom:6px}
 .irow img,.irow .noimg{width:64px;height:64px;border-radius:6px;object-fit:cover;background:#E3E9EF}
 .irow .st{font:700 22px/1.1 var(--sign)}
@@ -1487,13 +1526,16 @@ function recentHTML(){
 
 /* ---------- screens: inventory ---------- */
 const FLABEL = { pallet: 'Pallet', box: 'Box', item_type: 'Type', size: 'Size', brand: 'Brand', gender: 'Gender', season: 'Season', color: 'Color', by: 'Packed by' };
+const FFIELD = { pallet: i => String(i.pallet_id), box: i => String(i.box_id), item_type: i => i.item_type, size: i => i.size, brand: i => i.brand, gender: i => i.gender, season: i => i.season, color: i => i.color, by: i => i.created_by };
+// Does an item pass filter set f? `skip` ignores one field (used to count what each choice would give).
+function passes(i, f, skip){
+  for (const k in FFIELD) if (k !== skip && f[k] && FFIELD[k](i) !== String(f[k])) return false;
+  const q = (f.q || '').trim().toLowerCase();
+  return !q || [i.style_number, i.item_type, i.size && 'size ' + i.size, i.color, i.brand, i.tag_number, pCode(i.pallet_id), bCode(i.box_id)].join(' ').toLowerCase().includes(q);
+}
+const activeFilters = () => Object.keys(FLABEL).filter(k => filt[k]).length;
 function filtered(){
-  const q = filt.q.trim().toLowerCase();
-  let list = joined().filter(i =>
-    (!filt.pallet || String(i.pallet_id) === filt.pallet) && (!filt.box || String(i.box_id) === filt.box) &&
-    (!filt.item_type || i.item_type === filt.item_type) && (!filt.size || i.size === filt.size) && (!filt.brand || i.brand === filt.brand) && (!filt.gender || i.gender === filt.gender) && (!filt.season || i.season === filt.season) &&
-    (!filt.color || i.color === filt.color) && (!filt.by || i.created_by === filt.by) &&
-    (!q || [i.style_number, i.item_type, i.size && 'size ' + i.size, i.color, i.brand, i.tag_number, pCode(i.pallet_id), bCode(i.box_id)].join(' ').toLowerCase().includes(q)));
+  let list = joined().filter(i => passes(i, filt));
   const by = { new: (a, b) => b.created_at.localeCompare(a.created_at), style: (a, b) => a.style_number.localeCompare(b.style_number, undefined, { numeric: true }) || a.color.localeCompare(b.color) || bySize(a.size, b.size),
     where: (a, b) => a.pallet_id - b.pallet_id || a.box_id - b.box_id || a.style_number.localeCompare(b.style_number) };
   return list.sort(by[invSort]);
@@ -1502,7 +1544,7 @@ function inventoryHTML(){
   return `<h1 class="h">Inventory</h1>
   <div id="inv-totals"></div>
   <div class="tools"><input id="inv-q" type="search" placeholder="Search style, color, brand, tag, pallet" value="${esc(filt.q)}" aria-label="Search inventory">
-    <button class="btn alt" data-act="open-filters">Filter</button>${canExport() ? '<button class="btn alt" data-act="inv-export" aria-label="Export this list">Export</button>' : ''}</div>
+    <button class="btn alt fbtn" data-act="open-filters" aria-label="Filter"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg><span class="ft">Filter</span>${activeFilters() ? `<span class="fbadge">${activeFilters()}</span>` : ''}</button>${canExport() ? '<button class="btn alt" data-act="inv-export" aria-label="Export this list">Export</button>' : ''}</div>
   <div id="inv-chips" class="fchips"></div>
   <div class="ihead" aria-hidden="true"><span>Photo</span><span>Style</span><span>Type</span><span>Color</span><span>Brand</span><span>Gender</span><span>Season</span><span>UPC barcode</span><span>Sizes</span><span>Where</span><span style="text-align:right">Pieces</span></div>
   <div id="inv-list"></div>`;
@@ -1594,15 +1636,45 @@ function groupSheet(key){
     ${canManage() ? `<button class="btn quiet" data-act="open-style" data-style="${esc(i.style_number)}" style="margin-top:10px">Move, edit or delete the whole style</button>` : ''}
     <button class="btn" data-act="close-sheet" style="margin-top:10px">Done</button>`);
 }
-function filterSheet(){
-  const rows = joined(), opt = (k, vals, lab = v => v) => `<label class="f" for="f-${k}">${FLABEL[k]}</label><select id="f-${k}"><option value="">All</option>${vals.map(v => `<option value="${esc(v)}" ${String(filt[k]) === String(v) ? 'selected' : ''}>${esc(lab(v))}</option>`).join('')}</select>`;
-  const u = k => [...new Set(rows.map(r => r[k]).filter(Boolean))].sort();
-  openSheet(`<h2>Filter inventory</h2>
-    ${opt('pallet', data.pallets.map(p => p.id).sort((a, b) => a - b), v => pCode(v))}
-    ${opt('box', data.boxes.map(b => b.id).sort((a, b) => a - b), v => bCode(v) + ' on ' + pCode(idx.box.get(v).pallet_id))}
-    ${opt('item_type', u('item_type'))}${opt('size', u('size').sort(bySize))}${opt('brand', u('brand'))}${opt('gender', u('gender'))}${opt('season', u('season'))}${opt('color', u('color'))}${opt('by', u('created_by'))}
-    <label class="f" for="f-sort">Sort by</label><select id="f-sort"><option value="new">Newest first</option><option value="style" ${invSort === 'style' ? 'selected' : ''}>Style number</option><option value="where" ${invSort === 'where' ? 'selected' : ''}>Pallet and box</option></select>
-    <div class="row" style="margin-top:18px"><button class="btn alt" data-act="reset-filters">Clear all</button><button class="btn" data-act="apply-filters">Show items</button></div>`);
+let fDraft = null, fSortDraft = 'new', fMore = {};
+function filterSheet(){ fDraft = { ...filt }; fSortDraft = invSort; fMore = {}; openSheet('<div class="fsx" id="fsx"></div>'); drawFilters(); }
+function drawFilters(){
+  const host = $('#fsx'); if (!host) return;
+  const card = $('#sheet .card'), y = card.scrollTop, rows = joined();
+  // pieces per value of field k, given every other choice in the draft
+  const facet = k => { const m = new Map(); rows.forEach(i => { if (!passes(i, fDraft, k)) return; const v = FFIELD[k](i); if (v) m.set(v, (m.get(v) || 0) + (i.quantity || 0)); }); return m; };
+  const nOn = Object.keys(FLABEL).filter(k => fDraft[k]).length;
+  const result = rows.filter(i => passes(i, fDraft)), pcs = sumQty(result);
+  const chips = (k, order, label = v => v, cap = 12) => {
+    const m = facet(k), cur = String(fDraft[k] || '');
+    let vals = order(Array.from(new Set(rows.map(FFIELD[k]).filter(Boolean))));
+    vals.sort((x, y) => (m.get(String(y)) ? 1 : 0) - (m.get(String(x)) ? 1 : 0) || 0);
+    if (!vals.length) return `<p class="fnone">Nothing recorded yet</p>`;
+    const more = vals.length > cap && !fMore[k] && !(cur && vals.indexOf(cur) >= cap);
+    const shown = more ? vals.slice(0, cap) : vals;
+    return `<div class="fchipset" role="radiogroup" aria-label="${FLABEL[k]}">${shown.map(v => { const on = String(v) === cur, c = m.get(String(v)) || 0;
+      return `<button type="button" class="fc${on ? ' on' : ''}" role="radio" aria-checked="${on}" data-act="fpick" data-k="${k}" data-v="${esc(v)}" ${!c && !on ? 'disabled' : ''}>${on ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : ''}<span>${esc(label(v))}</span><small>${nf(c)}</small></button>`; }).join('')}
+      ${more ? `<button type="button" class="fc fmore" data-act="fmore" data-k="${k}">Show all ${nf(vals.length)}</button>` : ''}</div>`;
+  };
+  const sec = (k, body, title = FLABEL[k]) => `<section class="fsec"><header><h3>${title}</h3>${fDraft[k] ? `<button type="button" class="flink" data-act="fpick" data-k="${k}" data-v="">Clear</button>` : ''}</header>${body}</section>`;
+  const az = a => a.sort((x, y) => String(x).localeCompare(String(y), undefined, { numeric: true }));
+  const pm = facet('pallet'), bm = facet('box');
+  const sel = (k, vals, lab, m) => `<label class="fsel"><span>${FLABEL[k]}</span><select data-fk="${k}"><option value="">Any ${FLABEL[k].toLowerCase()}</option>${vals.map(v => `<option value="${v}" ${String(fDraft[k]) === String(v) ? 'selected' : ''} ${!m.get(String(v)) && String(fDraft[k]) !== String(v) ? 'disabled' : ''}>${esc(lab(v))}  (${nf(m.get(String(v)) || 0)})</option>`).join('')}</select></label>`;
+  const sorts = [['new', 'Newest'], ['style', 'Style number'], ['where', 'Pallet and box']];
+  host.innerHTML = `<div class="fhead"><h2>Filters${nOn ? `<span class="fbadge">${nOn}</span>` : ''}</h2>
+      <button type="button" class="flink" data-act="fclear" ${nOn ? '' : 'disabled'}>Clear all</button>
+      <button type="button" class="fx" data-act="close-sheet" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <section class="fsec"><header><h3>Sort by</h3></header><div class="fseg" role="radiogroup" aria-label="Sort by">${sorts.map(([v, t]) => `<button type="button" role="radio" aria-checked="${fSortDraft === v}" class="${fSortDraft === v ? 'on' : ''}" data-act="fsort" data-v="${v}">${t}</button>`).join('')}</div></section>
+    <section class="fsec"><header><h3>Location</h3>${fDraft.pallet || fDraft.box ? '<button type="button" class="flink" data-act="floc">Clear</button>' : ''}</header>
+      <div class="fpair">${sel('pallet', data.pallets.map(p => p.id).sort((a, b) => a - b), pCode, pm)}${sel('box', data.boxes.filter(b => !fDraft.pallet || String(b.pallet_id) === String(fDraft.pallet)).map(b => b.id).sort((a, b) => a - b), bCode, bm)}</div></section>
+    ${sec('item_type', chips('item_type', az))}
+    ${sec('size', chips('size', a => a.sort(bySize), v => v, 18))}
+    ${sec('color', chips('color', az))}
+    ${sec('brand', chips('brand', az))}
+    <div class="fduo">${sec('gender', chips('gender', az))}${sec('season', chips('season', az))}</div>
+    ${sec('by', chips('by', az))}
+    <div class="ffoot"><button type="button" class="btn" data-act="apply-filters" ${pcs ? '' : 'disabled'}>${pcs ? `Show ${nf(pcs)} ${unit(pcs, 'piece')}` : 'No items match'}</button></div>`;
+  card.scrollTop = y;
 }
 function itemSheet(id, edit){
   const i = joined().find(x => x.id === id); if (!i) return closeSheet();
@@ -2762,9 +2834,14 @@ const act = {
 
   /* inventory */
   'open-filters': filterSheet,
-  'apply-filters'(){ Object.keys(FLABEL).forEach(k => filt[k] = $('#f-' + k).value); invSort = $('#f-sort').value; invLimit = 150; closeSheet(); renderInvList(); },
-  'reset-filters'(){ Object.keys(FLABEL).forEach(k => filt[k] = ''); closeSheet(); renderInvList(); },
-  'clear-filter'(el){ filt[el.dataset.k] = ''; renderInvList(); },
+  'apply-filters'(){ Object.keys(FLABEL).forEach(k => filt[k] = String(fDraft[k] || '')); invSort = fSortDraft; invLimit = 150; closeSheet(); render(); },
+  'fpick'(el){ const k = el.dataset.k, v = el.dataset.v; fDraft[k] = String(fDraft[k]) === v ? '' : v; drawFilters(); },
+  'fmore'(el){ fMore[el.dataset.k] = true; drawFilters(); },
+  'fsort'(el){ fSortDraft = el.dataset.v; drawFilters(); },
+  'floc'(){ fDraft.pallet = fDraft.box = ''; drawFilters(); },
+  'fclear'(){ Object.keys(FLABEL).forEach(k => fDraft[k] = ''); drawFilters(); },
+  'reset-filters'(){ Object.keys(FLABEL).forEach(k => filt[k] = ''); closeSheet(); render(); },
+  'clear-filter'(el){ filt[el.dataset.k] = ''; render(); },
   'inv-more'(){ invLimit += 150; renderInvList(); },
   'open-item'(el){ itemSheet(el.dataset.id); },
   'open-group'(el){ groupSheet(el.dataset.k); },
@@ -3033,6 +3110,7 @@ document.addEventListener('click', e => {
   if (e.target.id === 'zoom') act['zoom-close']();
 });
 document.addEventListener('change', e => {
+  if (e.target.dataset && e.target.dataset.fk && fDraft) { const k = e.target.dataset.fk; fDraft[k] = e.target.value; if (k === 'pallet' && fDraft.pallet && fDraft.box && idx.box.get(+fDraft.box) && String(idx.box.get(+fDraft.box).pallet_id) !== fDraft.pallet) fDraft.box = ''; drawFilters(); return; }
   if (e.target.id === 'k-itemfirst' && e.target.files[0]) {
     const f = e.target.files[0]; e.target.value = '';
     pack.photo = f; if (pack.photoUrl) URL.revokeObjectURL(pack.photoUrl); pack.photoUrl = URL.createObjectURL(f);
@@ -3122,7 +3200,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.42';
+const APP_VERSION = '2026-11-23.43';
 let newVersion = false;
 async function checkVersion(){
   try {
