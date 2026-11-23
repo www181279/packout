@@ -396,6 +396,12 @@ body.signing #view{max-width:440px;padding:0 20px}
 .xsel{display:flex;align-items:center;gap:10px;margin:-4px 0 12px}
 .xsel span{font-size:13px;font-weight:600;color:var(--ink2)}
 .xsel select{flex:1;min-height:40px}
+.xbl{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:-4px 0 12px}
+.xbl .xsel{flex-direction:column;align-items:stretch;gap:4px;margin:0}
+.xbl input{width:100%;min-height:44px;font:700 20px/1 inherit;text-align:center;border:1.5px solid var(--line,#C9D1DC);border-radius:10px;background:var(--card,#fff);color:var(--ink)}
+.xbl input:focus{outline:2px solid var(--ink);outline-offset:1px}
+.xblh{margin:-4px 0 12px;font-size:13px;color:var(--ink2);line-height:1.4}.xblh b{color:var(--ink)}
+.pv-lbl.blank .q em{display:block;font:700 15px/1 "Barlow Condensed","Arial Narrow",sans-serif;font-style:normal;color:var(--ink);margin-bottom:5px}
 .xnote{color:var(--ink2);font-size:13px;margin:12px 0 0}
 /* previews: small drawings of each output */
 .pv{height:150px;background:linear-gradient(180deg,#F1F4F8,#E6EBF1);display:grid;place-items:center;border-bottom:1px solid var(--line);overflow:hidden}
@@ -744,9 +750,24 @@ dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
 .lb-l4 .lb-box{font-size:70pt}
 .lb-l2 .lb-page{grid-template-columns:1fr;grid-template-rows:4.75in 4.75in}
 .lb-l2 .lb-box{font-size:130pt}.lb-l2 .lb-pal{font-size:34pt}.lb-l2 .lbl table{font-size:13pt}
+.lb-write{display:flex;flex-direction:column;flex:1;justify-content:space-evenly;font-size:11pt;font-weight:600;color:#55627A}
+.lb-write i{display:block;border-bottom:1.5px solid #8C97A8;min-height:.26in}
+.lb-write .sig{margin-top:.08in;color:#13213A}
 .lb-t46 .lb-page{display:block}
-.lb-t46 .lbl{width:4in;height:5.95in;border:0;border-radius:0;padding:.22in}
-.lb-t46 .lb-box{font-size:92pt}
+/* 4 x 6: fill the whole label. Pallet on top, a giant box number in the middle, contents at the bottom */
+.lb-t46 .lbl{width:4in;height:5.95in;border:0;border-radius:0;padding:.2in .2in .18in}
+.lb-t46 .lb-top{align-items:center;font-size:15pt}
+.lb-t46 .lb-pal{font-size:36pt;padding:2px 14px}
+.lb-t46 .lb-box{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;line-height:.86;min-height:0}
+.lb-t46 .lb-box .w{font-size:30pt;letter-spacing:.04em;line-height:1}
+.lb-t46 .lb-box .n{font-size:190pt}
+.lb-t46 .lb-box.d4 .n{font-size:150pt}.lb-t46 .lb-box.d5 .n{font-size:118pt}
+.lb-t46 .lbl table{font-size:12pt;border-bottom:1px solid #AEB8C4}
+.lb-t46 .lbl td{padding:5px 6px 5px 0}
+.lb-t46 .lbl td.s,.lb-t46 .lbl td.q{font-size:16pt}
+.lb-t46 .lbl.tight .lb-box .n{font-size:120pt}.lb-t46 .lbl.tight .lb-box.d4 .n{font-size:100pt}.lb-t46 .lbl.tight .lb-box .w{font-size:22pt}
+.lb-t46 .lbl.blank .lb-box{flex:0 0 auto;margin:.1in 0 .04in}
+.lb-t46 .lb-write{font-size:12pt}.lb-t46 .lb-write i{min-height:.3in}
 </style>
 </head>
 <body>
@@ -1107,6 +1128,7 @@ function render(){
   document.querySelectorAll('#nav button').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   v.innerHTML = ({ pack: packHTML, pallets: palletsHTML, inventory: inventoryHTML, more: moreHTML, settings: settingsHTML })[tab]();
   if (tab === 'settings') settingsAfter();
+  if (tab === 'more') blankHint();
   if (tab === 'pack' && pack.stage === 'item' && pack.photo && !$('#k-photo-wrap img')) showPhoto(pack.photo);
   if (tab === 'inventory') renderInvList();
   setBars();
@@ -2158,6 +2180,8 @@ function moreHTML(){
   const prevWeb = `<div class="pv pv-web"><div class="bw"><div class="bar"><i></i><i></i><i></i><b></b></div><div class="cards">${'<span><em></em><u></u></span>'.repeat(6)}</div></div></div>`;
   const prevCsv = `<div class="pv pv-csv"><div class="sh">${Array.from({ length: 6 }, (_, r) => `<div class="tr${r ? '' : ' th'}">${'<i></i>'.repeat(5)}</div>`).join('')}</div></div>`;
   const prevSheet = `<div class="pv pv-sheet"><div class="pg"><i class="big"></i><i class="ln w7"></i>${'<i class="row"></i>'.repeat(6)}</div></div>`;
+  const prevBlank = `<div class="pv pv-lbl blank"><div class="pg q">${[101, 102, 103, 104].map(n => `<span><em>${n}</em><i></i><i></i></span>`).join('')}</div></div>`;
+  const sizeSel = id => `<label class="xsel"><span>Size</span><select id="${id}" class="p-label">${Object.entries(LABELS).map(([k, v]) => `<option value="${k}" ${k === labelSize ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></label>`;
   const prevLbl = `<div class="pv pv-lbl"><div class="pg q">${'<span><b></b><i></i><i></i></span>'.repeat(4)}</div></div>`;
   const tile = (act, prev, name, tag, desc, cta, extra = '') => `<div class="xtile">${prev}<div class="xtb"><div class="xtn"><b>${name}</b><span class="xtag">${tag}</span></div><p>${desc}</p>${extra}
     <button class="xcta" data-act="${act}">${cta}${ARROW}</button></div></div>`;
@@ -2183,10 +2207,11 @@ function moreHTML(){
       <section><div class="xsec"><h2>Print for the floor</h2>
           <div class="xseg sm" role="radiogroup"><label><input type="radio" name="p-scope" value="closed" ${nClosed ? 'checked' : ''}><span>Closed pallets (${nf(nClosed)})</span></label>
             <label><input type="radio" name="p-scope" value="all" ${nClosed ? '' : 'checked'}><span>All pallets (${nf(data.pallets.length)})</span></label></div></div>
-        <div class="xtiles two">
+        <div class="xtiles">
           ${tile('print-sheets', prevSheet, 'Pallet breakdowns', 'Letter', 'One page per pallet listing every box and style, to keep with the pallet.', 'Print breakdowns')}
-          ${tile('print-labels', prevLbl, 'Box labels', 'Labels', 'A large box number and its contents, to tape on each box.', 'Print labels',
-            `<label class="xsel"><span>Size</span><select id="p-label">${Object.entries(LABELS).map(([k, v]) => `<option value="${k}" ${k === labelSize ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></label>`)}
+          ${tile('print-labels', prevLbl, 'Box labels', 'Labels', 'A large box number and its contents, to tape on each box.', 'Print labels', sizeSel('p-label'))}
+          ${tile('print-blank', prevBlank, 'Labels before packing', 'Labels', `Numbered labels to put on empty boxes. Each pallet gets ${boxesPerPallet()}, matching the numbers the app gives.`, 'Print labels',
+            `<div class="xbl"><label class="xsel"><span>Pallets</span><input id="bl-n" type="number" inputmode="numeric" min="1" max="50" value="1"></label><label class="xsel"><span>From pallet</span><input id="bl-from" type="number" inputmode="numeric" min="1" value="${nextPalletNo()}"></label></div>${sizeSel('p-label2')}<p class="xblh" id="bl-hint"></p>`)}
         </div>
         <p class="xnote">For the PDF, your browser's print window opens. Choose "Save as PDF" there. To print one pallet only, open it on the Pallets tab.</p></section>
     </div>
@@ -2293,7 +2318,7 @@ function manifestHTML(rows, { title, img, sheets }){
 }
 /* ---------- printing: pallet breakdowns and box labels ---------- */
 const LETTER = 'size:letter;margin:.5in';
-const LABELS = { l4: ['4 per Letter page', 'size:letter;margin:.5in', 4, 7], l2: ['2 per Letter page (large)', 'size:letter;margin:.5in', 2, 7], t46: ['4 x 6 inch label printer', 'size:4in 6in;margin:0', 1, 9] };
+const LABELS = { l4: ['4 per Letter page', 'size:letter;margin:.5in', 4, 7], l2: ['2 per Letter page (large)', 'size:letter;margin:.5in', 2, 7], t46: ['4 x 6 inch label printer', 'size:4in 6in;margin:0', 1, 8] };
 let labelSize = store.get('labels') || 'l4';
 async function printHTML(html, page){
   await withBusy('Getting it ready to print', async () => {
@@ -2303,8 +2328,21 @@ async function printHTML(html, page){
     const imgs = [...root.querySelectorAll('img')]; let n = 0;
     await Promise.race([Promise.all(imgs.map(im => new Promise(ok => { const d = () => { setBusy(`Loading photos ${++n} of ${imgs.length}`); ok(); }; im.complete ? d() : (im.onload = im.onerror = d); }))), new Promise(ok => setTimeout(ok, 45000))]);
     if (document.fonts && document.fonts.ready) await Promise.race([document.fonts.ready, new Promise(ok => setTimeout(ok, 3000))]);
+    fitLabels(root);
   });
   window.print();
+}
+// Shrink a box number only if it would not fit across its label (long numbers, or a fallback font).
+function fitLabels(root){
+  const lb = root.querySelector('.lb'); if (!lb) return;
+  const size = (lb.className.match(/lb-(\w+)/) || [])[1], ctx = document.createElement('canvas').getContext('2d');
+  const avail = { t46: 3.5, l4: 3.1, l2: 6.9 }[size] * 96;
+  root.querySelectorAll('.lb-box').forEach(el => {
+    const n = el.querySelector('.n'), w = el.querySelector('.w'), cs = getComputedStyle(n), px = parseFloat(cs.fontSize);
+    ctx.font = `${cs.fontWeight} ${px}px ${cs.fontFamily}`;
+    const width = ctx.measureText(size === 't46' ? n.textContent : 'Box ' + n.textContent).width;
+    if (width > avail) { const k = avail / width; n.style.fontSize = px * k + 'px'; if (size !== 't46') w.style.fontSize = px * k + 'px'; }
+  });
 }
 const palletIds = scope => data.pallets.filter(p => scope !== 'closed' || p.status === 'closed').map(p => p.id).sort((a, b) => a - b);
 function printSheets(ids, photos = true){
@@ -2317,8 +2355,11 @@ function labelsHTML(boxes, size){
   const one = b => {
     const m = new Map(); itemsOf('box_id', b.id).forEach(i => { const g = m.get(i.style_number) || m.set(i.style_number, { colors: new Set(), sizes: [], type: i.item_type, qty: 0 }).get(i.style_number); g.colors.add(i.color); g.sizes.push(i); g.qty += i.quantity; });
     const list = [...m].sort((a, c) => a[0].localeCompare(c[0], undefined, { numeric: true })), total = list.reduce((n, [, g]) => n + g.qty, 0);
-    return `<div class="lbl"><div class="lb-top"><span class="lb-pal">${pCode(b.pallet_id)}</span><span>${list.length ? plural(total, 'piece') : 'Nothing recorded yet'}</span></div>
-      <div class="lb-box">${bCode(b.id)}</div>
+    const num = `<div class="lb-box d${String(b.id).length}"><span class="w">Box </span><span class="n">${b.id}</span></div>`;
+    if (b.blank) return `<div class="lbl blank"><div class="lb-top"><span class="lb-pal">${pCode(b.pallet_id)}</span><span>Pieces: ______</span></div>${num}
+      <div class="lb-write"><span>Contents</span>${'<i></i>'.repeat(size === 't46' ? 5 : 4)}<span class="sig">Packed by ____________________</span></div></div>`;
+    return `<div class="lbl${list.length > 4 ? ' tight' : ''}"><div class="lb-top"><span class="lb-pal">${pCode(b.pallet_id)}</span><span>${list.length ? plural(total, 'piece') : 'Nothing recorded yet'}</span></div>
+      ${num}
       <table><tbody>${list.slice(0, max).map(([st, g]) => `<tr><td class="s">${esc(st)}</td><td>${esc([g.type, [...g.colors].join(', ')].filter(Boolean).join(': '))}${sizesOf(g.sizes).length ? ` <span style="white-space:nowrap">(${esc(sizesOf(g.sizes).join(' '))})</span>` : ''}</td><td class="q">${nf(g.qty)}</td></tr>`).join('')}</tbody></table>
       ${list.length > max ? `<div class="more">and ${plural(list.length - max, 'more style')}. See the pallet breakdown.</div>` : ''}</div>`;
   };
@@ -2328,6 +2369,23 @@ function labelsHTML(boxes, size){
 function printLabels(boxes){
   boxes = boxes.slice().sort((a, b) => a.pallet_id - b.pallet_id || a.id - b.id);
   if (!boxes.length) return toast('There are no boxes to label yet.', 'bad');
+  return printHTML(labelsHTML(boxes, labelSize), LABELS[labelSize][1]);
+}
+// Numbered labels printed before packing: Pallet 1 gets Box 101-130, Pallet 2 gets 201-230 (same numbers the app gives new boxes).
+const boxesPerPallet = () => Math.max(1, parseInt(setting('boxes_per_pallet'), 10) || 30);
+const nextPalletNo = () => data.pallets.reduce((m, p) => Math.max(m, p.id), 0) + 1;
+function blankLabelCount(){
+  const n = Math.max(0, Math.min(50, parseInt(($('#bl-n') || {}).value, 10) || 0)), from = Math.max(1, parseInt(($('#bl-from') || {}).value, 10) || 1);
+  return { n, from, per: boxesPerPallet() };
+}
+function blankHint(){
+  const h = $('#bl-hint'); if (!h) return; const { n, from, per } = blankLabelCount();
+  h.innerHTML = n ? `<b>${nf(n * per)} labels</b> for ${n === 1 ? pCode(from) : `Pallets ${from} to ${from + n - 1}`}: Box ${from * 100 + 1} to Box ${(from + n - 1) * 100 + per}.` : 'Type how many pallets you need labels for (up to 50).';
+}
+function printBlankLabels(){
+  const { n, from, per } = blankLabelCount();
+  if (!n) return toast('Type how many pallets you need labels for.', 'bad');
+  const boxes = []; for (let p = from; p < from + n; p++) for (let i = 1; i <= per; i++) boxes.push({ id: p * 100 + i, pallet_id: p, blank: true });
   return printHTML(labelsHTML(boxes, labelSize), LABELS[labelSize][1]);
 }
 
@@ -2834,6 +2892,7 @@ const act = {
     if (el.dataset.id) return printSheets([+el.dataset.id]);
     printSheets(palletIds($('input[name=p-scope]:checked').value), $('input[name=x-photos]:checked').value === '1');
   },
+  'print-blank'(){ printBlankLabels(); },
   'print-labels'(el){
     if (el.dataset.box) return printLabels([idx.box.get(+el.dataset.box)]);
     const ids = new Set(el.dataset.id ? [+el.dataset.id] : palletIds($('input[name=p-scope]:checked').value));
@@ -2977,7 +3036,8 @@ document.addEventListener('change', async e => {
   catch (er) { e.target.checked = !v; toast(isDenied(er) ? DENIED_MSG : 'Could not save the setting: ' + er.message, 'bad'); }
 });
 document.addEventListener('change', e => { if (e.target.name === 'x-scope' && $('#x-sum')) $('#x-sum').innerHTML = exportSummaryHTML(e.target.value); });
-document.addEventListener('change', e => { if (e.target.id === 'p-label') { labelSize = e.target.value; store.set('labels', labelSize); } });
+document.addEventListener('change', e => { if (e.target.classList && e.target.classList.contains('p-label')) { labelSize = e.target.value; store.set('labels', labelSize); document.querySelectorAll('.p-label').forEach(x => { x.value = labelSize; }); } });
+document.addEventListener('input', e => { if (e.target.id === 'bl-n' || e.target.id === 'bl-from') blankHint(); });
 document.addEventListener('input', e => { if (e.target.id === 'k-color') delete e.target.dataset.auto; if (e.target.matches && e.target.matches('.szq, .k-more')) updateTotals(); });
 document.addEventListener('input', e => { if (e.target.id === 'inv-q') { filt.q = e.target.value; invLimit = 150; renderInvList(); } });
 document.addEventListener('keydown', e => {
@@ -2996,6 +3056,7 @@ function keepInputs(fn){                // re-draw the screen, keeping typed val
   const act = document.activeElement && document.activeElement.id, y = scrollY;
   fn();
   vals.forEach(([sel, v, type]) => { const el = document.querySelector(sel); if (!el) return; if (type === 'radio' || type === 'checkbox') el.checked = v; else el.value = v; });
+  blankHint();
   if (act && $('#' + act)) $('#' + act).focus({ preventScroll: true });
   scrollTo(0, y);
 }
@@ -3027,7 +3088,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.40';
+const APP_VERSION = '2026-11-23.41';
 let newVersion = false;
 async function checkVersion(){
   try {
