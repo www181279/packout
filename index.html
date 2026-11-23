@@ -309,25 +309,32 @@ dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
 .cg-kpi div:last-child{border-right:0}
 .cg-kpi b{display:block;font:700 22px/1 "Barlow Condensed","Barlow",sans-serif}
 .cg-kpi span{font-size:10px;color:#5B6B7F;text-transform:uppercase;letter-spacing:.06em}
-.cg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.cg-card{display:grid;grid-template-columns:1.3in 1fr;gap:12px;border:1px solid #D5DCE4;border-radius:8px;padding:9px;break-inside:avoid;page-break-inside:avoid;background:#fff}
-.cg-ph{width:1.3in;height:1.3in;border-radius:5px;background:#F4F6F8;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.cg-grid{display:grid;grid-template-columns:1fr;gap:8px}
+.cg-card{border:1px solid #D5DCE4;border-radius:8px;padding:8px 12px;break-inside:avoid;page-break-inside:avoid;background:#fff}
+.cg-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding-bottom:6px;border-bottom:1px solid #E6EBF0;margin-bottom:6px}
+.cg-st{font:700 19px/1.05 "Barlow Condensed","Barlow",sans-serif;margin-right:10px}
+.cg-meta{color:#5B6B7F;font-size:10.5px}
+.cg-foot{display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right;flex:none}
+.cg-loc{font-size:10px;color:#5B6B7F}
+.cg-tot{font:700 22px/1 "Barlow Condensed","Barlow",sans-serif;white-space:nowrap}
+.cg-line{display:grid;grid-template-columns:.85in 1.9in 1fr auto;gap:12px;align-items:center;padding:4px 0}
+.cg-one{padding:6px 12px 6px 6px}
+.cg-card:not(.cg-one) .cg-line{margin-left:-6px}
+.cg-one .cg-line{grid-template-columns:.85in 1.9in 1fr auto;padding:0}
+.cg-one .cg-st{display:block;margin:0 0 2px}
+.cg-line+.cg-line{border-top:1px dashed #E6EBF0}
+.cg-ph{width:.85in;height:.85in;border-radius:5px;background:#F4F6F8;overflow:hidden;display:flex;align-items:center;justify-content:center}
 .cg-ph img{width:100%;height:100%;object-fit:contain;background:#fff}
 .cg-ph em{font-style:normal;color:#9AA6B4;font-size:10px}
-.cg-info{min-width:0;display:flex;flex-direction:column}
-.cg-st{font:700 17px/1.05 "Barlow Condensed","Barlow",sans-serif;word-break:break-all}
-.cg-meta{color:#5B6B7F;font-size:10.5px;margin-top:2px}
-.cg-color{font-weight:600;margin-top:3px}
-.cg-sz{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px}
-.cg-sz span{display:inline-flex;flex-direction:column;align-items:center;min-width:34px;border:1px solid #D5DCE4;border-radius:4px;overflow:hidden}
+.cg-color{font-weight:600;font-size:12px}
+.cg-sz{display:flex;flex-wrap:wrap;gap:3px}
+.cg-sz span{display:inline-flex;flex-direction:column;align-items:center;min-width:36px;border:1px solid #D5DCE4;border-radius:4px;overflow:hidden}
 .cg-sz small{display:block;width:100%;text-align:center;background:#13213A;color:#fff;font-size:9.5px;font-weight:600;padding:1px 4px;white-space:nowrap}
-.cg-sz b{font:700 12.5px/1.3 "Barlow Condensed","Barlow",sans-serif;padding:0 4px;white-space:nowrap}
-.cg-foot{margin-top:auto;padding-top:6px;display:flex;justify-content:space-between;align-items:flex-end;gap:6px}
-.cg-loc{font-size:10px;color:#5B6B7F}
-.cg-tot{font:700 18px/1 "Barlow Condensed","Barlow",sans-serif;white-space:nowrap}
-.cg-tot u,.cg-sz u{text-decoration:none;font:500 9px "Barlow",sans-serif;color:#5B6B7F;margin-left:1px}
+.cg-sz b{font:700 13px/1.3 "Barlow Condensed","Barlow",sans-serif;padding:0 4px;white-space:nowrap}
+.cg-q{font:700 16px/1 "Barlow Condensed","Barlow",sans-serif;white-space:nowrap;text-align:right}
+.cg-tot u,.cg-sz u,.cg-q u{text-decoration:none;font:500 9px "Barlow",sans-serif;color:#5B6B7F;margin-left:1px}
 .cg-end{margin-top:14px;padding-top:8px;border-top:1px solid #D5DCE4;color:#5B6B7F;font-size:10px;display:flex;justify-content:space-between}
-@media screen and (max-width:700px){.cg-grid{grid-template-columns:1fr}.cg-kpi{grid-template-columns:repeat(3,1fr)}}
+@media screen and (max-width:700px){.cg-kpi{grid-template-columns:repeat(3,1fr)}.cg-line{grid-template-columns:.85in 1fr auto}.cg-sz{grid-column:2/-1}}
 </style>
 <style id="mf-css">
 .mf{font-family:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#13213A;font-size:12px;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -1718,6 +1725,11 @@ function filterSummary(){
   if (filt.q.trim()) parts.unshift(['Search', filt.q.trim()]);
   return parts;
 }
+// one entry per style, with a line per color
+function styleGroups(groups){
+  const m = new Map(); groups.forEach(g => { const k = g.first.style_number; if (!m.has(k)) m.set(k, { style: k, colors: [] }); m.get(k).colors.push(g); });
+  return [...m.values()];
+}
 function catalogHTML(groups, { img, title }){
   const items = groups.flatMap(g => g.items), pcs = sumQty(items), f = filterSummary();
   const n = (v, l) => `<div><b>${nf(v)}</b><span>${l}</span></div>`;
@@ -1727,18 +1739,24 @@ function catalogHTML(groups, { img, title }){
       <div class="brand">PACKOUT<span>Prepared by ${esc(me && me.name || '')}</span></div></div>
     ${f.length ? `<div class="cg-filters">${f.map(([k, v]) => `<span>${esc(k)}: <b>${esc(v)}</b></span>`).join('')}</div>` : ''}
     <div class="cg-kpi">${n(pcs, 'pieces')}${n(new Set(items.map(i => i.style_number)).size, 'styles')}${n(groups.length, 'colors')}${n(new Set(items.map(i => i.box_id)).size, 'boxes')}${n(new Set(items.map(i => i.pallet_id)).size, 'pallets')}</div>
-    <div class="cg-grid">${groups.map(g => { const i = g.first, src = img && i.photo_path ? img(i) : '';
-      const pals = [...new Set(g.items.map(x => x.pallet_id))].sort((a, b) => a - b), boxes = [...new Set(g.items.map(x => x.box_id))].sort((a, b) => a - b);
-      return `<div class="cg-card">
-        <div class="cg-ph">${src ? `<img src="${esc(src)}" alt="">` : '<em>No photo</em>'}</div>
-        <div class="cg-info">
-          <div class="cg-st">${esc(i.style_number)}</div>
-          <div class="cg-meta">${esc([i.item_type, i.gender, i.season].filter(Boolean).join(' · '))}</div>
-          <div class="cg-color">${esc(i.color)}${i.brand ? ` <span class="cg-meta">· ${esc(i.brand)}</span>` : ''}</div>
+    <div class="cg-grid">${styleGroups(groups).map(sg => { const i = sg.colors[0].first;
+      const all = sg.colors.flatMap(g => g.items), pals = [...new Set(all.map(x => x.pallet_id))].sort((a, b) => a - b), boxes = [...new Set(all.map(x => x.box_id))].sort((a, b) => a - b);
+      const loc = `${pals.map(pCode).join(', ')} · ${boxes.length > 4 ? boxes.length + ' boxes' : boxes.map(bCode).join(', ')}`;
+      if (sg.colors.length === 1) { const g = sg.colors[0], src = img && i.photo_path ? img(i) : '';
+        return `<div class="cg-card cg-one"><div class="cg-line"><div class="cg-ph">${src ? `<img src="${esc(src)}" alt="">` : '<em>No photo</em>'}</div>
+          <div><div class="cg-st">${esc(i.style_number)}</div><div class="cg-color">${esc(i.color)}</div><div class="cg-meta">${esc([i.brand, i.item_type, i.gender, i.season].filter(Boolean).join(' · '))}</div></div>
           <div class="cg-sz">${sizeTotals(g).map(([z, q]) => `<span><small>${esc(z || 'No size')}</small><b>${nf(q)}<u>pcs</u></b></span>`).join('')}</div>
-          <div class="cg-foot"><div class="cg-loc">${pals.map(pCode).join(', ')}<br>${boxes.length > 4 ? boxes.length + ' boxes' : boxes.map(bCode).join(', ')}</div><div class="cg-tot">${nf(g.qty)}<u>pcs</u></div></div>
-        </div></div>`; }).join('')}</div>
-    <div class="cg-end"><span>${nf(groups.length)} ${groups.length === 1 ? 'color' : 'colors'}, ${nf(pcs)} pieces</span><span>Packout inventory report</span></div>
+          <div class="cg-foot"><div class="cg-tot">${nf(g.qty)}<u>pcs</u></div><div class="cg-loc">${loc}</div></div></div></div>`; }
+      return `<div class="cg-card">
+        <div class="cg-top"><div><span class="cg-st">${esc(i.style_number)}</span><span class="cg-meta">${esc([i.brand, i.item_type, i.gender, i.season].filter(Boolean).join(' · '))}</span></div>
+          <div class="cg-foot"><div class="cg-tot">${nf(sumQty(all))}<u>pcs</u></div><div class="cg-loc">${pals.map(pCode).join(', ')} · ${boxes.length > 4 ? boxes.length + ' boxes' : boxes.map(bCode).join(', ')}</div></div></div>
+        ${sg.colors.map(g => { const c = g.first, src = img && c.photo_path ? img(c) : '';
+          return `<div class="cg-line"><div class="cg-ph">${src ? `<img src="${esc(src)}" alt="">` : '<em>No photo</em>'}</div>
+            <div class="cg-color">${esc(c.color)}</div>
+            <div class="cg-sz">${sizeTotals(g).map(([z, q]) => `<span><small>${esc(z || 'No size')}</small><b>${nf(q)}<u>pcs</u></b></span>`).join('')}</div>
+            <div class="cg-q">${nf(g.qty)}<u>pcs</u></div></div>`; }).join('')}
+      </div>`; }).join('')}</div>
+    <div class="cg-end"><span>${plural(styleGroups(groups).length, 'style')}, ${nf(groups.length)} ${groups.length === 1 ? 'color' : 'colors'}, ${nf(pcs)} pieces</span><span>Packout inventory report</span></div>
   </div>`;
 }
 async function embedThumbs(rows){
@@ -2335,7 +2353,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.17';
+const APP_VERSION = '2026-11-22.19';
 let newVersion = false;
 async function checkVersion(){
   try {
