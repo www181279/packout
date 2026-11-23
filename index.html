@@ -225,7 +225,13 @@ body.signing #view{max-width:440px;padding:0 20px}
 @media (prefers-reduced-motion:reduce){.dots.shake,.facering::after{animation:none}}
 .morebox{margin-top:4px}.morerow{display:flex;gap:8px}.morerow input{flex:1;text-align:center;font:700 24px/1 var(--sign)}.morerow .btn{width:auto;flex:none;min-height:50px}
 .addmore{display:block;margin-top:10px}
-.savedacts{margin-top:10px}.savedacts .btn{flex:1;font-size:15px}
+.savedacts{margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.snext{grid-column:1/-1;font:700 15px/1.2 var(--body);color:var(--ink);margin:0}
+.nx{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:12px 13px;min-height:64px;border:1.5px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);cursor:pointer;font:inherit}
+.nx b{font:700 15.5px/1.2 var(--body)}.nx span{font:500 13px/1.3 var(--body);color:var(--ink2)}
+.savedacts .nx:last-child{grid-column:1/-1}
+.nx.main{grid-column:1/-1;background:var(--ink);border-color:var(--ink);color:#fff}.nx.main span{color:#C9D3E0}
+.nx:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
 .colorrun{margin-top:8px;font-size:15px;font-weight:500}.colorrun b{font-weight:700}
 .restart{display:block;margin:0 auto 6px;color:var(--stop)}
 .samehead{display:flex;flex-wrap:wrap;gap:2px 12px;align-items:baseline;justify-content:space-between;margin:18px 0 0;padding-top:14px;border-top:1px dashed var(--line)}
@@ -1036,6 +1042,9 @@ async function saveSetting(k, value){
 }
 const photoUrl = (path, c = cfg) => path ? `${c.url}/storage/v1/object/public/${BUCKET}/${path}` : '';
 const thumbUrl = it => it.photo_path ? photoUrl((it.photo_pro ? 'pro/thumb/' : 'thumb/') + it.photo_path) : '';
+// the reused photo on the packing form switches to the polished one as soon as it is ready
+function refreshReuse(path){ if (!pack.reuse || pack.reuse.path !== path || pack.photo) return; const im = $('#k-photo-wrap img'); if (im) im.src = reuseUrl(path); }
+const reuseUrl = path => { const it = data.items.find(i => i.photo_path === path && i.photo_pro) || { photo_path: path }; return fullUrl(it); };
 const fullUrl = it => it.photo_path ? photoUrl((it.photo_pro ? 'pro/' : '') + it.photo_path) : '';
 
 function shrink(file, max, quality){
@@ -1400,11 +1409,14 @@ function packHTML(){
   const uniq = k => [...new Set(data.items.map(i => i[k]).filter(Boolean))].sort();
   return `${trailHTML()}
     ${pack.saved ? `<div class="saved">${esc(pack.saved)}${pack.runPath ? colorRunHTML(pack.runPath) : ''}${pack.justSaved && idx.box.get(pack.box)?.status === 'open' ? `
-      <div class="row savedacts"><button class="btn sm" data-act="continue-box">Same color, next box</button><button class="btn alt sm" data-act="same-box">Next style</button></div>
-      <p class="small" style="margin-top:8px">Next color of ${esc(pack.style)}: take a new photo below.</p>` : ''}</div>` : ''}
+      <div class="savedacts"><p class="snext">What's next?</p>
+        <button class="nx main" data-act="same-color"><b>More sizes of this color</b><span>Same photo and color, same box</span></button>
+        <button class="nx" data-act="next-color"><b>Next color</b><span>Take a photo of the new color</span></button>
+        <button class="nx" data-act="continue-box"><b>${bCode(pack.box)} is full</b><span>Same color into a new box</span></button>
+        <button class="nx" data-act="same-box"><b>Next style</b><span>Start a different style</span></button></div>` : ''}</div>` : ''}
     <div class="boxnow"><span>Packing into</span><b>${bCode(pack.box)}</b><span>${pCode(pack.pallet)}</span></div>
     <div class="panel">
-      <div class="photo" id="k-photo-wrap">${pack.reuse && !pack.photo ? `<img alt="Same photo as the last box" src="${esc(photoUrl(pack.reuse.path))}"><span class="again">Same photo. Tap to retake</span>` : '<span>Tap to take a photo of the item</span>'}
+      <div class="photo" id="k-photo-wrap">${pack.reuse && !pack.photo ? `<img alt="Same photo as the last box" src="${esc(reuseUrl(pack.reuse.path))}"><span class="again">Same photo. Tap to retake</span>` : '<span>Tap to take a photo of the item</span>'}
         <input id="k-photo" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the item"></div>
       <label class="btn alt filebtn tagbtn2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Read the tag for this color<input id="k-tagphoto" data-where="item" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in this item"></label>
       <div id="tag-status">${pack.tagStatus || ''}</div>
@@ -1847,7 +1859,7 @@ async function polishTick(){
     const { full, thumb } = await composePro(cut, orig);
     await Promise.all([uploadPhoto('pro/' + job.path, full), uploadPhoto('pro/thumb/' + job.path, thumb)]);
     await call('/rest/v1/items?photo_path=' + eq(job.path), { method: 'PATCH', body: JSON.stringify({ photo_pro: true }), headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' } });
-    data.items.forEach(i => { if (i.photo_path === job.path) i.photo_pro = true; });
+    data.items.forEach(i => { if (i.photo_path === job.path) i.photo_pro = true; }); refreshReuse(job.path);
     store.set('polishQ', polishQ().filter(x => x.path !== job.path));
     if (!sheetOpen() && !busyN && tab !== 'pack') softRender();
     const pc = $('#pol-count'); if (pc) pc.textContent = polishCountText();
@@ -2011,7 +2023,7 @@ function startEarlyPolish(file){
 async function markPro(path){
   try {
     await call('/rest/v1/items?photo_path=' + eq(path), { method: 'PATCH', body: JSON.stringify({ photo_pro: true }), headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' } });
-    data.items.forEach(i => { if (i.photo_path === path) i.photo_pro = true; });
+    data.items.forEach(i => { if (i.photo_path === path) i.photo_pro = true; }); refreshReuse(path);
   } catch { enqueuePolish([path]); }
 }
 
@@ -2057,6 +2069,7 @@ async function readTag(file, where){
     if (where === 'style') {
       if (!t.style) return status(`<div class="err">The style number was not clear on the tag. Take the tag photo again, or type the style.</div><button class="linkbtn" data-act="tag-ocr">Pick the style from the text myself</button>`);
       status(''); pack.tagRead = t;
+      if (pack.stage === 'item' && t.style === pack.style) { pack.tagRead = null; pack.lastTag.where = 'item'; return act['tag-use'](); }
       if (pack.stage !== 'style') return;
       const i = $('#k-style'); if (i) { i.value = t.style; act['check-style'](); }
       return;
@@ -2728,6 +2741,17 @@ const act = {
       } catch (e) { packFail(e); }
     });
   },
+  'same-color'(){
+    const le = pack.lastEntry; if (!le) return;
+    Object.assign(pack, { id: uuid(), ids: null, photo: null, colors: null, err: '', justSaved: false, reuse: { path: le.path }, runPath: null, tagNote: '', tagStatus: '',
+      form: { type: le.type, brand: le.brand, gender: le.gender, season: le.season, color: le.color, tag: '', sizes: [], more: [] },
+      saved: `Same photo and color (${le.color}). Tap the next sizes going into ${bCode(pack.box)} and type how many.` });
+    render(); const sz = $('.sizechips'); if (sz) sz.scrollIntoView({ block: 'center' }); else scrollTo(0, 0);
+  },
+  'next-color'(){
+    Object.assign(pack, { justSaved: false, runPath: null, saved: `Next color of ${pack.style}: take its photo, then read its tag.` });
+    render(); const w = $('#k-photo-wrap'); if (w) w.scrollIntoView({ block: 'center' });
+  },
   async 'continue-box'(){
     const cur = pack.box, le = pack.lastEntry; if (!cur || !le) return;
     await withBusy('Starting the next box', async () => {
@@ -3202,7 +3226,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.44';
+const APP_VERSION = '2026-11-23.45';
 let newVersion = false;
 async function checkVersion(){
   try {
