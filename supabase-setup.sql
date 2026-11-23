@@ -761,3 +761,97 @@ end;
 $$;
 drop trigger if exists passkeys_follow_staff on packout_private.staff;
 create trigger passkeys_follow_staff after update on packout_private.staff for each row execute function packout_private.passkeys_follow_staff();
+-- 9. People who can pack and edit but not delete (for example a Guest login for managers).
+alter table packout_private.staff add column if not exists can_delete boolean not null default true;
+
+create or replace function public.packout_can_delete()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select public.packout_can_write()
+     and coalesce((select s.can_delete from packout_private.staff s where s.name = packout_private.session_name()), true);
+$$;
+revoke all on function public.packout_can_delete() from public;
+grant execute on function public.packout_can_delete() to anon, authenticated;
+
+-- Deleting: items, pallets and settings need delete rights. An empty style claim or an empty box
+-- may still be tidied away by anyone who can write (moving and renaming styles do this).
+do $$
+declare t text;
+begin
+  foreach t in array array['pallets', 'items', 'settings'] loop
+    execute format('drop policy if exists "packout %s remove" on public.%I', t, t);
+    execute format('create policy "packout %s remove" on public.%I for delete to anon, authenticated using (public.packout_can_delete())', t, t);
+  end loop;
+end $$;
+drop policy if exists "packout styles remove" on public.styles;
+create policy "packout styles remove" on public.styles for delete to anon, authenticated
+  using (public.packout_can_delete() or (public.packout_can_write() and not exists (select 1 from public.items i where i.style_number = styles.style_number)));
+drop policy if exists "packout boxes remove" on public.boxes;
+create policy "packout boxes remove" on public.boxes for delete to anon, authenticated
+  using (public.packout_can_delete() or (public.packout_can_write() and not exists (select 1 from public.items i where i.box_id = boxes.id)));
+drop policy if exists "packout photos delete" on storage.objects;
+create policy "packout photos delete" on storage.objects
+  for delete to anon, authenticated using (bucket_id = 'item-photos' and public.packout_can_delete());
+
+-- Sign-in answers say whether this person may delete.
+create or replace function public.packout_login(p_name text, p_pin text)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare st packout_private.staff; v_token text;
+begin
+  if not packout_private.team_ok() then raise exception 'NOT_TEAM' using errcode = '42501'; end if;
+  select * into st from packout_private.staff where name = p_name for update;
+  if not found or not st.active then raise exception 'NO_NAME'; end if;
+  if st.failed >= 5 then raise exception 'LOCKED'; end if;
+  if st.pin_hash <> extensions.crypt(coalesce(p_pin, ''), st.pin_hash) then
+    update packout_private.staff set failed = failed + 1 where name = p_name;
+    return jsonb_build_object('ok', false, 'left', greatest(0, 4 - st.failed));
+  end if;
+  update packout_private.staff set failed = 0 where name = p_name;
+  v_token := encode(extensions.gen_random_bytes(32), 'hex');
+  insert into packout_private.sessions (token_hash, name) values (encode(extensions.digest(v_token, 'sha256'), 'hex'), p_name);
+  return jsonb_build_object('ok', true, 'token', v_token, 'name', st.name, 'owner', st.is_owner, 'del', st.can_delete);
+end;
+$$;
+create or replace function public.packout_whoami()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select case when n is null then null else (select jsonb_build_object('name', s.name, 'owner', s.is_owner, 'del', s.can_delete) from packout_private.staff s where s.name = n) end
+    from (select packout_private.session_name() as n) q;
+$$;
+create or replace function public.packout_passkey_finish(p_cred_id text, p_challenge text)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare st packout_private.staff; v_token text;
+begin
+  delete from packout_private.passkey_challenges where challenge = p_challenge and created_at > now() - interval '5 minutes';
+  if not found then raise exception 'EXPIRED'; end if;
+  select s.* into st from packout_private.passkeys k join packout_private.staff s on s.name = k.name where k.cred_id = p_cred_id;
+  if not found then raise exception 'NO_KEY'; end if;
+  if not st.active then raise exception 'NO_NAME'; end if;
+  if st.failed >= 5 then raise exception 'LOCKED'; end if;
+  update packout_private.passkeys set last_used = now() where cred_id = p_cred_id;
+  v_token := encode(extensions.gen_random_bytes(32), 'hex');
+  insert into packout_private.sessions (token_hash, name) values (encode(extensions.digest(v_token, 'sha256'), 'hex'), st.name);
+  return jsonb_build_object('ok', true, 'token', v_token, 'name', st.name, 'owner', st.is_owner, 'del', st.can_delete);
+end;
+$$;
+revoke all on function public.packout_passkey_finish(text, text) from public, anon, authenticated;
+grant execute on function public.packout_passkey_finish(text, text) to service_role;
+
+-- Owner: see and switch delete rights.
+drop function if exists public.packout_staff_list();
+create function public.packout_staff_list()
+returns table (name text, is_owner boolean, active boolean, locked boolean, phones bigint, can_delete boolean)
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform packout_private.require_owner();
+  return query select s.name, s.is_owner, s.active, s.failed >= 5, (select count(*) from packout_private.sessions x where x.name = s.name), s.can_delete
+                 from packout_private.staff s order by s.is_owner desc, s.name;
+end;
+$$;
+create or replace function public.packout_staff_delete_rights(p_name text, p_can boolean)
+returns void language plpgsql volatile security definer set search_path = '' as $$
+begin
+  perform packout_private.require_owner();
+  update packout_private.staff set can_delete = p_can where name = p_name and not is_owner;
+end;
+$$;
+revoke all on function public.packout_staff_list(), public.packout_staff_delete_rights(text, boolean) from public;
+grant execute on function public.packout_staff_list(), public.packout_staff_delete_rights(text, boolean) to anon, authenticated;

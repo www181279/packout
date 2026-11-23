@@ -318,10 +318,10 @@ body.signing #view{max-width:440px;padding:0 20px}
 .irow .szl{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .irow .szw{display:none}
 @media (min-width:980px){
-  .irow{grid-template-columns:64px 160px 1.2fr 1fr 1fr 1fr 1fr 120px 64px}
+  .irow{grid-template-columns:64px minmax(180px,1.6fr) 1fr 1fr .8fr .7fr 110px 64px}
   .irow .wide{display:block;font-size:15px}
-  .irow .mid>.d,.irow .szl{display:none}
-  .irow .wide.szw{display:flex;flex-wrap:wrap;gap:4px}
+  .irow .mid>.d{display:none}
+  .irow .wide.szw,.irow .wide.wt,.irow .wide.tg{display:none}
   .irow .lc{display:none}
   .irow .loc em{font-size:24px}
 }
@@ -350,8 +350,9 @@ body.signing #view{max-width:440px;padding:0 20px}
 .deskonly{display:none}
 .ihead{display:none}
 @media (min-width:1100px){
-  body.shell{background:#EEF1F4}
-  body.shell #top{position:fixed;left:0;top:0;bottom:0;width:236px;flex-direction:column;align-items:stretch;gap:0;padding:26px 18px 18px;z-index:30;
+  body.shell{background:#EEF1F4;--sb:236px}
+  @media (max-width:1279px){body.shell{--sb:204px}}
+  body.shell #top{position:fixed;left:0;top:0;bottom:0;width:var(--sb);flex-direction:column;align-items:stretch;gap:0;padding:26px 18px 18px;z-index:30;
     background:linear-gradient(180deg,#14233F 0%,#101C33 100%)}
   body.shell #top .name{font-size:30px;padding:0 10px}
   body.shell #sync{padding:6px 10px 0;font-size:13px}
@@ -361,7 +362,7 @@ body.signing #view{max-width:440px;padding:0 20px}
   body.shell #top .who b::before{content:attr(data-i);width:34px;height:34px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--placard);color:var(--ink);font:700 16px/1 var(--sign)}
   body.shell #help{order:4;position:static;align-self:flex-start;margin:8px 10px 0;width:auto;height:auto;border:0;background:none;color:#93A2BB;font-size:14px;padding:0}
   body.shell #help::after{content:" How to use Packout"}
-  body.shell #nav{position:fixed;left:0;top:118px;bottom:auto;width:236px;z-index:31;background:none;border:0;display:flex;flex-direction:column;gap:2px;padding:0 14px}
+  body.shell #nav{position:fixed;left:0;top:118px;bottom:auto;width:var(--sb);z-index:31;background:none;border:0;display:flex;flex-direction:column;gap:2px;padding:0 14px}
   body.shell #nav button{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:10px;font-size:16px;font-weight:500;color:#B6C1D3;position:relative}
   body.shell #nav button:hover{background:rgba(255,255,255,.06);color:#fff}
   body.shell #nav svg{width:22px;height:22px}
@@ -371,15 +372,14 @@ body.signing #view{max-width:440px;padding:0 20px}
   body.shell #nav [data-tab=pack]{display:none}
   body.shell #nav [data-tab=inventory]{order:-1}
   body.shell #help{display:none}
-  body.shell #view,body.shell #view.wide{margin:0 0 0 236px;max-width:none;padding:34px 44px 60px}
-  body.shell #view > *{max-width:1280px}
+  body.shell #view,body.shell #view.wide{margin:0 0 0 var(--sb);max-width:none;padding:clamp(24px,2.4vw,44px) clamp(24px,3vw,56px) 60px}
   body.shell .h{font-size:40px;margin:0 0 6px}
   body.shell .lead{font-size:16px;max-width:760px}
   body.shell .panel{border-radius:14px;padding:22px;border-color:#DCE2E8;box-shadow:0 1px 2px rgba(19,33,58,.04)}
   body.shell .deskonly{display:block}
   body.shell .btn{cursor:pointer}
   body.shell .row .btn{width:auto;flex:none;padding:0 20px}
-  body.shell #toast{bottom:24px;left:236px}
+  body.shell #toast{bottom:24px;left:var(--sb)}
   body.shell .savebar{bottom:0;margin:0;border-radius:12px 12px 0 0}
   body.shell .trail{top:0;margin:0 0 14px;border-radius:12px;border:1px solid var(--line);padding:10px 14px}
 
@@ -401,7 +401,7 @@ body.signing #view{max-width:440px;padding:0 20px}
   .kpis b{display:block;font:700 28px/1 var(--sign);color:#fff;margin-bottom:2px}
 
   /* pallets */
-  body.shell .pgrid{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+  body.shell .pgrid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
   body.shell .ptile{padding:18px 20px 16px;border-radius:14px;min-height:120px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;transition:transform .12s,box-shadow .12s}
   body.shell .ptile:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(19,33,58,.14)}
   body.shell .ptile .code{font-size:46px}
@@ -418,20 +418,35 @@ body.signing #view{max-width:440px;padding:0 20px}
   body.shell .totals div{padding:16px 8px;font-size:14px}
   body.shell .totals b{font-size:36px}
   body.shell .tools input{min-height:48px}
-  body.shell .ihead{display:grid;grid-template-columns:56px 210px 1fr 1fr .7fr .6fr 2fr 110px 70px;gap:14px;padding:4px 14px 8px 10px;font-size:12px;font-weight:600;color:var(--ink2);text-transform:none}
+  body.shell .ihead{display:grid;grid-template-columns:56px minmax(140px,200px) minmax(80px,.9fr) minmax(80px,1fr) minmax(90px,1fr) minmax(60px,.7fr) minmax(56px,.6fr) minmax(140px,1.1fr) minmax(220px,2fr) 96px 64px;gap:12px;padding:4px 14px 8px 10px;font-size:12px;font-weight:600;color:var(--ink2)}
   body.shell #inv-list{background:#fff;border:1px solid #DCE2E8;border-radius:14px;overflow:hidden}
-  body.shell #inv-list .irow{grid-template-columns:56px 210px 1fr 1fr .7fr .6fr 2fr 110px 70px;gap:14px;margin:0;border:0;border-bottom:1px solid #EDF0F3;border-radius:0;padding:8px 14px 8px 10px;cursor:pointer}
+  body.shell #inv-list .irow{grid-template-columns:56px minmax(140px,200px) minmax(80px,.9fr) minmax(80px,1fr) minmax(90px,1fr) minmax(60px,.7fr) minmax(56px,.6fr) minmax(140px,1.1fr) minmax(220px,2fr) 96px 64px;gap:12px;margin:0;border:0;border-bottom:1px solid #EDF0F3;border-radius:0;padding:8px 14px 8px 10px;cursor:pointer}
+  body.shell #inv-list .irow .tp{display:none}
+  body.shell #inv-list .irow .tg{font-size:14px;font-variant-numeric:tabular-nums;word-break:break-all}
+  body.shell #inv-list .irow .tg small{display:block;color:var(--ink2);font-size:12px}
+  body.shell #inv-list .irow .tg .upc{display:flex;gap:6px;font-size:13px;line-height:1.45;white-space:nowrap}
+  body.shell #inv-list .irow .tg .upc i{font-style:normal;font-weight:600;color:var(--ink2);min-width:18px}
   body.shell #inv-list .irow:hover{background:#F6F8FA}
   body.shell #inv-list .irow img,body.shell #inv-list .irow .noimg{width:56px;height:56px;border-radius:8px}
-  body.shell #inv-list .irow .szl,body.shell #inv-list .irow .mid>.d,body.shell #inv-list .irow .lc{display:none}
+  body.shell #inv-list .irow .mid>.szl,body.shell #inv-list .irow .mid>.d,body.shell #inv-list .irow .lc{display:none}
   body.shell #inv-list .irow .wide{display:block;font-size:15px}
+  body.shell #inv-list .irow .wide.wt,body.shell #inv-list .irow .wide.tg{display:block}
   body.shell #inv-list .irow .wide.szw{display:flex;flex-wrap:wrap;gap:4px}
   body.shell #inv-list .irow .st{font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  @media (max-width:1599px){
+    body.shell .ihead,body.shell #inv-list .irow{grid-template-columns:56px minmax(140px,190px) minmax(80px,.9fr) minmax(70px,1fr) minmax(90px,1fr) minmax(140px,1.1fr) minmax(210px,2fr) 92px 60px}
+    body.shell .ihead>:is(:nth-child(6),:nth-child(7)),body.shell #inv-list .irow>.wide:is(:nth-child(6),:nth-child(7)){display:none}
+  }
+  @media (max-width:1399px){
+    body.shell .ihead,body.shell #inv-list .irow{grid-template-columns:56px minmax(110px,180px) minmax(70px,1fr) minmax(70px,1fr) minmax(122px,1fr) minmax(160px,2fr) 76px 64px;gap:10px}
+    body.shell .ihead>:nth-child(3),body.shell #inv-list .irow>.wide.wt{display:none}
+    body.shell #inv-list .irow .tp{display:block}
+  }
   body.shell #inv-list > .btn{margin:12px;width:calc(100% - 24px)}
   body.shell #inv-list .empty{margin:0;border:0}
 
   /* export: panels side by side */
-  body.shell .xgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+  body.shell .xgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:18px;align-items:start}
   body.shell .xgrid .panel{margin:0}
 }
 @media (min-width:700px){#sheet{align-items:center}#sheet .card{border-radius:16px}}
@@ -942,7 +957,7 @@ async function checkStaff(){
   staff = 'checking';
   try {
     const w = await rpc('packout_whoami', {});
-    if (w && w.name) { me = { name: w.name, owner: !!w.owner }; store.set('me', me); staff = 'in'; return; }
+    if (w && w.name) { me = { name: w.name, owner: !!w.owner, del: w.del !== false }; store.set('me', me); staff = 'in'; return; }
     const names = await rpc('packout_staff_names', {});
     staffNames = (names || []).map(n => typeof n === 'string' ? n : Object.values(n)[0]);
     if (staffNames.length) { staff = 'out'; me = null; store.del('me'); if (cfg.session) { delete cfg.session; store.set('cfg', cfg); } }
@@ -1000,10 +1015,11 @@ async function staffSheet(){
   try {
     const rows = await rpc('packout_staff_list', {});
     if ($('#st-list')) $('#st-list').innerHTML = rows.map(r => `<div class="staffrow">
-      <div><b>${esc(r.name)}</b>${r.is_owner ? ' <span class="badge">Owner</span>' : ''}<br><span class="small muted">${!r.active ? 'Turned off' : r.locked ? 'Locked after 5 wrong PINs' : r.phones ? `Signed in on ${plural(r.phones, 'phone')}` : 'Not signed in yet'}</span></div>
+      <div><b>${esc(r.name)}</b>${r.is_owner ? ' <span class="badge">Owner</span>' : ''}<br><span class="small muted">${!r.active ? 'Turned off' : r.locked ? 'Locked after 5 wrong PINs' : r.phones ? `Signed in on ${plural(r.phones, 'phone')}` : 'Not signed in yet'}${r.can_delete === false ? ' · <b>Cannot delete</b>' : ''}</span></div>
       <div class="row">
         ${r.locked && r.active ? `<button class="btn sm" data-act="staff-unlock" data-n="${esc(r.name)}">Unlock</button>` : ''}
         <button class="btn alt sm" data-act="staff-pin" data-n="${esc(r.name)}">New PIN</button>
+        ${r.is_owner || r.can_delete == null ? '' : `<button class="btn quiet sm" data-act="staff-del" data-n="${esc(r.name)}" data-v="${r.can_delete ? '0' : '1'}">${r.can_delete ? 'No deleting' : 'Allow deleting'}</button>`}
         ${r.is_owner ? '' : `<button class="btn ${r.active ? 'danger' : 'alt'} sm" data-act="staff-active" data-n="${esc(r.name)}" data-v="${r.active ? '0' : '1'}">${r.active ? 'Turn off' : 'Turn on'}</button>`}
       </div></div>`).join('');
   } catch (e) { if ($('#st-list')) $('#st-list').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
@@ -1207,7 +1223,7 @@ function palletDetailHTML(p){
   </div></div>
   ${canEdit() ? `<div class="row" style="margin-bottom:12px">
     <button class="btn alt sm" data-act="toggle-pallet" data-id="${p.id}">${p.status === 'open' ? 'Close pallet' : 'Reopen pallet'}</button>
-    ${!boxes.length && !styles.length ? `<button class="btn danger sm" data-act="del-pallet" data-id="${p.id}">Delete</button>` : ''}
+    ${!boxes.length && !styles.length && canDelete() ? `<button class="btn danger sm" data-act="del-pallet" data-id="${p.id}">Delete</button>` : ''}
   </div>` : ''}
   ${boxes.length ? `<div class="row" style="margin-bottom:12px">
     <button class="btn quiet sm" data-act="print-sheets" data-id="${p.id}">Print breakdown</button>
@@ -1219,7 +1235,7 @@ function palletDetailHTML(p){
     <div class="panel"><div class="boxhead"><span class="code">${bCode(b.id)}</span>
       <span class="muted small">${plural(sumQty(bi), 'piece')}, by ${esc(b.created_by)}</span>
       ${b.status === 'closed' ? '<span class="badge closed">Closed</span>' : ''}
-      ${canEdit() ? `<button class="linkbtn small" style="margin-left:auto" data-act="${bi.length ? 'toggle-box' : 'del-box'}" data-id="${b.id}">${bi.length ? (b.status === 'open' ? 'Close box' : 'Reopen box') : 'Delete empty box'}</button>` : '<span style="margin-left:auto"></span>'}
+      ${canEdit() ? `<button class="linkbtn small" style="margin-left:auto" data-act="${bi.length || !canDelete() ? 'toggle-box' : 'del-box'}" data-id="${b.id}">${bi.length || !canDelete() ? (b.status === 'open' ? 'Close box' : 'Reopen box') : 'Delete empty box'}</button>` : '<span style="margin-left:auto"></span>'}
       ${bi.length ? `<button class="linkbtn small" data-act="print-labels" data-box="${b.id}">Print label</button>` : ''}</div>
       ${bi.length ? `<ul class="lines">${bi.map(i => `<li><span><b>${esc(i.style_number)}</b> ${esc(i.color)}${i.size ? ', ' + esc(i.size) : ''}<br><span class="muted small">${esc([i.item_type, i.brand].filter(Boolean).join(', '))}</span></span><span class="n">${nf(i.quantity)}</span></li>`).join('')}</ul>` : ''}
     </div>`; }).join('') || `<div class="empty"><b>No boxes on this pallet yet</b></div>`}</div>`;
@@ -1260,7 +1276,7 @@ function inventoryHTML(){
   <div class="tools"><input id="inv-q" type="search" placeholder="Search style, color, brand, tag, pallet" value="${esc(filt.q)}" aria-label="Search inventory">
     <button class="btn alt" data-act="open-filters">Filter</button><button class="btn alt" data-act="inv-export" aria-label="Export this list">Export</button></div>
   <div id="inv-chips" class="fchips"></div>
-  <div class="ihead" aria-hidden="true"><span>Photo</span><span>Style</span><span>Color</span><span>Brand</span><span>Gender</span><span>Season</span><span>Sizes</span><span>Where</span><span style="text-align:right">Pieces</span></div>
+  <div class="ihead" aria-hidden="true"><span>Photo</span><span>Style</span><span>Type</span><span>Color</span><span>Brand</span><span>Gender</span><span>Season</span><span>UPC barcode</span><span>Sizes</span><span>Where</span><span style="text-align:right">Pieces</span></div>
   <div id="inv-list"></div>`;
 }
 function renderInvList(){
@@ -1281,7 +1297,7 @@ function renderInvList(){
         <span class="mid"><span class="st">${esc(i.style_number)}</span>${i.item_type ? `<span class="tp">${esc(i.item_type)}</span>` : ''}
           <span class="d">${esc(i.color)}, ${esc(i.brand)}</span><span class="d">${esc(i.gender)}, ${esc(i.season)}</span>
           <span class="szl">${sizeLineHTML(g)}</span></span>
-        <span class="wide">${esc(i.color)}</span><span class="wide">${esc(i.brand)}</span><span class="wide">${esc(i.gender)}</span><span class="wide">${esc(i.season)}</span><span class="wide szw">${sizeLineHTML(g)}</span>
+        <span class="wide wt">${esc(i.item_type || '')}</span><span class="wide">${esc(i.color)}</span><span class="wide">${esc(i.brand)}</span><span class="wide">${esc(i.gender)}</span><span class="wide">${esc(i.season)}</span><span class="wide tg">${tagsText(g)}</span><span class="wide szw">${sizeLineHTML(g)}</span>
         <span class="loc wide" style="text-align:left">${locText(g)}</span>
         <span class="loc"><span class="lc">${locText(g)}</span><em>${nf(g.qty)}<u>pcs</u></em></span>
       </button>` }; });
@@ -1308,6 +1324,13 @@ function patchList(box, rows){
     prev = el;
   });
   old.forEach(el => el.remove());
+}
+// tag numbers of a row: one per size can differ, so show the first and how many more
+function tagsText(g){
+  const seen = new Set(), t = [...g.items].sort((a, b) => bySize(a.size, b.size)).filter(i => i.tag_number && !seen.has(i.tag_number) && seen.add(i.tag_number));
+  if (!t.length) return '<span class="muted">—</span>';
+  const show = t.slice(0, 3).map(i => `<span class="upc">${t.length > 1 && i.size ? `<i>${esc(i.size)}</i>` : ''}${esc(i.tag_number)}</span>`).join('');
+  return show + (t.length > 3 ? `<small>+${t.length - 3} more</small>` : '');
 }
 // one row per style and color; the sizes are shown together in that row
 function groupItems(list){
@@ -1379,7 +1402,7 @@ function itemSheet(id, edit){
     <label class="f" for="e-season">Season</label>${sel('e-season', SEASONS, i.season)}
     <div id="e-err"></div>
     <div class="row" style="margin-top:18px"><button class="btn alt" data-act="open-item" data-id="${i.id}">Cancel</button><button class="btn" data-act="save-edit" data-id="${i.id}">Save changes</button></div>
-    <button class="btn danger" data-act="del-item" data-id="${i.id}" style="margin-top:10px">Delete this item</button>`);
+    ${canDelete() ? `<button class="btn danger" data-act="del-item" data-id="${i.id}" style="margin-top:10px">Delete this item</button>` : ''}`);
 }
 
 function colorRunHTML(path){
@@ -1618,7 +1641,8 @@ function readingSteps(){
 }
 
 /* ---------- optional Face ID: locks the app on this phone; the person unlocks it with their face ---------- */
-const faceIdAvailable = async () => !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
+// Face ID is for phones only: a computer never offers or asks for it.
+const faceIdAvailable = async () => !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext) && matchMedia('(pointer:coarse)').matches;
 const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 const rnd = n => crypto.getRandomValues(new Uint8Array(n));
@@ -1640,7 +1664,7 @@ async function faceIdTurnOn(){
   } catch (e) { if (e && e.name !== 'NotAllowedError') toast('Face ID could not be turned on: ' + e.message, 'bad'); }
 }
 function lockNow(){
-  if (!faceId() || staff === 'out' || cfg.view) return;
+  if (!faceSupported || !faceId() || staff === 'out' || cfg.view) return;
   $('#lock-who').textContent = 'Welcome back, ' + me.name; $('#lock-err').textContent = ''; $('#lock').hidden = false; lockedAt = Date.now();
   setTimeout(faceIdUnlock, 300);      // ask for the face straight away; the button stays for a second try
 }
@@ -1783,7 +1807,7 @@ async function runOcr(file){
 
 /* ---------- Face ID sign-in on this phone ---------- */
 // When Face ID is the chosen way for the person on screen, start it straight away.
-function autoFace(){ const f = faceSaved(); if (f && f.name === signinPick && signinMode !== 'pin' && staff === 'out') faceIdSignIn(true); }
+function autoFace(){ if (!faceSupported) return; const f = faceSaved(); if (f && f.name === signinPick && signinMode !== 'pin' && staff === 'out') faceIdSignIn(true); }
 // Fetch the one-time challenge ahead of time, so a tap goes straight to Face ID (iPhone wants it right after the tap).
 let faceCh = null;
 function prefetchFaceChallenge(){
@@ -1817,7 +1841,7 @@ async function faceIdSignIn(auto){
 async function signedIn(r){
   cfg.session = r.token; store.set('cfg', cfg); store.set('lastName', r.name);
   const fid = store.get('faceid'); if (fid && fid.name !== r.name) store.del('faceid');
-  me = { name: r.name, owner: !!r.owner }; store.set('me', me); staff = 'in'; signinErr = ''; signinPick = '';
+  me = { name: r.name, owner: !!r.owner, del: r.del !== false }; store.set('me', me); staff = 'in'; signinErr = ''; signinPick = '';
   await refresh(); render(); startLive();
   if (!store.get('seenGuide')) { store.set('seenGuide', 1); guideSheet(true); }
   else if (faceSupported && !faceId() && !store.get('faceidAsk:' + r.name)) { store.set('faceidAsk:' + r.name, 1); faceOffer(); }
@@ -1830,7 +1854,7 @@ function faceOffer(){
 }
 function accountSheet(){
   openSheet(`<h2>${esc(me.name)}</h2>
-    ${!faceSupported ? `<p class="lead">Face ID sign-in isn't available in this browser. Open Packout from its home-screen icon, or in Safari.</p>`
+    ${!faceSupported ? (matchMedia('(pointer:coarse)').matches ? `<p class="lead">Face ID sign-in isn't available in this browser. Open Packout from its home-screen icon, or in Safari.</p>` : '')
       : faceId() ? `<p class="lead"><b>Face ID sign-in is on</b> for this phone.</p><button class="btn quiet" data-act="faceid-off">Turn off Face ID</button>`
       : `<p class="lead">Sign in with your face on this phone instead of typing your PIN.</p><button class="btn" data-act="faceid-on">Use Face ID</button>`}
     <button class="btn quiet" data-act="sign-out">Sign out</button>
@@ -1873,7 +1897,7 @@ function styleSheet(st){
       <dt>Colors</dt><dd>${esc([...new Set(its.map(i => i.color))].join(', ') || 'None yet')}</dd><dt>Sizes</dt><dd>${esc(sizesOf(its).join(', ') || 'None yet')}</dd><dt>Started by</dt><dd>${esc(s.created_by)}</dd></dl>
     <button class="btn" data-act="move-style" data-style="${esc(st)}">Move to another pallet</button>
     <button class="btn alt" data-act="edit-style" data-style="${esc(st)}">Edit style</button>
-    <button class="btn danger" data-act="del-style" data-style="${esc(st)}">Delete style</button>
+    ${canDelete() ? `<button class="btn danger" data-act="del-style" data-style="${esc(st)}">Delete style</button>` : ''}
     <button class="btn quiet" data-act="close-sheet">Done</button>`);
 }
 function moveSheet(st){
@@ -2055,6 +2079,7 @@ const b64json = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
 const joinHash = withName => '#join=' + b64json({ u: cfg.url, k: cfg.key, ...(cfg.team ? { t: cfg.team } : {}), ...(withName && me ? { n: me.name } : {}) });
 const viewLink = () => location.origin + location.pathname + '#view=' + b64json({ u: cfg.url, k: cfg.key });
 const canEdit = () => !!cfg && !cfg.view;
+const canDelete = () => canEdit() && !(me && me.del === false);      // a Guest login can pack and edit, but not delete
 const isDenied = e => e && (e.code === '42501' || /row-level security|permission denied/i.test(e.message || ''));
 const DENIED_MSG = 'This phone is not allowed to make changes. Sign in again, or open the team link from Avigdor.';
 const fileStamp = () => new Date().toISOString().slice(0, 10);
@@ -2181,6 +2206,7 @@ const act = {
     try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_pin: pin }); showPin(el.dataset.n, pin); } catch (e) { toast(e.message, 'bad'); }
   },
   async 'staff-unlock'(el){ try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_unlock: true }); staffSheet(); } catch (e) { toast(e.message, 'bad'); } },
+  async 'staff-del'(el){ try { await rpc('packout_staff_delete_rights', { p_name: el.dataset.n, p_can: el.dataset.v === '1' }); staffSheet(); } catch (e) { toast(e.message, 'bad'); } },
   async 'staff-active'(el){ try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_active: el.dataset.v === '1' }); staffSheet(); } catch (e) { toast(e.message, 'bad'); } },
   disconnect(){
     openSheet(`<h2>Disconnect this phone?</h2><p class="lead">Nothing is deleted from the database. This phone will need the invite link again.</p>
@@ -2707,7 +2733,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.29';
+const APP_VERSION = '2026-11-22.31';
 let newVersion = false;
 async function checkVersion(){
   try {
