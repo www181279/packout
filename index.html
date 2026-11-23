@@ -572,15 +572,26 @@ button.rolep{cursor:pointer}button.rolep:hover{filter:brightness(.95)}
   body.shell #inv-list .empty{margin:0;border:0}
 
   /* settings: title on the left, rows on the right */
-  body.shell .sset{display:grid;grid-template-columns:minmax(200px,300px) minmax(0,920px);gap:32px;margin-bottom:34px;align-items:start}
-  body.shell .sset header{padding-top:6px}
-  body.shell .sprof{grid-template-columns:auto 1fr auto;padding:24px 28px;max-width:1252px}
+  body.shell .sprof{grid-template-columns:auto 1fr auto;padding:24px 28px}
+  body.shell .sgrid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(340px,1fr);gap:22px 26px;align-items:start}
+  body.shell .sgrid>.sset{margin:0}
+  body.shell #s-team{grid-row:span 3}
+  body.shell .sgrid>.sset:only-child{grid-column:1/-1}
+  body.shell .sset header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin-bottom:10px}
+  body.shell .sset header h2{margin:0}
+  body.shell .sset header p{flex-basis:100%;margin:0}
+  body.shell .scount{order:1;margin:0}
+  body.shell #s-team .srow.st{padding:12px 16px}
+  @media (max-width:1349px){body.shell .sgrid{grid-template-columns:minmax(0,1fr)}body.shell #s-team{grid-row:auto}}
   body.shell .spa{grid-column:auto}
   /* export: report on the left, downloads beside it, printing below */
-  body.shell .xwrap{grid-template-columns:minmax(320px,420px) minmax(0,1fr);gap:20px;align-items:start;max-width:1280px}
-  body.shell .xbuild{grid-row:span 2;position:sticky;top:24px}
+  body.shell .xwrap{grid-template-columns:minmax(320px,400px) minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+  body.shell .xbuild{grid-row:auto}
+  @media (max-width:1499px){body.shell .xwrap{grid-template-columns:minmax(320px,400px) minmax(0,1fr)}body.shell .xbuild{grid-row:span 2}}
+  body.shell .xbuild{position:sticky;top:24px}
   body.shell .xcard{padding:24px}
-  body.shell .xprints{grid-template-columns:1fr 1fr}
+  body.shell .xprints{grid-template-columns:1fr}
+  @media (max-width:1499px){body.shell .xprints{grid-template-columns:1fr 1fr}}
   /* export: panels side by side */
   body.shell .xgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:18px;align-items:start}
   body.shell .xgrid .panel{margin:0}
@@ -2169,6 +2180,7 @@ function settingsHTML(){
       <small>${cfg.view ? 'You can look at everything, but not change anything.' : owner ? 'Full control: people, settings, exports and everything packed.' : me.del === false ? 'You can pack new items and export. Saved items can\'t be changed or deleted.' : 'You can pack, edit and move items.'}</small></div>
     <div class="spa">${staff === 'in' && faceSupported ? (faceId() ? `<button class="btn sm ghost" data-act="faceid-off">${FACE_SVG}Face ID on</button>` : `<button class="btn sm ghost" data-act="faceid-on">${FACE_SVG}Turn on Face ID</button>`) : ''}
       ${canEdit() && staff === 'in' ? `<button class="btn sm ghost" data-act="sign-out">Sign out</button>` : ''}</div></section>`;
+  h += '<div class="sgrid">';
   if (owner) {
     h += sec('s-team', 'Team', 'Everyone who can sign in. Guests can pack new items and export, but can\'t edit, delete or change settings. Several people can share one login.',
       `<div id="st-list" class="stlist"><p class="muted small" style="padding:16px">Loading</p></div>
@@ -2187,7 +2199,7 @@ function settingsHTML(){
     (phone && !isStandalone() ? row(ic('M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2'), 'Add to home screen', 'Opens full screen like an app, without the address bar.', `<button class="btn alt sm" data-act="install">Show me how</button>`) : '')
     + row(ic('M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'), 'Access', cfg.view ? 'View only' : 'Team member access on this device', '')
     + row(ic('M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7'), 'Disconnect this device', 'Removes the team link from this device. Nothing is deleted.', `<button class="btn quiet sm danger-t" data-act="disconnect">Disconnect</button>`));
-  return h;
+  return h + '</div>';
 }
 async function settingsAfter(){
   if (!(me && me.owner) || cfg.view) return;
@@ -2970,7 +2982,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.37';
+const APP_VERSION = '2026-11-23.38';
 let newVersion = false;
 async function checkVersion(){
   try {
