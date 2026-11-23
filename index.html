@@ -1440,7 +1440,7 @@ function readingSteps(){
 }
 
 /* ---------- optional Face ID: locks the app on this phone; the person unlocks it with their face ---------- */
-const faceIdAvailable = async () => { try { return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch { return false; } };
+const faceIdAvailable = async () => !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
 const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
 const rnd = n => crypto.getRandomValues(new Uint8Array(n));
@@ -1609,6 +1609,7 @@ function guideSheet(first){
       <li><b class="n">4</b><span><strong>When a box is full</strong>After saving, tap <em>Same color, next box</em> to keep going with the same photo, or <em>Box full</em> at the top. Write the new box number on the box. <em>Next style</em> when the style is done.</span></li>
     </ol>
     <p class="small muted" style="margin-bottom:12px">Tap the ? at the top to see this again.</p>
+    ${staff === 'in' && faceSupported && !faceId() ? `<div class="faceid" style="margin-bottom:12px"><span><b>Face ID</b> (optional): open the app on this phone with your face.</span><button class="btn alt sm" data-act="faceid-on">Turn on</button></div>` : ''}
     <button class="btn" data-act="close-sheet" autofocus>${first ? 'Start packing' : 'Got it'}</button>`);
 }
 const QR_LIB = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
@@ -1734,7 +1735,9 @@ function moreHTML(){
     <button class="btn" data-act="join-code">Show join code</button>
     <button class="btn alt" data-act="invite">Share invite link</button></div>` : ''}
   <div class="panel"><h2>This phone</h2>
-    ${staff === 'in' && faceSupported ? `<div class="faceid">${faceId()
+    ${staff === 'in' ? `<div class="faceid">${!faceSupported
+      ? `<span><b>Face ID</b> isn't available in this browser. Open Packout from its home-screen icon, or in Safari, and look here again.</span>`
+      : faceId()
       ? `<span><b>Face ID is on.</b> The app asks for it when you open it.</span><button class="btn quiet sm" data-act="faceid-off">Turn off</button>`
       : `<span><b>Face ID</b> (optional): lock the app on this phone and open it with your face.</span><button class="btn alt sm" data-act="faceid-on">Turn on</button>`}</div>` : ''}
     <dl class="facts"><dt>Name</dt><dd>${esc(me.name)}</dd><dt>Access</dt><dd>${cfg.view ? 'View only' : cfg.team ? 'Team (can pack)' : 'Team'}</dd><dt>Database</dt><dd style="word-break:break-all">${esc(cfg.url.replace('https://', ''))}</dd></dl>
@@ -2474,7 +2477,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.22';
+const APP_VERSION = '2026-11-22.23';
 let newVersion = false;
 async function checkVersion(){
   try {
@@ -2497,7 +2500,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
       if (cfg && cfg.team) setTimeout(() => toast('This phone already has the team link, so the view-only link was not applied.', 'bad'), 800);
       else { cfg = { url: j.u, key: j.k, view: true }; store.set('cfg', cfg); }
     } } catch {} if (!isStandalone()) history.replaceState(null, '', location.pathname); }
-  if (cfg && !cfg.view) { staff = 'checking'; render(); await checkStaff(); faceSupported = await faceIdAvailable(); if (staff === 'in') lockNow(); }
+  if (cfg && !cfg.view) { faceSupported = await faceIdAvailable(); staff = 'checking'; render(); await checkStaff(); if (staff === 'in') lockNow(); }
   render();
   if (cfg && staff !== 'out') {
     if (await loadCache()) { render(); refresh(true).then(ok => { if (ok && !sheetOpen()) softRender(); }); }   // open instantly, then catch up quietly
