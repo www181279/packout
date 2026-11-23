@@ -368,6 +368,9 @@ body.signing #view{max-width:440px;padding:0 20px}
   body.shell #nav button[aria-current=page]{background:rgba(255,255,255,.1);color:#fff;font-weight:600}
   body.shell #nav button[aria-current=page]::before{content:"";position:absolute;left:-14px;top:9px;bottom:9px;width:4px;border-radius:0 4px 4px 0;background:var(--placard)}
   body.shell #nav button[aria-current=page] span{box-shadow:none}
+  body.shell #nav [data-tab=pack]{display:none}
+  body.shell #nav [data-tab=inventory]{order:-1}
+  body.shell #help{display:none}
   body.shell #view,body.shell #view.wide{margin:0 0 0 236px;max-width:none;padding:34px 44px 60px}
   body.shell #view > *{max-width:1280px}
   body.shell .h{font-size:40px;margin:0 0 6px}
@@ -904,8 +907,9 @@ function render(){
   $('#nav').style.gridTemplateColumns = cfg.view ? 'repeat(3,1fr)' : ''; $('#nav [data-tab=pack]').hidden = !!cfg.view;
   document.querySelectorAll('#nav button').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   validatePack();
-  v.innerHTML = tab === 'pack' && isDesk() ? `<div class="packgrid"><div class="packmain">${packHTML()}</div><aside class="packside">${recentHTML()}</aside></div>`
-    : ({ pack: packHTML, pallets: palletsHTML, inventory: inventoryHTML, more: moreHTML })[tab]();
+  if (tab === 'pack' && isDesk()) tab = 'inventory';      // packing happens on phones; the computer is for looking things up
+  document.querySelectorAll('#nav button').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+  v.innerHTML = ({ pack: packHTML, pallets: palletsHTML, inventory: inventoryHTML, more: moreHTML })[tab]();
   if (tab === 'pack' && pack.stage === 'item' && pack.photo && !$('#k-photo-wrap img')) showPhoto(pack.photo);
   if (tab === 'inventory') renderInvList();
   setBars();
@@ -2703,7 +2707,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.28';
+const APP_VERSION = '2026-11-22.29';
 let newVersion = false;
 async function checkVersion(){
   try {
