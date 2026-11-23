@@ -248,10 +248,23 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 @media (min-width:980px){
   .irow{grid-template-columns:64px 160px 1.2fr 1fr 1fr 1fr 1fr 120px 64px}
   .irow .wide{display:block;font-size:15px}
-  .irow .mid>.d{display:none}
+  .irow .mid>.d,.irow .szl{display:none}
+  .irow .wide.szw{display:flex;flex-wrap:wrap;gap:4px}
   .irow .lc{display:none}
   .irow .loc em{font-size:24px}
 }
+.irow .szl{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.irow .szl i,.irow .szw i{font-style:normal;font-size:13px;background:#EEF2F6;border-radius:5px;padding:2px 7px;white-space:nowrap}
+.irow .szl i b,.irow .szw i b{font-weight:700}
+.irow .szw{display:none}
+.szgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;margin-top:8px}
+.szgrid div{background:#fff;border:1px solid var(--line);border-radius:8px;text-align:center;padding:6px 4px}
+.szgrid b{display:block;font-size:15px}
+.szgrid span{font:700 22px var(--sign)}
+.glines{display:grid;gap:4px}
+.gline{display:grid;grid-template-columns:90px 70px 1fr 50px;gap:8px;align-items:center;text-align:left;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:15px}
+.gline b{text-align:right;font:700 20px var(--sign)}
+.gline span:nth-child(3){color:var(--ink2);font-size:13px;overflow:hidden;text-overflow:ellipsis}
 .empty{text-align:center;padding:36px 16px;color:var(--ink2)}
 .empty b{display:block;color:var(--ink);font-size:18px;margin-bottom:4px}
 
@@ -991,22 +1004,57 @@ function inventoryHTML(){
 }
 function renderInvList(){
   if (!$('#inv-list')) return;
-  const list = filtered();
+  const list = filtered(), groups = groupItems(list);
   $('#inv-totals').innerHTML = `<div class="totals"><div><b>${nf(sumQty(list))}</b>${unit(sumQty(list), 'piece')}</div><div><b>${nf(new Set(list.map(i => i.style_number)).size)}</b>${unit(new Set(list.map(i => i.style_number)).size, 'style')}</div>
     <div><b>${nf(new Set(list.map(i => i.box_id)).size)}</b>${unit(new Set(list.map(i => i.box_id)).size, 'box')}</div><div><b>${nf(new Set(list.map(i => i.pallet_id)).size)}</b>${unit(new Set(list.map(i => i.pallet_id)).size, 'pallet')}</div></div>`;
   const val = k => k === 'pallet' ? pCode(filt[k]) : k === 'box' ? bCode(filt[k]) : filt[k];
   $('#inv-chips').innerHTML = Object.keys(FLABEL).filter(k => filt[k]).map(k => `<button data-act="clear-filter" data-k="${k}" aria-label="Remove filter ${FLABEL[k]}">${k === 'pallet' || k === 'box' ? '' : FLABEL[k] + ': '}${esc(val(k))} &times;</button>`).join('');
   $('#inv-list').innerHTML = !data.items.length ? `<div class="empty"><b>Nothing packed yet</b>Items show up here the moment someone saves them.</div>`
     : !list.length ? `<div class="empty"><b>No items match</b>Change the search or remove a filter.</div>`
-    : list.slice(0, invLimit).map(i => `
-      <button class="irow" data-act="open-item" data-id="${i.id}">
+    : groups.slice(0, invLimit).map(g => { const i = g.first; return `
+      <button class="irow" data-act="open-group" data-k="${esc(g.key)}">
         ${i.photo_path ? `<img loading="lazy" alt="Enlarge photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(thumbUrl(i))}" data-act="zoom-photo" data-id="${i.id}">` : '<span class="noimg"></span>'}
-        <span class="mid"><span class="st">${esc(i.style_number)}</span>${i.item_type || i.size ? `<span class="tp">${esc([i.item_type, i.size && 'Size ' + i.size].filter(Boolean).join(', '))}</span>` : ''}
-          <span class="d">${esc(i.color)}, ${esc(i.brand)}</span><span class="d">${esc(i.gender)}, ${esc(i.season)}${i.tag_number ? ', tag ' + esc(i.tag_number) : ''}</span></span>
-        <span class="wide">${esc(i.color)}</span><span class="wide">${esc(i.brand)}</span><span class="wide">${esc(i.gender)}</span><span class="wide">${esc(i.season)}</span><span class="wide">${esc(i.tag_number || '')}</span>
-        <span class="loc wide" style="text-align:left">${pCode(i.pallet_id)}<br>${bCode(i.box_id)}</span>
-        <span class="loc"><span class="lc">${pCode(i.pallet_id)}<br>${bCode(i.box_id)}</span><em>${nf(i.quantity)}</em></span>
-      </button>`).join('') + (list.length > invLimit ? `<button class="btn quiet" data-act="inv-more">Show more (${nf(list.length - invLimit)} left)</button>` : '');
+        <span class="mid"><span class="st">${esc(i.style_number)}</span>${i.item_type ? `<span class="tp">${esc(i.item_type)}</span>` : ''}
+          <span class="d">${esc(i.color)}, ${esc(i.brand)}</span><span class="d">${esc(i.gender)}, ${esc(i.season)}</span>
+          <span class="szl">${sizeLineHTML(g)}</span></span>
+        <span class="wide">${esc(i.color)}</span><span class="wide">${esc(i.brand)}</span><span class="wide">${esc(i.gender)}</span><span class="wide">${esc(i.season)}</span><span class="wide szw">${sizeLineHTML(g)}</span>
+        <span class="loc wide" style="text-align:left">${locText(g)}</span>
+        <span class="loc"><span class="lc">${locText(g)}</span><em>${nf(g.qty)}</em></span>
+      </button>`; }).join('') + (groups.length > invLimit ? `<button class="btn quiet" data-act="inv-more">Show more (${nf(groups.length - invLimit)} left)</button>` : '');
+}
+// one row per style and color; the sizes are shown together in that row
+function groupItems(list){
+  const m = new Map();
+  for (const i of list){
+    const key = i.style_number + '|' + i.color;
+    let g = m.get(key); if (!g) m.set(key, g = { key, first: i, items: [], qty: 0 });
+    g.items.push(i); g.qty += i.quantity;
+    if (i.photo_pro && !g.first.photo_pro) g.first = i;
+  }
+  return [...m.values()];
+}
+function sizeTotals(g){
+  const t = new Map(); g.items.forEach(i => t.set(i.size || '', (t.get(i.size || '') || 0) + i.quantity));
+  return [...t.entries()].sort((a, b) => bySize(a[0], b[0]));
+}
+const sizeLineHTML = g => sizeTotals(g).map(([z, q]) => `<i>${esc(z || 'No size')} <b>×${nf(q)}</b></i>`).join('');
+function locText(g){
+  const pals = [...new Set(g.items.map(i => i.pallet_id))].sort((a, b) => a - b), boxes = [...new Set(g.items.map(i => i.box_id))].sort((a, b) => a - b);
+  return `${pals.map(pCode).join(', ')}<br>${boxes.length > 3 ? `${boxes.length} boxes` : boxes.map(bCode).join(', ')}`;
+}
+function groupSheet(key){
+  const g = groupItems(joined().filter(i => i.style_number + '|' + i.color === key))[0]; if (!g) return closeSheet();
+  const i = g.first;
+  openSheet(`
+    ${i.photo_path ? `<img class="big" id="big-photo" data-act="zoom-photo" data-id="${i.id}" alt="Photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(fullUrl(i))}">` : ''}
+    <h2>${esc(i.style_number)} <span class="muted" style="font-weight:500">${esc(i.color)}</span></h2>
+    <dl class="facts"><dt>Type</dt><dd>${esc(i.item_type || 'Not set')}</dd><dt>Brand</dt><dd>${esc(i.brand)}</dd><dt>Gender</dt><dd>${esc(i.gender)}</dd><dt>Season</dt><dd>${esc(i.season)}</dd><dt>Total</dt><dd>${plural(g.qty, 'piece')}</dd></dl>
+    <div class="szgrid">${sizeTotals(g).map(([z, q]) => `<div><b>${esc(z || 'No size')}</b><span>${nf(q)}</span></div>`).join('')}</div>
+    <h3 class="small muted" style="margin:14px 0 6px">By box${canEdit() ? ' (tap a line to edit it)' : ''}</h3>
+    <div class="glines">${g.items.slice().sort((a, b) => a.box_id - b.box_id || bySize(a.size, b.size)).map(x => `
+      <button class="gline" data-act="open-item" data-id="${x.id}"><span>${bCode(x.box_id)}</span><span>${esc(x.size || 'No size')}</span><span>${x.tag_number ? esc(x.tag_number) : ''}</span><b>${nf(x.quantity)}</b></button>`).join('')}</div>
+    ${canEdit() ? `<button class="btn quiet" data-act="open-style" data-style="${esc(i.style_number)}" style="margin-top:10px">Move, edit or delete the whole style</button>` : ''}
+    <button class="btn" data-act="close-sheet" style="margin-top:10px">Done</button>`);
 }
 function filterSheet(){
   const rows = joined(), opt = (k, vals, lab = v => v) => `<label class="f" for="f-${k}">${FLABEL[k]}</label><select id="f-${k}"><option value="">All</option>${vals.map(v => `<option value="${esc(v)}" ${String(filt[k]) === String(v) ? 'selected' : ''}>${esc(lab(v))}</option>`).join('')}</select>`;
@@ -1871,6 +1919,7 @@ const act = {
   'clear-filter'(el){ filt[el.dataset.k] = ''; renderInvList(); },
   'inv-more'(){ invLimit += 150; renderInvList(); },
   'open-item'(el){ itemSheet(el.dataset.id); },
+  'open-group'(el){ groupSheet(el.dataset.k); },
   'edit-item'(el){ itemSheet(el.dataset.id, true); },
   async 'save-edit'(el){
     const patch = { color: $('#e-color').value.trim(), brand: $('#e-brand').value.trim(), tag_number: $('#e-tag').value.trim(),
@@ -2193,7 +2242,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.13';
+const APP_VERSION = '2026-11-22.14';
 let newVersion = false;
 async function checkVersion(){
   try {
