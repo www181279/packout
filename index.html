@@ -450,8 +450,32 @@ body.signing #view{max-width:440px;padding:0 20px}
 .rolep.own{background:var(--placard);color:var(--ink)}
 .rolep.gst{background:#FFF1D6;color:#7A5300}
 .sprof .rolep{vertical-align:4px}
-button.rolep{cursor:pointer}button.rolep:hover{filter:brightness(.95)}
-.rolep svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+/* role picker */
+.rsheet .lead{margin-bottom:18px}
+.ropts{display:grid;gap:10px;margin-bottom:20px}
+.ropt{position:relative;display:grid;grid-template-columns:44px 1fr 22px;gap:14px;align-items:start;padding:16px;background:var(--paper);border:1.5px solid var(--line);border-radius:14px;cursor:pointer;transition:border-color .12s,box-shadow .12s}
+.ropt:hover{border-color:#AEB8C4}
+.ropt input{position:absolute;opacity:0;pointer-events:none}
+.ropt:has(input:checked){border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.ropt:has(input:focus-visible){outline:3px solid var(--placard);outline-offset:2px}
+.ri{width:44px;height:44px;border-radius:12px;display:grid;place-items:center}
+.ri svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round;stroke-linecap:round}
+.r-packer .ri{background:#E8F4EE;color:#145C3C}.r-guest .ri{background:#FFF1D6;color:#7A5300}
+.rb{min-width:0}
+.rt{display:flex;align-items:center;gap:8px}
+.rt b{font:700 21px/1.1 var(--sign)}
+.rt em{font:600 11.5px/1 var(--body);font-style:normal;color:var(--ink2);background:var(--floor);padding:4px 8px;border-radius:999px}
+.rs{display:block;color:var(--ink2);font-size:14.5px;margin:3px 0 10px}
+.rp{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:14px}
+.rp span{display:flex;align-items:center;gap:6px;line-height:1.25}
+.rp svg{width:16px;height:16px;flex:none;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.rp .y svg{stroke:var(--go)}.rp .n{color:var(--ink2)}.rp .n svg{stroke:#A3ADBB}
+.rr{width:22px;height:22px;border-radius:50%;border:2px solid #AEB8C4;margin-top:11px;transition:border-color .12s}
+.ropt:has(input:checked) .rr{border:7px solid var(--ink)}
+.rfoot{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.rfoot .btn{margin:0}
+@media (max-width:420px){.rp{grid-template-columns:1fr}.ropt{grid-template-columns:40px 1fr 22px;gap:12px;padding:14px}.ri{width:40px;height:40px}}
+@media (prefers-reduced-motion:reduce){.ropt,.rr{transition:none}}
 .scount{font:600 13px var(--body);color:var(--ink);background:#E3E8EF;border-radius:999px;padding:5px 10px;display:inline-block;margin:0 0 8px}
 .srow.st .stx b{display:flex;align-items:center;gap:8px}
 .srow.st .stx .warn{color:var(--stop);font-weight:600}
@@ -1219,11 +1243,11 @@ async function staffSheet(){
   try {
     const rows = await rpc('packout_staff_list', {});
     if ($('#st-list')) $('#st-list').innerHTML = rows.map(r => `<div class="staffrow">
-      <div><b>${esc(r.name)}</b>${r.is_owner ? ' <span class="badge">Owner</span>' : ''}<br><span class="small muted">${!r.active ? 'Turned off' : r.locked ? 'Locked after 5 wrong PINs' : r.phones ? `Signed in on ${plural(r.phones, 'phone')}` : 'Not signed in yet'}${r.can_delete === false ? ' · <b>Guest: pack only</b>' : ''}</span></div>
+      <div><b>${esc(r.name)}</b>${r.is_owner ? ' <span class="badge">Owner</span>' : ''}<br><span class="small muted">${!r.active ? 'Turned off' : r.locked ? 'Locked after 5 wrong PINs' : r.phones ? `Signed in on ${plural(r.phones, 'phone')}` : 'Not signed in yet'}${r.can_delete === false ? ' · <b>Guest</b>' : ''}</span></div>
       <div class="row">
         ${r.locked && r.active ? `<button class="btn sm" data-act="staff-unlock" data-n="${esc(r.name)}">Unlock</button>` : ''}
         <button class="btn alt sm" data-act="staff-pin" data-n="${esc(r.name)}">New PIN</button>
-        ${r.is_owner || r.can_delete == null ? '' : `<button class="btn quiet sm" data-act="staff-del" data-n="${esc(r.name)}" data-v="${r.can_delete ? '0' : '1'}">${r.can_delete ? 'Make guest' : 'Full access'}</button>`}
+        ${r.is_owner || r.can_delete == null ? '' : `<button class="btn quiet sm" data-act="staff-role" data-n="${esc(r.name)}" data-v="${r.can_delete ? 'packer' : 'guest'}" aria-haspopup="dialog">Roles</button>`}
         ${r.is_owner ? '' : `<button class="btn ${r.active ? 'danger' : 'alt'} sm" data-act="staff-active" data-n="${esc(r.name)}" data-v="${r.active ? '0' : '1'}">${r.active ? 'Turn off' : 'Turn on'}</button>`}
       </div></div>`).join('');
   } catch (e) { if ($('#st-list')) $('#st-list').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
@@ -2241,7 +2265,7 @@ function settingsHTML(){
       ${canEdit() && staff === 'in' ? `<button class="btn sm ghost" data-act="sign-out">Sign out</button>` : ''}</div></section>`;
   h += '<div class="sgrid">';
   if (owner) {
-    h += sec('s-team', 'Team', 'Everyone who can sign in. Tap a role to change it. Only you can change settings and manage people. Several people can share one login.',
+    h += sec('s-team', 'Team', 'Everyone who can sign in. Use Roles to change what someone can do. Only you can change settings and manage people. Several people can share one login.',
       `<div id="st-list" class="stlist"><p class="muted small" style="padding:16px">Loading</p></div>
        <div class="srow add"><span class="sic">${ic('M12 5v14M5 12h14')}</span><input id="st-new" type="text" autocomplete="off" placeholder="Add a person" aria-label="New person's name"><button class="btn sm" data-act="staff-add">Add and make a PIN</button></div>`);
     h += sec('s-links', 'Links', 'Anyone with a link can use it, so send them only to your team.',
@@ -2269,10 +2293,11 @@ function staffRowsHTML(rows){
   const n = rows.filter(r => r.active).length, g = rows.filter(r => r.active && r.can_delete === false).length;
   const hd = document.querySelector('#s-team header p'); if (hd && !hd.dataset.c) { hd.dataset.c = 1; hd.insertAdjacentHTML('beforebegin', `<div class="scount">${nf(n)} active · ${nf(n - g - 1)} ${n - g - 1 === 1 ? 'packer' : 'packers'} · ${nf(g)} ${g === 1 ? 'guest' : 'guests'}</div>`); }
   return rows.map(r => `<div class="srow st ${r.active ? '' : 'off'}"><span class="av sm">${esc(initials(r.name))}</span>
-    <div class="stx"><b>${esc(r.name)} ${r.is_owner ? '<span class="rolep own">Owner</span>' : r.can_delete == null ? '' : `<button class="rolep ${r.can_delete ? 'pk' : 'gst'}" data-act="staff-role" data-n="${esc(r.name)}" data-v="${r.can_delete ? 'packer' : 'guest'}" aria-haspopup="dialog">${r.can_delete ? 'Packer' : 'Guest'}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>`}</b>
+    <div class="stx"><b>${esc(r.name)} ${r.is_owner ? '<span class="rolep own">Owner</span>' : r.can_delete == null ? '' : `<span class="rolep ${r.can_delete ? 'pk' : 'gst'}">${r.can_delete ? 'Packer' : 'Guest'}</span>`}</b>
       <small class="stat ${!r.active ? 'off' : r.locked ? 'bad' : r.phones ? 'on' : ''}"><i></i>${!r.active ? 'Turned off' : r.locked ? 'Locked after 5 wrong PINs' : r.phones ? `Signed in on ${plural(r.phones, 'device')}` : 'Not signed in yet'}</small></div>
     <div class="sact">
       ${r.locked && r.active ? `<button class="btn sm" data-act="staff-unlock" data-n="${esc(r.name)}">Unlock</button>` : ''}
+      ${r.is_owner || r.can_delete == null ? '' : `<button class="btn alt sm" data-act="staff-role" data-n="${esc(r.name)}" data-v="${r.can_delete ? 'packer' : 'guest'}" aria-haspopup="dialog">Roles</button>`}
       <button class="btn alt sm" data-act="staff-pin" data-n="${esc(r.name)}">New PIN</button>
       ${r.is_owner ? '' : `<button class="btn quiet sm" data-act="staff-active" data-n="${esc(r.name)}" data-v="${r.active ? '0' : '1'}">${r.active ? 'Turn off' : 'Turn on'}</button>
       <button class="btn quiet sm danger-t" data-act="staff-remove" data-n="${esc(r.name)}">Remove</button>`}
@@ -2541,15 +2566,24 @@ const act = {
   async 'staff-unlock'(el){ try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_unlock: true }); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
   'staff-role'(el){
     const n = el.dataset.n, cur = el.dataset.v;
-    const opt = (v, title, can, cant) => `<button class="ropt ${cur === v ? 'on' : ''}" data-act="staff-role-set" data-n="${esc(n)}" data-v="${v}" aria-pressed="${cur === v}">
-      <span class="rtop"><b>${title}</b>${cur === v ? '<span class="rcur">Current</span>' : ''}</span>
-      <span class="rl yes">${can}</span><span class="rl no">${cant}</span></button>`;
-    openSheet(`<h2>Role for ${esc(n)}</h2><p class="lead">Changes apply right away on every device.</p>
-      ${opt('packer', 'Packer', 'Packs items, and can edit, move or delete what is packed', 'Can\'t export, change settings or manage people')}
-      ${opt('guest', 'Guest', 'Packs new items and exports reports', 'Can\'t edit or delete anything, change settings or manage people')}
-      <button class="btn quiet" data-act="close-sheet">Cancel</button>`);
+    const yes = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>', no = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>';
+    const icon = { packer: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l9-5 9 5v8l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>', guest: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>' };
+    const opt = (v, title, sum, can, cant) => `<label class="ropt r-${v}"><input type="radio" name="role" value="${v}" ${cur === v ? 'checked' : ''}>
+      <span class="ri">${icon[v]}</span>
+      <span class="rb"><span class="rt"><b>${title}</b>${cur === v ? '<em>Current</em>' : ''}</span><span class="rs">${sum}</span>
+        <span class="rp">${can.map(t => `<span class="y">${yes}${t}</span>`).join('')}${cant.map(t => `<span class="n">${no}${t}</span>`).join('')}</span></span>
+      <span class="rr" aria-hidden="true"></span></label>`;
+    openSheet(`<div class="rsheet"><h2>Roles</h2><p class="lead">Choose what ${esc(n)} can do. The change applies right away on every device.</p>
+      <div class="ropts" role="radiogroup" aria-label="Role for ${esc(n)}">
+      ${opt('packer', 'Packer', 'For staff who pack and fix mistakes.', ['Pack items', 'Edit, move and delete'], ['Export reports', 'Settings and people'])}
+      ${opt('guest', 'Guest', 'For helpers who pack new items and take reports.', ['Pack new items', 'Export reports'], ['Edit or delete', 'Settings and people'])}
+      </div>
+      <div class="rfoot"><button class="btn quiet" data-act="close-sheet">Cancel</button><button class="btn" data-act="staff-role-set" data-n="${esc(n)}" data-cur="${cur}">Save role</button></div></div>`);
   },
-  async 'staff-role-set'(el){ try { await rpc('packout_staff_delete_rights', { p_name: el.dataset.n, p_can: el.dataset.v === 'packer' }); closeSheet(); toast(`${el.dataset.n} is now a ${el.dataset.v === 'packer' ? 'Packer' : 'Guest'}`, 'good'); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
+  async 'staff-role-set'(el){
+    const v = ($('#sheet input[name=role]:checked') || {}).value; if (!v || v === el.dataset.cur) return closeSheet();
+    el.dataset.v = v;
+    try { await rpc('packout_staff_delete_rights', { p_name: el.dataset.n, p_can: el.dataset.v === 'packer' }); closeSheet(); toast(`${el.dataset.n} is now a ${el.dataset.v === 'packer' ? 'Packer' : 'Guest'}`, 'good'); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
   async 'staff-del'(el){ try { await rpc('packout_staff_delete_rights', { p_name: el.dataset.n, p_can: el.dataset.v === '1' }); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
   'staff-remove'(el){
     const n = esc(el.dataset.n);
@@ -3088,7 +3122,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.41';
+const APP_VERSION = '2026-11-23.42';
 let newVersion = false;
 async function checkVersion(){
   try {
