@@ -360,11 +360,11 @@ body.signing #view{max-width:440px;padding:0 20px}
 .dw-note i{width:8px;height:8px;border-radius:50%;background:var(--go);flex:none}
 /* export */
 .xhead .lead{max-width:640px}
-.xwrap{display:grid;gap:14px}
-.xcard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px}
-.xcard h2{font:700 20px/1.2 var(--sign);margin:0 0 14px}
-.xfield{margin-bottom:14px}
+.xwrap{display:grid;gap:18px}
+.xrail{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px}
+.xfield{margin-bottom:16px}
 .xfield .f{display:block;margin-bottom:6px}
+.xhint{display:block;color:var(--ink2);font-size:12.5px;margin-top:6px}
 .xseg{display:flex;background:#EEF1F5;border-radius:10px;padding:3px;gap:3px}
 .xseg label{flex:1;position:relative}
 .xseg input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
@@ -372,48 +372,65 @@ body.signing #view{max-width:440px;padding:0 20px}
 .xseg input:checked+span{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(19,33,58,.14)}
 .xseg input:focus-visible+span{outline:2px solid var(--ink);outline-offset:1px}
 .xseg label.dis span{opacity:.45}
+.xseg.sm span{padding:7px 12px;font-size:13px}
 .xsum{background:var(--ink);color:#fff;border-radius:12px;padding:14px 16px 12px}
 .xsg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .xsg b{display:block;font:700 26px/1 var(--sign)}
 .xsg span{font-size:12px;color:#B6C1D3}
 .xsum p{margin:10px 0 0;font-size:13px;color:#B6C1D3}
-.xfmt{display:grid;grid-template-columns:44px 1fr auto 20px;gap:14px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s}
-.xfmt:hover{border-color:var(--ink);box-shadow:0 6px 18px rgba(19,33,58,.1)}
-.xfmt:active{transform:scale(.99)}
-.xfi{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:#EEF1F5;color:var(--ink)}
-.xfi svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.xfmt.pdf .xfi{background:var(--ink);color:var(--placard)}
-.xft b{display:block;font-size:16px}
-.xft small{display:block;color:var(--ink2);font-size:13.5px;line-height:1.4;margin-top:2px}
-.xtag{font:700 12px/1 var(--body);letter-spacing:.04em;color:var(--ink2);background:#EEF1F5;border-radius:6px;padding:5px 7px}
-.xgo svg{width:18px;height:18px;fill:none;stroke:var(--ink2);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.xnote{color:var(--ink2);font-size:13px;margin:4px 0 0}
-@media (max-width:640px){.xfmt{grid-template-columns:44px 1fr}.xfmt .xtag,.xfmt .xgo{display:none}.xcard{padding:16px}}
-.xprints{display:grid;gap:10px}
-.xpr{display:grid;grid-template-columns:44px 1fr;column-gap:14px;row-gap:2px;align-items:start;text-align:left;background:#F7F9FB;border:1px solid var(--line);border-radius:12px;padding:14px;width:100%}
-button.xpr{cursor:pointer}button.xpr:hover{border-color:var(--ink)}
-.xpr .xfi{grid-row:span 3;background:#fff}
-.xlrow{grid-column:2}
-.xpr b{font-size:16px}
-.xpr small{color:var(--ink2);font-size:13.5px;line-height:1.4}
-.xlrow{display:flex;gap:8px;margin-top:10px}
-.xlrow select{flex:1;min-height:40px}
-.xlrow .btn{width:auto;margin:0;min-height:40px;padding:0 18px}
-/* roles */
-.rolep.pk{background:#E7EEF8;color:#1E3A66}
-.stat{display:flex!important;align-items:center;gap:6px}
-.stat i{width:7px;height:7px;border-radius:50%;background:#B9C3CF;flex:none}
-.stat.on i{background:var(--go)}.stat.bad i{background:var(--stop)}.stat.bad{color:var(--stop)!important;font-weight:600}
-.ropt{display:block;width:100%;text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
-.ropt:hover{border-color:#8FA0B5}
-.ropt.on{border-color:var(--ink);box-shadow:0 0 0 3px rgba(19,33,58,.08)}
-.rtop{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.rtop b{font:700 19px/1.1 var(--sign)}
-.rcur{font:600 12px var(--body);background:var(--ink);color:#fff;border-radius:999px;padding:4px 9px}
-.rl{display:flex;gap:8px;font-size:14px;line-height:1.4;color:var(--ink2);margin-top:4px}
-.rl::before{flex:none;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font:700 11px/18px var(--body);text-align:center}
-.rl.yes::before{content:"✓";background:var(--go-bg);color:var(--go)}
-.rl.no::before{content:"✕";background:#F1F3F6;color:#7A8698}
+.xmain section{margin-bottom:22px}
+.xsec{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+.xsec h2{font:700 22px/1.1 var(--sign);margin:0}
+.xsec>span{color:var(--ink2);font-size:13px}
+.xtiles{display:grid;gap:14px}
+.xtile{display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;transition:box-shadow .2s,border-color .2s,transform .2s}
+.xtile:hover{border-color:#B8C3D0;box-shadow:0 12px 28px rgba(19,33,58,.10);transform:translateY(-2px)}
+.xtb{padding:16px 18px 18px;display:flex;flex-direction:column;flex:1}
+.xtn{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.xtn b{font-size:17px}
+.xtag{font:700 11px/1 var(--body);letter-spacing:.05em;color:var(--ink2);background:#EEF1F5;border-radius:6px;padding:5px 7px;text-transform:uppercase}
+.xtb p{color:var(--ink2);font-size:14px;line-height:1.45;margin:6px 0 14px;flex:1}
+.xcta{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:46px;border-radius:11px;border:0;background:var(--ink);color:#fff;font:600 15px var(--body);cursor:pointer}
+.xcta:hover{background:#0B1528}
+.xcta svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.xsel{display:flex;align-items:center;gap:10px;margin:-4px 0 12px}
+.xsel span{font-size:13px;font-weight:600;color:var(--ink2)}
+.xsel select{flex:1;min-height:40px}
+.xnote{color:var(--ink2);font-size:13px;margin:12px 0 0}
+/* previews: small drawings of each output */
+.pv{height:150px;background:linear-gradient(180deg,#F1F4F8,#E6EBF1);display:grid;place-items:center;border-bottom:1px solid var(--line);overflow:hidden}
+.pv .pg{width:118px;height:150px;margin-top:34px;background:#fff;border-radius:6px 6px 0 0;box-shadow:0 6px 18px rgba(19,33,58,.12);padding:12px 10px}
+.pv i{display:block;background:#D7DEE7;border-radius:3px;height:6px;margin-bottom:6px}
+.pv .ph{height:10px;width:60%;background:var(--ink)}
+.pv .w7{width:70%}.pv .w5{width:50%}
+.pv .cards{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.pv .cards span{background:#F4F6F9;border-radius:4px;padding:4px}
+.pv .cards em{display:block;height:26px;border-radius:3px;background:linear-gradient(135deg,#2B3F66,#4B6390)}
+.pv .cards u{display:block;height:4px;margin-top:4px;border-radius:2px;background:#C9D2DD;text-decoration:none}
+.pv-pdf .cards em{background:linear-gradient(135deg,#FFC629,#F2A900)}
+.pv-web .bw{width:200px;height:150px;margin-top:34px;background:#fff;border-radius:8px 8px 0 0;box-shadow:0 6px 18px rgba(19,33,58,.12);overflow:hidden}
+.pv-web .bar{display:flex;gap:4px;align-items:center;padding:7px 8px;background:#EEF1F5}
+.pv-web .bar i{width:6px;height:6px;border-radius:50%;margin:0;background:#C3CCD7}
+.pv-web .bar b{flex:1;height:8px;border-radius:4px;background:#fff;margin-left:6px}
+.pv-web .cards{grid-template-columns:repeat(3,1fr);padding:8px}
+.pv-csv .sh{width:200px;margin-top:34px;height:150px;background:#fff;border-radius:6px 6px 0 0;box-shadow:0 6px 18px rgba(19,33,58,.12);overflow:hidden}
+.pv-csv .tr{display:grid;grid-template-columns:1.4fr 1fr 1fr .6fr .8fr;gap:6px;padding:7px 8px;border-bottom:1px solid #EDF0F3}
+.pv-csv .tr i{margin:0}
+.pv-csv .th{background:#E8F4EE}.pv-csv .th i{background:#8CC7A8}
+.pv-sheet .big{height:22px;width:48%;background:var(--placard)}
+.pv-sheet .row{height:9px;background:#E8ECF1}
+.pv-lbl .q{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px}
+.pv-lbl .q span{border:2px solid var(--ink);border-radius:5px;padding:5px}
+.pv-lbl .q b{display:block;height:16px;width:70%;background:var(--ink);border-radius:3px;margin-bottom:5px}
+.pv-lbl .q i{height:4px;margin-bottom:4px}
+@media (max-width:640px){
+  .xtile{flex-direction:row;align-items:stretch}
+  .pv{width:96px;height:auto;flex:none;border-bottom:0;border-right:1px solid var(--line)}
+  .pv .pg,.pv-web .bw,.pv-csv .sh{transform:scale(.5);transform-origin:top center;margin-top:16px}
+  .xtb{padding:14px}
+  .xtb p{font-size:13.5px}
+  .xsec{align-items:flex-start;flex-direction:column}
+}
 /* settings v2 */
 .sprof{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,#14233F,#1E3157);color:#fff;border-radius:18px;padding:20px;margin:0 0 26px}
 .sprof .av{width:64px;height:64px;border-radius:50%;background:var(--placard);color:var(--ink);display:grid;place-items:center;font:700 26px/1 var(--sign)}
@@ -599,14 +616,13 @@ button.rolep{cursor:pointer}button.rolep:hover{filter:brightness(.95)}
   body.shell #s-team .srow.st{padding:12px 16px}
   @media (max-width:1349px){body.shell .sgrid{grid-template-columns:minmax(0,1fr)}body.shell #s-team{grid-row:auto}}
   body.shell .spa{grid-column:auto}
-  /* export: report on the left, downloads beside it, printing below */
-  body.shell .xwrap{grid-template-columns:minmax(320px,400px) minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
-  body.shell .xbuild{grid-row:auto}
-  @media (max-width:1499px){body.shell .xwrap{grid-template-columns:minmax(320px,400px) minmax(0,1fr)}body.shell .xbuild{grid-row:span 2}}
-  body.shell .xbuild{position:sticky;top:24px}
-  body.shell .xcard{padding:24px}
-  body.shell .xprints{grid-template-columns:1fr}
-  @media (max-width:1499px){body.shell .xprints{grid-template-columns:1fr 1fr}}
+  /* export: options rail on the left, outputs on the right */
+  body.shell .xwrap{grid-template-columns:300px minmax(0,1fr);gap:28px;align-items:start}
+  body.shell .xrail{position:sticky;top:24px;padding:20px}
+  body.shell .xtiles{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.shell .xtiles.two{grid-template-columns:repeat(2,minmax(0,1fr));max-width:calc((100% - 28px) * 2 / 3 + 14px)}
+  @media (max-width:1399px){body.shell .xtiles{grid-template-columns:repeat(2,minmax(0,1fr))}body.shell .xtiles.two{max-width:none}}
+  @media (max-width:1219px){body.shell .xwrap{grid-template-columns:minmax(0,1fr)}body.shell .xrail{position:static}}
   /* export: panels side by side */
   body.shell .xgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:18px;align-items:start}
   body.shell .xgrid .panel{margin:0}
@@ -2137,40 +2153,43 @@ function moreHTML(){
   const nClosed = data.pallets.filter(p => p.status === 'closed').length;
   const nF = filtered().length, any = Object.keys(FLABEL).some(k => filt[k]) || filt.q;
   const I = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
-  const fmt = (act, cls, icon, name, desc, tag) => `<button class="xfmt ${cls}" data-act="${act}"><span class="xfi">${icon}</span>
-    <span class="xft"><b>${name}</b><small>${desc}</small></span><span class="xtag">${tag}</span><span class="xgo">${I('M5 12h14M13 6l6 6-6 6')}</span></button>`;
-  return `<div class="xhead"><div><h1 class="h">Export</h1><p class="lead">Share the inventory as a catalog, a web page or a spreadsheet, and print sheets and labels for the floor.</p></div></div>
+  const ARROW = I('M5 12h14M13 6l6 6-6 6');
+  const prevPdf = `<div class="pv pv-pdf"><div class="pg"><i class="ph"></i><i class="ln w7"></i><i class="ln w5"></i><div class="cards">${'<span><em></em><u></u></span>'.repeat(4)}</div></div></div>`;
+  const prevWeb = `<div class="pv pv-web"><div class="bw"><div class="bar"><i></i><i></i><i></i><b></b></div><div class="cards">${'<span><em></em><u></u></span>'.repeat(6)}</div></div></div>`;
+  const prevCsv = `<div class="pv pv-csv"><div class="sh">${Array.from({ length: 6 }, (_, r) => `<div class="tr${r ? '' : ' th'}">${'<i></i>'.repeat(5)}</div>`).join('')}</div></div>`;
+  const prevSheet = `<div class="pv pv-sheet"><div class="pg"><i class="big"></i><i class="ln w7"></i>${'<i class="row"></i>'.repeat(6)}</div></div>`;
+  const prevLbl = `<div class="pv pv-lbl"><div class="pg q">${'<span><b></b><i></i><i></i></span>'.repeat(4)}</div></div>`;
+  const tile = (act, prev, name, tag, desc, cta, extra = '') => `<div class="xtile">${prev}<div class="xtb"><div class="xtn"><b>${name}</b><span class="xtag">${tag}</span></div><p>${desc}</p>${extra}
+    <button class="xcta" data-act="${act}">${cta}${ARROW}</button></div></div>`;
+  return `<div class="xhead"><h1 class="h">Export</h1><p class="lead">Share the inventory as a catalog, a web page or a spreadsheet, and print sheets and labels for the floor.</p></div>
   <div class="xwrap">
-    <section class="xcard xbuild">
-      <h2>Report</h2>
-      <div class="xfield"><label class="f" for="x-title">Title</label><input id="x-title" type="text" value="${esc(exTitle)}"></div>
+    <aside class="xrail">
+      <div class="xfield"><label class="f" for="x-title">Report title</label><input id="x-title" type="text" value="${esc(exTitle)}"></div>
       <div class="xfield"><span class="f">Include</span>
         <div class="xseg" role="radiogroup"><label><input type="radio" name="x-scope" value="all" checked><span>Everything</span></label>
-          <label class="${any ? '' : 'dis'}"><input type="radio" name="x-scope" value="filt" ${any ? '' : 'disabled'}><span>${any ? `Filtered (${nf(nF)})` : 'Filtered'}</span></label></div></div>
+          <label class="${any ? '' : 'dis'}"><input type="radio" name="x-scope" value="filt" ${any ? '' : 'disabled'}><span>${any ? `Filtered (${nf(nF)})` : 'Filtered'}</span></label></div>
+        ${any ? '' : '<small class="xhint">Search or filter on the Inventory tab to export only part of it.</small>'}</div>
       <div class="xfield"><span class="f">Photos</span>
         <div class="xseg" role="radiogroup"><label><input type="radio" name="x-photos" value="1" checked><span>With photos</span></label><label><input type="radio" name="x-photos" value="0"><span>Without</span></label></div></div>
       <div id="x-sum" class="xsum">${exportSummaryHTML('all')}</div>
-    </section>
-    <section class="xcard xformats">
-      <h2>Download</h2>
-      ${fmt('export-pdf', 'pdf', I('M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h4'), 'PDF catalog', 'One card per style with photos, colors, sizes and where it is. Best for sharing and printing.', 'PDF')}
-      ${fmt('export-html', 'web', I('M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18'), 'Web page', 'The same catalog as one file that opens in any browser, on any device.', 'HTML')}
-      ${fmt('export-csv', 'csv', I('M4 4h16v16H4zM4 10h16M4 15h16M10 4v16'), 'Spreadsheet', 'Every item on its own row with UPC, size, pallet and box. Opens in Excel or Google Sheets.', 'CSV')}
-      <p class="xnote">For the PDF, the print window opens. Choose "Save as PDF" there.</p>
-    </section>
-    <section class="xcard xprint">
-      <h2>Print for the floor</h2>
-      <div class="xfield"><span class="f">Pallets</span>
-        <div class="xseg" role="radiogroup"><label><input type="radio" name="p-scope" value="closed" ${nClosed ? 'checked' : ''}><span>Closed (${nf(nClosed)})</span></label>
-          <label><input type="radio" name="p-scope" value="all" ${nClosed ? '' : 'checked'}><span>All (${nf(data.pallets.length)})</span></label></div></div>
-      <div class="xprints">
-        <button class="xpr" data-act="print-sheets"><span class="xfi">${I('M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z')}</span><b>Pallet breakdowns</b><small>A Letter page per pallet listing every box and style. Uses the photo choice above.</small></button>
-        <div class="xpr xlbl"><span class="xfi">${I('M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8zM7.5 7.5h.01')}</span><b>Box labels</b><small>A large box number and its contents, to tape on each box.</small>
-          <div class="xlrow"><select id="p-label" aria-label="Label size">${Object.entries(LABELS).map(([k, v]) => `<option value="${k}" ${k === labelSize ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
-          <button class="btn sm" data-act="print-labels">Print</button></div></div>
-      </div>
-      <p class="xnote">To print one pallet only, open it on the Pallets tab.</p>
-    </section>
+    </aside>
+    <div class="xmain">
+      <section><div class="xsec"><h2>Download</h2><span>Uses the choices on the left</span></div>
+        <div class="xtiles">
+          ${tile('export-pdf', prevPdf, 'PDF catalog', 'PDF', 'One card per style with photos, colors, sizes and location. Best for sharing and printing.', 'Download PDF')}
+          ${tile('export-html', prevWeb, 'Web page', 'HTML', 'The same catalog as one file that opens in any browser, on any device.', 'Download web page')}
+          ${tile('export-csv', prevCsv, 'Spreadsheet', 'CSV', 'Every item on its own row with UPC, size, pallet and box. Opens in Excel or Google Sheets.', 'Download spreadsheet')}
+        </div></section>
+      <section><div class="xsec"><h2>Print for the floor</h2>
+          <div class="xseg sm" role="radiogroup"><label><input type="radio" name="p-scope" value="closed" ${nClosed ? 'checked' : ''}><span>Closed pallets (${nf(nClosed)})</span></label>
+            <label><input type="radio" name="p-scope" value="all" ${nClosed ? '' : 'checked'}><span>All pallets (${nf(data.pallets.length)})</span></label></div></div>
+        <div class="xtiles two">
+          ${tile('print-sheets', prevSheet, 'Pallet breakdowns', 'Letter', 'One page per pallet listing every box and style, to keep with the pallet.', 'Print breakdowns')}
+          ${tile('print-labels', prevLbl, 'Box labels', 'Labels', 'A large box number and its contents, to tape on each box.', 'Print labels',
+            `<label class="xsel"><span>Size</span><select id="p-label">${Object.entries(LABELS).map(([k, v]) => `<option value="${k}" ${k === labelSize ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></label>`)}
+        </div>
+        <p class="xnote">For the PDF, your browser's print window opens. Choose "Save as PDF" there. To print one pallet only, open it on the Pallets tab.</p></section>
+    </div>
   </div>`;
 }
 function exportSummaryHTML(scope){
@@ -3008,7 +3027,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.39';
+const APP_VERSION = '2026-11-23.40';
 let newVersion = false;
 async function checkVersion(){
   try {
