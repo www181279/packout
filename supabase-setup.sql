@@ -855,3 +855,29 @@ end;
 $$;
 revoke all on function public.packout_staff_list(), public.packout_staff_delete_rights(text, boolean) from public;
 grant execute on function public.packout_staff_list(), public.packout_staff_delete_rights(text, boolean) to anon, authenticated;
+-- 10. Short invite links: https://…/packout/?j=CODE. The code is swapped for the team code here.
+alter table packout_private.app_secret add column if not exists join_code text;
+update packout_private.app_secret
+   set join_code = (select string_agg(substr('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 1 + get_byte(extensions.gen_random_bytes(1), 0) % 31, 1), '') from generate_series(1, 8))
+ where id = 1 and join_code is null;
+
+create or replace function public.packout_join(p_code text)
+returns text language plpgsql volatile security definer set search_path = '' as $$
+declare v text;
+begin
+  perform pg_sleep(0.3);      -- slows down anyone guessing codes
+  select s.team_code into v from packout_private.app_secret s
+   where s.id = 1 and s.join_code is not null and s.join_code = upper(btrim(coalesce(p_code, '')));
+  return v;
+end;
+$$;
+create or replace function public.packout_join_code()
+returns text language plpgsql stable security definer set search_path = '' as $$
+begin
+  perform packout_private.require_owner();
+  return (select join_code from packout_private.app_secret where id = 1);
+end;
+$$;
+revoke all on function public.packout_join(text), public.packout_join_code() from public;
+grant execute on function public.packout_join(text), public.packout_join_code() to anon, authenticated;
+select join_code from packout_private.app_secret where id = 1;

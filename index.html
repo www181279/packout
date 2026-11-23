@@ -419,6 +419,7 @@ body.signing #view{max-width:440px;padding:0 20px}
   body.shell .totals b{font-size:36px}
   body.shell .tools input{min-height:48px}
   body.shell .ihead{display:grid;grid-template-columns:56px minmax(140px,200px) minmax(80px,.9fr) minmax(80px,1fr) minmax(90px,1fr) minmax(60px,.7fr) minmax(56px,.6fr) minmax(140px,1.1fr) minmax(220px,2fr) 96px 64px;gap:12px;padding:4px 14px 8px 10px;font-size:12px;font-weight:600;color:var(--ink2)}
+  body.shell .ihead{position:sticky;top:0;z-index:6;background:#EEF1F4;box-shadow:0 1px 0 #DCE2E8;margin:0 -2px;padding-top:10px}
   body.shell #inv-list{background:#fff;border:1px solid #DCE2E8;border-radius:14px;overflow:hidden}
   body.shell #inv-list .irow{grid-template-columns:56px minmax(140px,200px) minmax(80px,.9fr) minmax(80px,1fr) minmax(90px,1fr) minmax(60px,.7fr) minmax(56px,.6fr) minmax(140px,1.1fr) minmax(220px,2fr) 96px 64px;gap:12px;margin:0;border:0;border-bottom:1px solid #EDF0F3;border-radius:0;padding:8px 14px 8px 10px;cursor:pointer}
   body.shell #inv-list .irow .tp{display:none}
@@ -1876,7 +1877,7 @@ function guideSheet(first){
 }
 const QR_LIB = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
 async function joinCodeSheet(){
-  const link = location.origin + location.pathname + joinHash(false);
+  const link = await inviteLink();
   openSheet(`<h2>Join code</h2><p class="lead">The employee points their phone camera at this code and taps the link. The app opens connected; they type their name.</p>
     <div class="qrbox" id="qr"><p class="muted">Making the code</p></div><button class="btn" data-act="close-sheet">Done</button>`);
   try {
@@ -2077,7 +2078,16 @@ function download(name, text, type){
 const isStandalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 const b64json = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
 const joinHash = withName => '#join=' + b64json({ u: cfg.url, k: cfg.key, ...(cfg.team ? { t: cfg.team } : {}), ...(withName && me ? { n: me.name } : {}) });
-const viewLink = () => location.origin + location.pathname + '#view=' + b64json({ u: cfg.url, k: cfg.key });
+// This store's database. Its publishable key is meant to be public; it opens nothing by itself.
+const HOME_DB = { url: 'https://lwhgsnketkpksbhbqygk.supabase.co', key: 'sb_publishable_QacR2UHZ80RbqgBuT8Y5Cw_AD2AJJdO' };
+const appUrl = () => location.origin + location.pathname;
+const isHome = () => cfg && cfg.url === HOME_DB.url && cfg.key === HOME_DB.key;
+const viewLink = () => isHome() ? appUrl() + '?view' : appUrl() + '#view=' + b64json({ u: cfg.url, k: cfg.key });
+// Short invite link (?j=CODE): the owner can read the code; the database swaps it for the team code.
+async function inviteLink(){
+  if (isHome() && me && me.owner) { try { const c = await rpc('packout_join_code', {}); if (c) return appUrl() + '?j=' + c; } catch {} }
+  return appUrl() + joinHash(false);
+}
 const canEdit = () => !!cfg && !cfg.view;
 const canDelete = () => canEdit() && !(me && me.del === false);      // a Guest login can pack and edit, but not delete
 const isDenied = e => e && (e.code === '42501' || /row-level security|permission denied/i.test(e.message || ''));
@@ -2592,7 +2602,7 @@ document.querySelectorAll('.mf-pal').forEach(function(p){p.hidden=!p.querySelect
       <button class="btn" data-act="close-sheet">Done</button>`);
   },
   async invite(){
-    const link = location.origin + location.pathname + joinHash(false);
+    const link = await inviteLink();
     if (!/^https?:/.test(location.protocol)) toast('Put the app online first. A link to a file on this computer won\'t open on other phones.', 'bad');
     try { if (navigator.share) return await navigator.share({ title: 'Packout', text: 'Open this to start packing', url: link }); } catch (e) { if (e.name === 'AbortError') return; }
     try { await navigator.clipboard.writeText(link); toast('Invite link copied', 'good'); }
@@ -2733,7 +2743,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.31';
+const APP_VERSION = '2026-11-22.32';
 let newVersion = false;
 async function checkVersion(){
   try {
@@ -2749,6 +2759,20 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 
 /* ---------- start ---------- */
 (async function start(){
+  const qs = new URLSearchParams(location.search);
+  if (qs.has('j')) {
+    try {
+      const r = await fetch(HOME_DB.url + '/rest/v1/rpc/packout_join', { method: 'POST', headers: { apikey: HOME_DB.key, 'Content-Type': 'application/json' }, body: JSON.stringify({ p_code: qs.get('j') }) });
+      const team = r.ok ? await r.json() : null;
+      if (team) { if (!(cfg && cfg.url === HOME_DB.url && cfg.team === team)) { cfg = { url: HOME_DB.url, key: HOME_DB.key, team }; store.set('cfg', cfg); } }
+      else setTimeout(() => toast('This invite link is not valid any more. Ask Avigdor for a new one.', 'bad'), 800);
+    } catch { setTimeout(() => toast('No connection. Check the internet and open the link again.', 'bad'), 800); }
+    if (!isStandalone()) history.replaceState(null, '', location.pathname);
+  } else if (qs.has('view')) {
+    if (cfg && cfg.team) setTimeout(() => toast('This phone already has the team link, so the view-only link was not applied.', 'bad'), 800);
+    else { cfg = { url: HOME_DB.url, key: HOME_DB.key, view: true }; store.set('cfg', cfg); }
+    if (!isStandalone()) history.replaceState(null, '', location.pathname);
+  }
   const m = location.hash.match(/^#(join|view)=(.+)$/);
   if (m) { try { const j = JSON.parse(decodeURIComponent(escape(atob(m[2]))));
     if (j.u && j.k && m[1] === 'join') { const same = cfg && cfg.url === j.u && cfg.key === j.k && (cfg.team || '') === (j.t || '');   // opening from the home-screen icon: keep the sign-in
