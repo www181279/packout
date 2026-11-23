@@ -1464,6 +1464,7 @@ function packHTML(){
   const prev = data.items.filter(i => i.style_number === pack.style).slice(-1)[0] || store.get('lastForm') || {};
   let f = pack.form || { type: prev.item_type || prev.type || '', brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', sizes: [], more: [] };
   if (!pack.form && pack.tagRead) { f = mergeTag(f, pack.tagRead); pack.tagRead = null; pack.form = f; }
+  if (pack.stage === 'item' && !pack.photo && (!pack.reuse || pack.reuse.auto)) autoReuse(f.color);
   const sizes = f.sizes || [];
   const typeOther = f.type === '__other' || (f.type && !ALL_TYPES.includes(f.type) && !data.items.some(i => i.item_type === f.type));
   const more = f.more || [];
@@ -1477,7 +1478,7 @@ function packHTML(){
         <button class="nx" data-act="same-box"><b>Next style</b><span>Start a different style</span></button></div>` : ''}</div>` : ''}
     <div class="boxnow"><span>Packing into</span><b>${bCode(pack.box)}</b><span>${pCode(pack.pallet)}</span></div>
     <div class="panel">
-      <div class="photo" id="k-photo-wrap">${pack.reuse && !pack.photo ? `<img alt="Same photo as the last box" src="${esc(reuseUrl(pack.reuse.path))}"><span class="again">Same photo. Tap to retake</span>` : '<span>Tap to take a photo of the item</span>'}
+      <div class="photo" id="k-photo-wrap">${pack.reuse && !pack.photo ? `<img alt="${pack.reuse.auto ? 'Photo of this color from earlier' : 'Same photo as the last box'}" src="${esc(reuseUrl(pack.reuse.path))}"><span class="again">${pack.reuse.auto ? 'This color is already photographed. Tap to retake' : 'Same photo. Tap to retake'}</span>` : '<span>Tap to take a photo of the item</span>'}
         <input id="k-photo" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the item"></div>
       <label class="btn alt filebtn tagbtn2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Read the tag for this color<input id="k-tagphoto" data-where="item" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in this item"></label>
       <div id="tag-status">${pack.tagStatus || ''}</div>
@@ -2129,6 +2130,16 @@ async function markPro(path){
 
 /* ---------- tag reading: the AI reader on the server, the on-phone text reader as a fallback ---------- */
 let tagRun = 0;
+// Same style and same color already packed with a photo? Use that photo instead of asking for a new one.
+const colorKey = c => String(c || '').toLowerCase().replace(/\s*\(.*\)\s*$/, '').replace(/\s+/g, ' ').trim();
+function autoReuse(color){
+  if (pack.photo || !pack.style || !colorKey(color)) return false;
+  const k = colorKey(color), hit = data.items.filter(i => i.style_number === pack.style && i.photo_path && colorKey(i.color) === k)
+    .sort((a, b) => (b.photo_pro ? 1 : 0) - (a.photo_pro ? 1 : 0))[0];
+  if (!hit) { if (pack.reuse && pack.reuse.auto) pack.reuse = null; return false; }
+  if (pack.reuse && pack.reuse.path === hit.photo_path) return true;
+  pack.reuse = { path: hit.photo_path, auto: true }; return true;
+}
 function mergeTag(f, t){
   f = { ...f, sizes: [...(f.sizes || [])], more: [...(f.more || [])] };
   const known = t.upc && data.items.find(i => i.tag_number && i.tag_number.replace(/\D/g, '') === t.upc);
@@ -3291,7 +3302,8 @@ function swClose(){ if (swOpen) { swSet(swOpen, 0, true); swOpen.parentElement.c
   }, true);
   addEventListener('scroll', () => { if (swOpen && !row) swClose(); }, { passive: true });
 })();
-document.addEventListener('change', e => { if (e.target.closest && e.target.closest('.dl')) delCount(); });
+document.addEventListener('change', e => {
+  if (e.target.id === 'k-color' && tab === 'pack' && pack.stage === 'item' && !pack.photo) { const had = pack.reuse && pack.reuse.path; autoReuse(e.target.value); if ((pack.reuse && pack.reuse.path) !== had) { pack.form = readForm(); const y = scrollY; render(); scrollTo(0, y); } } if (e.target.closest && e.target.closest('.dl')) delCount(); });
 
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
@@ -3394,7 +3406,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.48';
+const APP_VERSION = '2026-11-23.49';
 let newVersion = false;
 async function checkVersion(){
   try {
