@@ -951,13 +951,29 @@ function sizeSetFor(type, gender){
   return 'letter';
 }
 const MONTHS = SIZESETS.baby.list;
-const normSize = z => { const t = String(z || '').trim().toUpperCase().replace(/\s+/g, ''); const m = t.match(/^W?(\d{2})[X\/]L?(\d{2})$/) || t.match(/^W(\d{2})L(\d{2})$/); return m ? m[1] + '/' + m[2] : t; };
+// Sizes written the same way everywhere: 32/34, 14½ Plus, 2XL, 16W, 4T
+const SIZE_WORDS = { PLUS: 'Plus', PETITE: 'Petite', TALL: 'Tall', LONG: 'Long', SHORT: 'Short', SLIM: 'Slim', HUSKY: 'Husky', REGULAR: '', REG: '', AVG: '' };
+const normSize = z => {
+  let t = String(z || '').trim().toUpperCase().replace(/\s+/g, ' ');
+  if (!t) return '';
+  if (/^ONE ?SIZE$|^OS$|^O\/S$/.test(t)) return 'One size';
+  const c = t.replace(/\s/g, '');
+  const m = c.match(/^W?(\d{2})[X\/]L?(\d{2})$/) || c.match(/^W(\d{2})L(\d{2})$/); if (m) return m[1] + '/' + m[2];
+  if (/^X{2,4}L$/.test(c)) return (c.length - 1) + 'XL';
+  const bi = c.match(/^(XS|S|M|L|XL|XXL|2XL|3XL)\/(XCH|CH|M|G|XG|XXG|3XG)$/); if (bi) return bi[1] === 'XXL' ? '2XL' : bi[1];   // bilingual tags: L/G -> L
+  // a half size: 14 1/2, 141/2, 14.5, 14½ (but not kids ranges like 7/8 or 10/12)
+  t = t.replace(/^(\d{1,2})\s*(?:1\/2|\.5|½)(?!\d)/, '$1½');
+  // words after the number: 14½PLUS -> 14½ Plus, 16 TALL -> 16 Tall
+  const w = t.match(/^([\d½]+[A-Z]??)\s*([A-Z]{3,})$/);
+  if (w && w[2] in SIZE_WORDS) return (w[1] + (SIZE_WORDS[w[2]] ? ' ' + SIZE_WORDS[w[2]] : '')).replace(/^(\d+½?)([A-Z])$/, '$1$2');
+  return t.replace(/\s/g, ' ');
+};
 const sizeRank = z => {
   const i = SIZES.indexOf(z); if (i >= 0) return i;
   const b = MONTHS.indexOf(z); if (b >= 0) return 20 + b;
   if (z === '00') return 99;
   const wl = String(z).match(/^(\d{2})\/(\d{2})$/); if (wl) return 1000 + +wl[1] + +wl[2] / 100;
-  const n = parseFloat(z); return isNaN(n) ? 5000 : 100 + n + (/X$/.test(z) ? .5 : 0);
+  const n = parseFloat(String(z).replace('½', '.5')); return isNaN(n) ? 5000 : 100 + n + (/X$/.test(z) ? .5 : 0) + (/Plus|W$/.test(z) ? .2 : 0);
 };
 const bySize = (a, b) => sizeRank(a) - sizeRank(b) || String(a).localeCompare(String(b));
 const sizesOf = rows => [...new Set(rows.map(r => r.size).filter(Boolean))].sort(bySize);
@@ -2980,7 +2996,7 @@ const act = {
       quantity: parseInt($('#e-qty').value, 10), gender: $('#e-gender').value, season: $('#e-season').value };
     const et = $('#e-type').value, etype = et === '__other' ? $('#e-type-other').value.trim() : et;
     if (etype) patch.item_type = etype;
-    patch.size = $('#e-size').value.trim().toUpperCase().replace(/^ONE SIZE$/, 'One size');
+    patch.size = normSize($('#e-size').value);
     if (!patch.color || !patch.brand || !(patch.quantity >= 1)) return $('#e-err').innerHTML = '<div class="err">Color, brand and a quantity of 1 or more are needed.</div>';
     closeSheet(); await mutate('Saving changes', () => db.update('items', 'id=' + eq(el.dataset.id), patch), 'Saved changes');
   },
@@ -3371,7 +3387,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.46';
+const APP_VERSION = '2026-11-23.47';
 let newVersion = false;
 async function checkVersion(){
   try {
