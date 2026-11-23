@@ -868,7 +868,7 @@ const KEY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy=
 const DEL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1zM17 9l-5 6M12 9l5 6"/></svg>';
 let signinMode = '';
 function signinHTML(){
-  pinBuf = '';
+  pinBuf = ''; prefetchFaceChallenge();
   const brand = `<div class="si-brand"><img src="icon-192.png" alt=""><b>Packout</b></div>`;
   const f = faceSupported ? faceSaved() : null;
   const pick = staffNames.includes(signinPick) ? signinPick : '';
@@ -1523,7 +1523,7 @@ async function faceIdTurnOn(){
     if (!pk || (c.response.getPublicKeyAlgorithm && c.response.getPublicKeyAlgorithm() !== -7)) throw new Error('this browser cannot save Face ID. Open Packout from its home-screen icon or in Safari.');
     await rpc('packout_passkey_add', { p_cred_id: b64u(c.rawId), p_public_key: b64u(pk) });
     store.set('faceid', { name: me.name, id: b64u(c.rawId), server: true });
-    closeSheet(); toast('Face ID is on. Next time, tap Sign in with Face ID.', 'good'); render();
+    closeSheet(); toast('Face ID is on. Next time, Packout opens with your face.', 'good'); render();
   } catch (e) { if (e && e.name !== 'NotAllowedError') toast('Face ID could not be turned on: ' + e.message, 'bad'); }
 }
 function lockNow(){
@@ -1669,12 +1669,21 @@ async function runOcr(file){
 }
 
 /* ---------- Face ID sign-in on this phone ---------- */
+// When Face ID is the chosen way for the person on screen, start it straight away.
+function autoFace(){ const f = faceSaved(); if (f && f.name === signinPick && signinMode !== 'pin' && staff === 'out') faceIdSignIn(true); }
+// Fetch the one-time challenge ahead of time, so a tap goes straight to Face ID (iPhone wants it right after the tap).
+let faceCh = null;
+function prefetchFaceChallenge(){
+  if (!faceSaved() || (faceCh && Date.now() - faceCh.t < 4 * 60000)) return;
+  rpc('packout_passkey_challenge', {}).then(v => { faceCh = { v, t: Date.now() }; }).catch(() => {});
+}
 async function faceIdSignIn(auto){
   const f = faceSaved(); if (!f || staff !== 'out') return;
   signinErr = '';
   let a;
   try {
-    const ch = await rpc('packout_passkey_challenge', {});
+    let ch = faceCh && Date.now() - faceCh.t < 4 * 60000 ? faceCh.v : null; faceCh = null;
+    if (!ch) ch = await rpc('packout_passkey_challenge', {});
     a = await navigator.credentials.get({ publicKey: { challenge: unb64u(ch), rpId: location.hostname,
       allowCredentials: [{ type: 'public-key', id: unb64u(f.id) }], userVerification: 'required', timeout: 60000 } });
   } catch (e) {
@@ -2012,9 +2021,9 @@ const act = {
     if (!store.get('seenGuide')) { store.set('seenGuide', 1); guideSheet(true); }
   },
   'change-who'(){ me = null; render(); },
-  'si-name'(el){ signinPick = el.dataset.n; signinErr = ''; signinMode = ''; render(); window.scrollTo(0, 0); },
+  'si-name'(el){ signinPick = el.dataset.n; signinErr = ''; signinMode = store.get('signinMode:' + signinPick) || ''; render(); window.scrollTo(0, 0); autoFace(); },
   'si-back'(){ signinPick = ''; signinErr = ''; signinMode = ''; render(); },
-  'si-mode'(el){ signinMode = el.dataset.m; signinErr = ''; render(); },
+  'si-mode'(el){ signinMode = el.dataset.m; store.set('signinMode:' + signinPick, signinMode); signinErr = ''; render(); if (signinMode === 'face') faceIdSignIn(false); },
   'pin-key'(el){
     if (pack.signingIn) return;
     const k = el.dataset.k;
@@ -2584,7 +2593,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.26';
+const APP_VERSION = '2026-11-22.27';
 let newVersion = false;
 async function checkVersion(){
   try {
@@ -2608,8 +2617,9 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
       if (cfg && cfg.team) setTimeout(() => toast('This phone already has the team link, so the view-only link was not applied.', 'bad'), 800);
       else { cfg = { url: j.u, key: j.k, view: true }; store.set('cfg', cfg); }
     } } catch {} if (!isStandalone()) history.replaceState(null, '', location.pathname); }
-  if (cfg && !cfg.view) { faceSupported = await faceIdAvailable(); staff = 'checking'; render(); await checkStaff(); if (staff === 'in') lockNow(); else if (staff === 'out') signinPick = store.get('lastName') || ''; }
+  if (cfg && !cfg.view) { faceSupported = await faceIdAvailable(); staff = 'checking'; render(); await checkStaff(); if (staff === 'in') lockNow(); else if (staff === 'out') { signinPick = store.get('lastName') || ''; signinMode = store.get('signinMode:' + signinPick) || ''; } }
   render();
+  if (staff === 'out') setTimeout(autoFace, 400);
   if (cfg && staff !== 'out') {
     if (await loadCache()) { render(); refresh(true).then(ok => { if (ok && !sheetOpen()) softRender(); }); }   // open instantly, then catch up quietly
     else { await withBusy('Loading inventory', () => refresh()); render(); }

@@ -698,7 +698,7 @@ returns void language plpgsql volatile security definer set search_path = '' as 
 declare v_name text := packout_private.session_name();
 begin
   if v_name is null or not packout_private.team_ok() then raise exception 'NOT_SIGNED_IN' using errcode = '42501'; end if;
-  if p_cred_id !~ '^[A-Za-z0-9_-]{16,512}$' or length(p_public_key) not between 60 and 400 then raise exception 'BAD_KEY'; end if;
+  if p_cred_id !~ '^[A-Za-z0-9_-]+$' or length(p_cred_id) not between 16 and 512 or length(p_public_key) not between 60 and 400 then raise exception 'BAD_KEY'; end if;
   insert into packout_private.passkeys (cred_id, name, public_key) values (p_cred_id, v_name, p_public_key)
   on conflict (cred_id) do update set name = excluded.name, public_key = excluded.public_key, created_at = now();
 end;
