@@ -1414,8 +1414,8 @@ function packHTML(){
     ${pack.saved ? `<div class="saved">${esc(pack.saved)}</div>` : ''}
     <div class="panel">
       <div class="photosteps">
-        <label class="btn ${pack.photo ? 'done' : 'alt'} filebtn tagbtn">${pack.photo ? `<img class="mini" alt="" src="${esc(pack.photoUrl || '')}">` : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>'}${pack.photo ? '1. Item photo taken. Tap to retake' : '1. Photo of the item'}<input id="k-itemfirst" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the item on the rack"></label>
-        <label class="btn alt filebtn tagbtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>2. Photo of the tag<input id="k-tagphoto" data-where="style" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in the style and details"></label>
+        <label class="btn ${pack.photo ? 'done' : 'alt'} filebtn tagbtn">${pack.photo ? `<img class="mini" alt="" src="${esc(pack.photoUrl || '')}">` : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h4l2-3h6l2 3h4v11H3z"/><circle cx="12" cy="13" r="3.5"/></svg>'}${pack.photo ? '1. Item photo taken. Tap to retake' : '1. Photo of the item'}<input id="k-itemfirst" type="file" onchange="fileIn(event)" accept="image/*" capture="environment" aria-label="Take a photo of the item on the rack"></label>
+        <label class="btn alt filebtn tagbtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>2. Photo of the tag<input id="k-tagphoto" data-where="style" type="file" onchange="fileIn(event)" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in the style and details"></label>
       </div>
       <div id="tag-status">${pack.tagStatus || ''}</div>
       <p class="small muted" style="margin:8px 0 4px">With both photos, the app reads the style, color, size, type and brand, and names the color from the item. Check them before saving.</p>
@@ -1427,7 +1427,7 @@ function packHTML(){
 
   if (pack.stage === 'pallet') {
     const open = data.pallets.filter(p => p.status === 'open');
-    const rank = p => (pack.last && p.id === pack.last.pallet ? 0 : p.created_by === me.name ? 1 : 2);
+    const rank = p => (pack.last && p.id === pack.last.pallet ? 0 : p.created_by === me.name && itemsOf('pallet_id', p.id).length ? 1 : 2);
     open.sort((a, b) => rank(a) - rank(b) || b.id - a.id);
     return `${trailHTML()}
     <h1 class="h">New style. Pick its pallet.</h1>
@@ -1480,8 +1480,8 @@ function packHTML(){
     <div class="boxnow"><span>Packing into</span><b>${bCode(pack.box)}</b><span>${pCode(pack.pallet)}</span></div>
     <div class="panel">
       <div class="photo" id="k-photo-wrap">${pack.reuse && !pack.photo ? `<img alt="${pack.reuse.auto ? 'Photo of this color from earlier' : 'Same photo as the last box'}" src="${esc(reuseUrl(pack.reuse.path))}"><span class="again">${pack.reuse.auto ? 'This color is already photographed. Tap to retake' : 'Same photo. Tap to retake'}</span>` : '<span>Tap to take a photo of the item</span>'}
-        <input id="k-photo" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the item"></div>
-      <label class="btn alt filebtn tagbtn2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Read the tag for this color<input id="k-tagphoto" data-where="item" type="file" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in this item"></label>
+        <input id="k-photo" type="file" onchange="fileIn(event)" accept="image/*" capture="environment" aria-label="Take a photo of the item"></div>
+      <label class="btn alt filebtn tagbtn2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Read the tag for this color<input id="k-tagphoto" data-where="item" type="file" onchange="fileIn(event)" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in this item"></label>
       <div id="tag-status">${pack.tagStatus || ''}</div>
       ${pack.tagNote ? `<div class="note">${esc(pack.tagNote)}</div>` : ''}
       <label class="f" for="k-color">Color</label>
@@ -1534,7 +1534,7 @@ function palPick(p){
   const its = itemsOf('pallet_id', p.id);
   const last = pack.last && p.id === pack.last.pallet;
   return `<button class="pick ${last ? 'mine' : ''}" data-act="choose-pallet" data-id="${p.id}"><span class="tag">${pCode(p.id)}</span>
-    <span><b>${last ? 'Keep using this pallet' : 'Started by ' + esc(p.created_by)}</b>
+    <span><b>${last && its.length ? 'Keep using this pallet' : !its.length ? 'Empty. Anyone can use it' : 'Started by ' + esc(p.created_by)}</b>
     <small>${plural(data.boxes.filter(b => b.pallet_id === p.id).length, 'box')}, ${plural(sumQty(its), 'piece')}</small></span></button>`;
 }
 function readForm(){
@@ -1555,7 +1555,7 @@ const BOXES_PER_PALLET = 30;
 function palletsHTML(){
   if (palView && idx.pal.get(palView)) return palletDetailHTML(idx.pal.get(palView));
   palView = null;
-  const list = data.pallets.filter(p => !palMine || p.created_by === me.name).sort((a, b) => a.id - b.id);
+  const list = data.pallets.filter(p => !palMine || (p.created_by === me.name && itemsOf('pallet_id', p.id).length)).sort((a, b) => a.id - b.id);
   return `<h1 class="h">Pallets</h1>
   <p class="lead">${plural(data.pallets.length, 'pallet')}, ${plural(data.boxes.length, 'box')}. Tap one to see what is on it.</p>
   <div class="seg"><button data-act="pal-mine" data-v="0" aria-pressed="${!palMine}">All</button><button data-act="pal-mine" data-v="1" aria-pressed="${palMine}">Started by me</button></div>
@@ -1575,7 +1575,7 @@ function palletDetailHTML(p){
   <div class="placard"><div class="stripes"></div><div class="in">
     ${p.status === 'closed' ? '<p><span class="badge closed">Closed</span></p>' : ''}
     <div class="code">${pCode(p.id)}</div>
-    <p>${plural(boxes.length, 'box')}, ${plural(styles.length, 'style')}, ${plural(sumQty(its), 'piece')}. Started by ${esc(p.created_by)}.</p>
+    <p>${plural(boxes.length, 'box')}, ${plural(styles.length, 'style')}, ${plural(sumQty(its), 'piece')}. ${its.length ? `Started by ${esc(p.created_by)}.` : 'Empty, so anyone can use it.'}</p>
   </div></div>
   ${canManage() ? `<div class="row" style="margin-bottom:12px">
     <button class="btn alt sm" data-act="toggle-pallet" data-id="${p.id}">${p.status === 'open' ? 'Close pallet' : 'Reopen pallet'}</button>
@@ -2187,7 +2187,7 @@ async function readTag(file, where){
   readingSteps();
   pack.tagFile = file;
   try {
-    const body = { tag: await blobToB64(await shrink(file, 1200, .85)), types: ALL_TYPES, sizes: [...SIZES, ...SIZESETS.women.list, ...SIZESETS.kids.list, ...SIZESETS.baby.list], style: where === 'item' ? pack.style : '' };
+    const body = { tag: await blobToB64(await shrink(file, 1600, .9)), types: ALL_TYPES, sizes: [...SIZES, ...SIZESETS.women.list, ...SIZESETS.kids.list, ...SIZESETS.baby.list], style: where === 'item' ? pack.style : '' };
     if (pack.photo) body.item = await blobToB64(await shrink(pack.photo, 512, .75));
     const t = await (await fnCall('read-tag', body)).json();
     if (run !== tagRun) return;
@@ -2217,7 +2217,7 @@ async function readTag(file, where){
 }
 async function runOcr(file){
   const run = ++ocrRun, url = URL.createObjectURL(file);
-  const again = `<label class="btn alt filebtn">Take the photo again<input id="k-ocr" type="file" accept="image/*" capture="environment"></label>`;
+  const again = `<label class="btn alt filebtn">Take the photo again<input id="k-ocr" type="file" onchange="fileIn(event)" accept="image/*" capture="environment"></label>`;
   openSheet(`<h2>Reading the tag</h2><img class="big" style="max-height:26vh" src="${url}" alt="Your photo of the tag">
     <div id="ocr-out"><p class="lead" id="ocr-msg">Getting the reader ready</p></div>
     <button class="btn quiet" data-act="close-sheet" style="margin-top:10px">Cancel</button>`);
@@ -3051,6 +3051,8 @@ const act = {
       await db.remove('items', 'id=in.(' + ids.map(encodeURIComponent).join(',') + ')');
       const gone = [...new Set(its.map(i => i.photo_path).filter(Boolean))].filter(p => !data.items.some(i => !ids.includes(i.id) && i.photo_path === p));
       if (gone.length) await removePhotos(gone);
+      for (const st of new Set(its.map(i => i.style_number)))
+        if (!data.items.some(i => i.style_number === st && !ids.includes(i.id))) { try { await db.remove('styles', 'style_number=' + eq(st)); } catch {} }
     }, `Deleted ${nf(sumQty(its))} ${unit(sumQty(its), 'piece')}`);
   },
   async 'row-edit-save'(el){
@@ -3069,7 +3071,7 @@ const act = {
     openSheet(`<h2>Delete this item?</h2><p class="lead">It is removed from the inventory for everyone. This can't be undone.</p>
       <div class="row"><button class="btn alt" data-act="open-item" data-id="${el.dataset.id}">Keep it</button><button class="btn danger" data-act="del-item-yes" data-id="${el.dataset.id}">Delete</button></div>`);
   },
-  async 'del-item-yes'(el){ closeSheet(); const it = data.items.find(i => i.id === el.dataset.id); await mutate('Deleting', async () => { await db.remove('items', 'id=' + eq(el.dataset.id)); if (it && !data.items.some(i => i.id !== it.id && i.photo_path === it.photo_path)) await removePhotos([it.photo_path]); }, 'Deleted'); },
+  async 'del-item-yes'(el){ closeSheet(); const it = data.items.find(i => i.id === el.dataset.id); await mutate('Deleting', async () => { await db.remove('items', 'id=' + eq(el.dataset.id)); if (it && !data.items.some(i => i.id !== it.id && i.photo_path === it.photo_path)) await removePhotos([it.photo_path]); if (it && !data.items.some(i => i.id !== it.id && i.style_number === it.style_number)) { try { await db.remove('styles', 'style_number=' + eq(it.style_number)); } catch {} } }, 'Deleted'); },
 
   scan(el){ openScanner(el.dataset.target); },
   guide(){ guideSheet(false); },
@@ -3322,18 +3324,18 @@ function swClose(){ if (swOpen) { swSet(swOpen, 0, true); swOpen.parentElement.c
 document.addEventListener('change', e => {
   if (e.target.id === 'k-color' && tab === 'pack' && pack.stage === 'item' && !pack.photo) { const had = pack.reuse && pack.reuse.path; autoReuse(e.target.value); if ((pack.reuse && pack.reuse.path) !== had) { pack.form = readForm(); const y = scrollY; render(); scrollTo(0, y); } } if (e.target.closest && e.target.closest('.dl')) delCount(); });
 
-/* ---------- events ---------- */
-document.addEventListener('click', e => {
-  const t = e.target.closest('[data-tab]');
-  if (t) { tab = t.dataset.tab; if (tab === 'pallets') palView = null; render(); scrollTo(0, 0); if (tab !== 'pack' && !liveOn) refresh(true).then(ok => ok && !sheetOpen() && softRender()); return; }
-  const a = e.target.closest('[data-act]');
-  if (a && act[a.dataset.act]) return act[a.dataset.act](a);
-  if (e.target.id === 'sheet') closeSheet();
-  if (e.target.id === 'zoom') act['zoom-close']();
-});
-document.addEventListener('change', e => {
-  if (e.target.dataset && 'fsort' in e.target.dataset) { fSortDraft = e.target.value; return; }
-  if (e.target.dataset && e.target.dataset.fk && fDraft) { const k = e.target.dataset.fk; fDraft[k] = e.target.value; if (k === 'pallet' && fDraft.pallet && fDraft.box && idx.box.get(+fDraft.box) && String(idx.box.get(+fDraft.box).pallet_id) !== fDraft.pallet) fDraft.box = ''; drawFilters(); return; }
+// Photos. The camera sends the page to the background; when it comes back the app may refresh. A file input
+// replaced during that refresh would lose the photo, so: no refreshes or updates while the camera is open, and
+// every file input also calls fileIn directly (that still works if the input was replaced).
+let picking = 0;
+const isPicking = () => picking && Date.now() - picking < 180000;
+document.addEventListener('click', e => { const inp = e.target.closest && (e.target.matches('input[type=file]') ? e.target : e.target.closest('label') && e.target.closest('label').querySelector('input[type=file]')); if (inp) picking = Date.now(); }, true);
+document.addEventListener('cancel', e => { if (e.target.type === 'file') pickDone(); }, true);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && picking) setTimeout(() => { if (picking && Date.now() - picking > 4000) pickDone(); }, 6000); });
+function pickDone(){ if (!picking) return; picking = 0; setTimeout(() => { if (!picking) softRender(); }, 1500); }
+function fileIn(e){
+  if (!e.target.files || !e.target.files[0] || e.target._took === e.target.files[0]) return;
+  e.target._took = e.target.files[0]; pickDone();
   if (e.target.id === 'k-itemfirst' && e.target.files[0]) {
     const f = e.target.files[0]; e.target.value = '';
     pack.photo = f; pack.photoFirst = true; if (pack.photoUrl) URL.revokeObjectURL(pack.photoUrl); pack.photoUrl = URL.createObjectURL(f);
@@ -3354,6 +3356,21 @@ document.addEventListener('change', e => {
   }
   if (e.target.id === 'k-ocr' && e.target.files[0]) { const f = e.target.files[0]; e.target.value = ''; runOcr(f); }
   if (e.target.id === 'k-tagphoto' && e.target.files[0]) { const f = e.target.files[0], w = e.target.dataset.where || 'style'; e.target.value = ''; readTag(f, w); }
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-tab]');
+  if (t) { tab = t.dataset.tab; if (tab === 'pallets') palView = null; render(); scrollTo(0, 0); if (tab !== 'pack' && !liveOn) refresh(true).then(ok => ok && !sheetOpen() && softRender()); return; }
+  const a = e.target.closest('[data-act]');
+  if (a && act[a.dataset.act]) return act[a.dataset.act](a);
+  if (e.target.id === 'sheet') closeSheet();
+  if (e.target.id === 'zoom') act['zoom-close']();
+});
+document.addEventListener('change', e => {
+  if (e.target.dataset && 'fsort' in e.target.dataset) { fSortDraft = e.target.value; return; }
+  if (e.target.dataset && e.target.dataset.fk && fDraft) { const k = e.target.dataset.fk; fDraft[k] = e.target.value; if (k === 'pallet' && fDraft.pallet && fDraft.box && idx.box.get(+fDraft.box) && String(idx.box.get(+fDraft.box).pallet_id) !== fDraft.pallet) fDraft.box = ''; drawFilters(); return; }
+  if (e.target.type === 'file') fileIn(e);
 });
 document.addEventListener('change', e => {
   if (tab === 'pack' && pack.stage === 'item' && !pack.sizeSet && (e.target.id === 'k-type' || e.target.name === 'k-gender') && e.target.value !== '__other') {
@@ -3397,6 +3414,7 @@ function keepInputs(fn){                // re-draw the screen, keeping typed val
 }
 function softRender(){            // show changes from other phones without disturbing the person using this one
   if (!cfg || !me || !loaded) return;
+  if (isPicking()) return;          // the camera is open: redraw after the photo arrives
   if (sheetOpen()) { softPending = true; return; }
   if (tab === 'inventory') return renderInvList();
   if (tab === 'pallets') return keepInputs(render);
@@ -3423,7 +3441,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.51';
+const APP_VERSION = '2026-11-23.52';
 let newVersion = false;
 async function checkVersion(){
   try {
@@ -3432,7 +3450,7 @@ async function checkVersion(){
     if (m && m[1] !== APP_VERSION) newVersion = true;
   } catch {}
 }
-const safeToReload = () => !busyN && !sheetOpen() && !polishBusy && !(tab === 'pack' && (pack.stage !== 'style' || pack.photo || pack.tagStatus));
+const safeToReload = () => !isPicking() && !busyN && !sheetOpen() && !polishBusy && !(tab === 'pack' && (pack.stage !== 'style' || pack.photo || pack.tagStatus));
 setInterval(() => { if (!document.hidden) checkVersion(); }, 120000);
 setInterval(() => { if (newVersion && safeToReload()) location.reload(); }, 5000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkVersion(); });
