@@ -1053,9 +1053,12 @@ function renderInvList(){
     <div><b>${nf(new Set(list.map(i => i.box_id)).size)}</b>${unit(new Set(list.map(i => i.box_id)).size, 'box')}</div><div><b>${nf(new Set(list.map(i => i.pallet_id)).size)}</b>${unit(new Set(list.map(i => i.pallet_id)).size, 'pallet')}</div></div>`;
   const val = k => k === 'pallet' ? pCode(filt[k]) : k === 'box' ? bCode(filt[k]) : filt[k];
   $('#inv-chips').innerHTML = Object.keys(FLABEL).filter(k => filt[k]).map(k => `<button data-act="clear-filter" data-k="${k}" aria-label="Remove filter ${FLABEL[k]}">${k === 'pallet' || k === 'box' ? '' : FLABEL[k] + ': '}${esc(val(k))} &times;</button>`).join('');
-  $('#inv-list').innerHTML = !data.items.length ? `<div class="empty"><b>Nothing packed yet</b>Items show up here the moment someone saves them.</div>`
-    : !list.length ? `<div class="empty"><b>No items match</b>Change the search or remove a filter.</div>`
-    : groups.slice(0, invLimit).map(g => { const i = g.first; return `
+  const box = $('#inv-list');
+  if (!data.items.length || !list.length) {
+    box.innerHTML = !data.items.length ? `<div class="empty"><b>Nothing packed yet</b>Items show up here the moment someone saves them.</div>` : `<div class="empty"><b>No items match</b>Change the search or remove a filter.</div>`;
+    return;
+  }
+  const rows = groups.slice(0, invLimit).map(g => { const i = g.first; return { key: g.key, html: `
       <button class="irow" data-act="open-group" data-k="${esc(g.key)}">
         ${i.photo_path ? `<img loading="lazy" alt="Enlarge photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(thumbUrl(i))}" data-act="zoom-photo" data-id="${i.id}">` : '<span class="noimg"></span>'}
         <span class="mid"><span class="st">${esc(i.style_number)}</span>${i.item_type ? `<span class="tp">${esc(i.item_type)}</span>` : ''}
@@ -1064,7 +1067,30 @@ function renderInvList(){
         <span class="wide">${esc(i.color)}</span><span class="wide">${esc(i.brand)}</span><span class="wide">${esc(i.gender)}</span><span class="wide">${esc(i.season)}</span><span class="wide szw">${sizeLineHTML(g)}</span>
         <span class="loc wide" style="text-align:left">${locText(g)}</span>
         <span class="loc"><span class="lc">${locText(g)}</span><em>${nf(g.qty)}<u>pcs</u></em></span>
-      </button>`; }).join('') + (groups.length > invLimit ? `<button class="btn quiet" data-act="inv-more">Show more (${nf(groups.length - invLimit)} left)</button>` : '');
+      </button>` }; });
+  if (groups.length > invLimit) rows.push({ key: '__more', html: `<button class="btn quiet" data-act="inv-more">Show more (${nf(groups.length - invLimit)} left)</button>` });
+  patchList(box, rows);
+}
+// Updates a list in place: rows that did not change are kept as they are, so their photos never reload or flicker.
+function patchList(box, rows){
+  const old = new Map([...box.children].filter(c => c.dataset && c.dataset.pk).map(c => [c.dataset.pk, c]));
+  [...box.children].forEach(c => { if (!c.dataset || !c.dataset.pk) c.remove(); });
+  const tpl = document.createElement('template');
+  let prev = null;
+  rows.forEach(r => {
+    let el = old.get(r.key);
+    if (!el || el._h !== r.html) {
+      tpl.innerHTML = r.html.trim(); const fresh = tpl.content.firstElementChild;
+      fresh.dataset.pk = r.key; fresh._h = r.html;
+      if (el) el.replaceWith(fresh);
+      el = fresh;
+    }
+    old.delete(r.key);
+    const want = prev ? prev.nextElementSibling : box.firstElementChild;
+    if (want !== el) box.insertBefore(el, want);
+    prev = el;
+  });
+  old.forEach(el => el.remove());
 }
 // one row per style and color; the sizes are shown together in that row
 function groupItems(list){
@@ -2353,7 +2379,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.19';
+const APP_VERSION = '2026-11-22.20';
 let newVersion = false;
 async function checkVersion(){
   try {
