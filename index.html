@@ -160,6 +160,9 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 #lock h2{margin:0 0 4px}
 #lock #lock-who{color:var(--ink2);margin:0 0 18px;font-weight:600}
 #lock #lock-err{color:#B42318;margin:10px 0 0}
+#lock .faceb{display:flex;align-items:center;justify-content:center;gap:10px}
+#lock .faceb svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#top .who b{cursor:pointer}
 .faceid{display:flex;gap:10px;align-items:center;justify-content:space-between;background:#F4F6F8;border-radius:8px;padding:10px 12px;margin-bottom:12px}
 .faceid span{font-size:14px}
 .faceid .btn{width:auto;flex:none;margin:0}
@@ -435,10 +438,10 @@ dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
   <button data-tab="more"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Export</span></button>
 </nav>
 <div id="sheet"><div class="card" role="dialog" aria-modal="true"></div></div>
-<div id="lock" hidden role="dialog" aria-modal="true" aria-label="Packout is locked"><div class="lockcard">
-  <img src="icon-192.png" alt="" width="72" height="72"><h2>Packout is locked</h2><p id="lock-who"></p>
-  <button class="btn" data-act="faceid-unlock">Unlock with Face ID</button>
-  <button class="btn quiet" data-act="faceid-usepin">Use my PIN instead</button><p id="lock-err" class="small"></p></div></div>
+<div id="lock" hidden role="dialog" aria-modal="true" aria-label="Sign in"><div class="lockcard">
+  <img src="icon-192.png" alt="" width="72" height="72"><h2>Sign in</h2><p id="lock-who"></p>
+  <button class="btn faceb" data-act="faceid-unlock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M9 9v1M15 9v1M12 9v4h-1M9 16c1.8 1.3 4.2 1.3 6 0"/></svg>Sign in with Face ID</button>
+  <button class="btn quiet" data-act="faceid-usepin">Sign in with PIN</button><p id="lock-err" class="small"></p></div></div>
 <div id="zoom" hidden role="dialog" aria-modal="true" aria-label="Photo"><div class="zcard"><button id="zoom-x" data-act="zoom-close" aria-label="Close photo">&times;</button><img id="zoom-img" alt=""><p id="zoom-cap"></p></div></div>
 <div id="toast" role="status"></div>
 <div id="busy"><div><i></i><span></span></div></div>
@@ -759,7 +762,7 @@ const joined = () => data.items.map(i => ({ ...i, box: idx.box.get(i.box_id), pa
 
 /* ---------- screens: setup ---------- */
 function render(){
-  $('#who').innerHTML = me ? `<b>${esc(me.name)}</b>` : '';
+  $('#who').innerHTML = me ? (staff === 'in' ? `<b data-act="account" role="button" tabindex="0">${esc(me.name)} ›</b>` : `<b>${esc(me.name)}</b>`) : '';
   const v = $('#view'); v.classList.toggle('wide', tab === 'inventory' && !!cfg && !!me);
   if (!cfg) { $('#nav').hidden = true; return v.innerHTML = connectHTML(); }
   if (cfg.view) { if (!me || !me.view) { me = { name: 'View only', view: true }; store.set('me', me); } if (tab === 'pack') tab = 'inventory'; $('#who').innerHTML = '<b>View only</b>'; }
@@ -1454,12 +1457,12 @@ async function faceIdTurnOn(){
       pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
       authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' }, timeout: 60000 } });
     store.set('faceid', { name: me.name, id: b64u(c.rawId) });
-    toast('Face ID is on. The app asks for it when you open it.', 'good'); render();
+    closeSheet(); toast('Face ID is on. Next time, sign in with your face.', 'good'); render();
   } catch (e) { if (e && e.name !== 'NotAllowedError') toast('Face ID could not be turned on: ' + e.message, 'bad'); }
 }
 function lockNow(){
   if (!faceId() || staff === 'out' || cfg.view) return;
-  $('#lock-who').textContent = me.name; $('#lock-err').textContent = ''; $('#lock').hidden = false; lockedAt = Date.now();
+  $('#lock-who').textContent = 'Welcome back, ' + me.name; $('#lock-err').textContent = ''; $('#lock').hidden = false; lockedAt = Date.now();
   setTimeout(faceIdUnlock, 300);      // ask for the face straight away; the button stays for a second try
 }
 async function faceIdUnlock(){
@@ -1467,7 +1470,7 @@ async function faceIdUnlock(){
   try {
     await navigator.credentials.get({ publicKey: { challenge: rnd(32), rpId: location.hostname, allowCredentials: [{ type: 'public-key', id: unb64u(f.id) }], userVerification: 'required', timeout: 60000 } });
     $('#lock').hidden = true;
-  } catch (e) { $('#lock-err').textContent = e && e.name === 'NotAllowedError' ? 'Face ID was cancelled. Try again, or use your PIN.' : 'Face ID did not work. Use your PIN instead.'; }
+  } catch (e) { $('#lock-err').textContent = e && e.name === 'NotAllowedError' ? 'Face ID was cancelled. Try again, or sign in with your PIN.' : 'Face ID did not work. Sign in with your PIN.'; }
 }
 // lock again when the app comes back after 5 minutes away
 document.addEventListener('visibilitychange', () => {
@@ -1599,6 +1602,22 @@ async function runOcr(file){
   } finally { URL.revokeObjectURL(url); }
 }
 
+/* ---------- Face ID sign-in on this phone ---------- */
+function faceOffer(){
+  openSheet(`<h2>Sign in with Face ID?</h2>
+    <p class="lead">Next time you open Packout on this phone, sign in with your face instead of typing your PIN.</p>
+    <button class="btn" data-act="faceid-on">Use Face ID</button>
+    <button class="btn quiet" data-act="close-sheet">Not now</button>`);
+}
+function accountSheet(){
+  openSheet(`<h2>${esc(me.name)}</h2>
+    ${!faceSupported ? `<p class="lead">Face ID sign-in isn't available in this browser. Open Packout from its home-screen icon, or in Safari.</p>`
+      : faceId() ? `<p class="lead"><b>Face ID sign-in is on</b> for this phone.</p><button class="btn quiet" data-act="faceid-off">Turn off Face ID</button>`
+      : `<p class="lead">Sign in with your face on this phone instead of typing your PIN.</p><button class="btn" data-act="faceid-on">Use Face ID</button>`}
+    <button class="btn quiet" data-act="sign-out">Sign out</button>
+    <button class="btn quiet" data-act="close-sheet">Close</button>`);
+}
+
 /* ---------- quick guide for employees ---------- */
 function guideSheet(first){
   openSheet(`<h2>${first ? 'How packing works' : 'How to use Packout'}</h2>
@@ -1609,7 +1628,7 @@ function guideSheet(first){
       <li><b class="n">4</b><span><strong>When a box is full</strong>After saving, tap <em>Same color, next box</em> to keep going with the same photo, or <em>Box full</em> at the top. Write the new box number on the box. <em>Next style</em> when the style is done.</span></li>
     </ol>
     <p class="small muted" style="margin-bottom:12px">Tap the ? at the top to see this again.</p>
-    ${staff === 'in' && faceSupported && !faceId() ? `<div class="faceid" style="margin-bottom:12px"><span><b>Face ID</b> (optional): open the app on this phone with your face.</span><button class="btn alt sm" data-act="faceid-on">Turn on</button></div>` : ''}
+    ${staff === 'in' && faceSupported && !faceId() ? `<div class="faceid" style="margin-bottom:12px"><span><b>Face ID</b> (optional): next time, sign in with your face.</span><button class="btn alt sm" data-act="faceid-on">Turn on</button></div>` : ''}
     <button class="btn" data-act="close-sheet" autofocus>${first ? 'Start packing' : 'Got it'}</button>`);
 }
 const QR_LIB = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
@@ -1735,11 +1754,6 @@ function moreHTML(){
     <button class="btn" data-act="join-code">Show join code</button>
     <button class="btn alt" data-act="invite">Share invite link</button></div>` : ''}
   <div class="panel"><h2>This phone</h2>
-    ${staff === 'in' ? `<div class="faceid">${!faceSupported
-      ? `<span><b>Face ID</b> isn't available in this browser. Open Packout from its home-screen icon, or in Safari, and look here again.</span>`
-      : faceId()
-      ? `<span><b>Face ID is on.</b> The app asks for it when you open it.</span><button class="btn quiet sm" data-act="faceid-off">Turn off</button>`
-      : `<span><b>Face ID</b> (optional): lock the app on this phone and open it with your face.</span><button class="btn alt sm" data-act="faceid-on">Turn on</button>`}</div>` : ''}
     <dl class="facts"><dt>Name</dt><dd>${esc(me.name)}</dd><dt>Access</dt><dd>${cfg.view ? 'View only' : cfg.team ? 'Team (can pack)' : 'Team'}</dd><dt>Database</dt><dd style="word-break:break-all">${esc(cfg.url.replace('https://', ''))}</dd></dl>
     ${!canEdit() ? '' : staff === 'in' ? '<button class="btn quiet" data-act="sign-out">Sign out</button>' : '<button class="btn quiet" data-act="change-who">Change name</button>'}
     <button class="btn quiet" data-act="disconnect">Disconnect this phone</button></div>`;
@@ -1926,6 +1940,7 @@ const act = {
         me = { name: r.name, owner: !!r.owner }; store.set('me', me); staff = 'in'; signinErr = '';
         await refresh(); render(); startLive();
         if (!store.get('seenGuide')) { store.set('seenGuide', 1); guideSheet(true); }
+        else if (faceSupported && !faceId() && !store.get('faceidAsked:' + r.name)) { store.set('faceidAsked:' + r.name, 1); faceOffer(); }
       } catch (e) {
         signinErr = /LOCKED/.test(e.message) ? 'This name is locked after 5 wrong PINs. Ask Avigdor to unlock it.' : /NO_NAME/.test(e.message) ? 'This name is turned off. Ask Avigdor.' : /NOT_TEAM/.test(e.message) ? 'This phone needs the team link from Avigdor first.' : e.message;
         render();
@@ -1933,13 +1948,14 @@ const act = {
     });
   },
   'faceid-on'(){ faceIdTurnOn(); },
-  'faceid-off'(){ store.del('faceid'); toast('Face ID is off on this phone.', 'good'); render(); },
+  'faceid-off'(){ store.del('faceid'); closeSheet(); toast('Face ID is off on this phone.', 'good'); render(); },
   'faceid-unlock'(){ faceIdUnlock(); },
-  async 'faceid-usepin'(){ store.del('faceid'); $('#lock').hidden = true; await act['sign-out'](); },
+  async 'faceid-usepin'(){ const f = store.get('faceid'); $('#lock').hidden = true; signinPick = me && me.name || ''; await act['sign-out'](); if (f) store.set('faceid', f); render(); },
   async 'sign-out'(){
     try { await rpc('packout_logout', {}); } catch {}
-    delete cfg.session; store.set('cfg', cfg); me = null; store.del('me'); await checkStaff(); render();
+    store.del('faceid'); closeSheet(); delete cfg.session; store.set('cfg', cfg); me = null; store.del('me'); await checkStaff(); render();
   },
+  'account'(){ if (staff === 'in') accountSheet(); },
   'staff-open': staffSheet,
   'staff-back': staffSheet,
   async 'staff-add'(){
@@ -2477,7 +2493,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.23';
+const APP_VERSION = '2026-11-22.24';
 let newVersion = false;
 async function checkVersion(){
   try {
@@ -2495,7 +2511,8 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 (async function start(){
   const m = location.hash.match(/^#(join|view)=(.+)$/);
   if (m) { try { const j = JSON.parse(decodeURIComponent(escape(atob(m[2]))));
-    if (j.u && j.k && m[1] === 'join') { cfg = { url: j.u, key: j.k, ...(j.t ? { team: j.t } : {}) }; store.set('cfg', cfg); if (j.n && !me) { me = { name: j.n }; store.set('me', me); } }
+    if (j.u && j.k && m[1] === 'join') { const same = cfg && cfg.url === j.u && cfg.key === j.k && (cfg.team || '') === (j.t || '');   // opening from the home-screen icon: keep the sign-in
+      if (!same) { cfg = { url: j.u, key: j.k, ...(j.t ? { team: j.t } : {}) }; store.set('cfg', cfg); } if (j.n && !me) { me = { name: j.n }; store.set('me', me); } }
     if (j.u && j.k && m[1] === 'view') {
       if (cfg && cfg.team) setTimeout(() => toast('This phone already has the team link, so the view-only link was not applied.', 'bad'), 800);
       else { cfg = { url: j.u, key: j.k, view: true }; store.set('cfg', cfg); }
