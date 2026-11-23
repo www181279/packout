@@ -1464,7 +1464,7 @@ function packHTML(){
   const prev = data.items.filter(i => i.style_number === pack.style).slice(-1)[0] || store.get('lastForm') || {};
   let f = pack.form || { type: prev.item_type || prev.type || '', brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', sizes: [], more: [] };
   if (!pack.form && pack.tagRead) { f = mergeTag(f, pack.tagRead); pack.tagRead = null; pack.form = f; }
-  if (pack.stage === 'item' && !pack.photo && (!pack.reuse || pack.reuse.auto)) autoReuse(f.color);
+  if (pack.stage === 'item' && (!pack.photo || pack.photoFirst) && (!pack.reuse || pack.reuse.auto)) autoReuse(f.color);
   const sizes = f.sizes || [];
   const typeOther = f.type === '__other' || (f.type && !ALL_TYPES.includes(f.type) && !data.items.some(i => i.item_type === f.type));
   const more = f.more || [];
@@ -1732,12 +1732,14 @@ function rowEditSheet(key){
 function groupItems(list){
   const m = new Map();
   for (const i of list){
-    const key = i.style_number + '|' + i.color;
+    const key = i.style_number + '|' + (colorKey(i.color) || i.color);     // LTEZYM, LTEZYM (Blue) and LTEZYM (Light Blue) are one color
     let g = m.get(key); if (!g) m.set(key, g = { key, first: i, items: [], qty: 0 });
     g.items.push(i); g.qty += i.quantity;
     if (i.photo_pro && !g.first.photo_pro) g.first = i;
   }
-  return [...m.values()];
+  const gs = [...m.values()];
+  gs.forEach(g => { const label = colorLabel(g.items.map(i => i.color)); if (label !== g.first.color) g.first = { ...g.first, color: label }; });
+  return gs;
 }
 function sizeTotals(g){
   const t = new Map(); g.items.forEach(i => t.set(i.size || '', (t.get(i.size || '') || 0) + i.quantity));
@@ -2132,13 +2134,26 @@ async function markPro(path){
 let tagRun = 0;
 // Same style and same color already packed with a photo? Use that photo instead of asking for a new one.
 const colorKey = c => String(c || '').toLowerCase().replace(/\s*\(.*\)\s*$/, '').replace(/\s+/g, ' ').trim();
+// the clearest way a color was written: with its plain name, the most used one first
+function colorLabel(list){
+  const n = new Map(); list.filter(Boolean).forEach(c => n.set(c, (n.get(c) || 0) + 1));
+  return [...n.keys()].sort((a, b) => (/\(/.test(b) - /\(/.test(a)) || n.get(b) - n.get(a) || b.length - a.length)[0] || '';
+}
+// a color typed or read for a style that already has it is saved exactly as before, so the inventory stays one row
+function sameColorAs(style, color){
+  const k = colorKey(color); if (!k) return color;
+  const seen = data.items.filter(i => i.style_number === style && colorKey(i.color) === k).map(i => i.color);
+  return seen.length ? colorLabel(seen.concat(/\(/.test(color) && !seen.some(c => /\(/.test(c)) ? [color] : [])) : color;
+}
 function autoReuse(color){
-  if (pack.photo || !pack.style || !colorKey(color)) return false;
+  if ((pack.photo && !pack.photoFirst) || !pack.style || !colorKey(color)) return false;
   const k = colorKey(color), hit = data.items.filter(i => i.style_number === pack.style && i.photo_path && colorKey(i.color) === k)
     .sort((a, b) => (b.photo_pro ? 1 : 0) - (a.photo_pro ? 1 : 0))[0];
   if (!hit) { if (pack.reuse && pack.reuse.auto) pack.reuse = null; return false; }
   if (pack.reuse && pack.reuse.path === hit.photo_path) return true;
-  pack.reuse = { path: hit.photo_path, auto: true }; return true;
+  pack.reuse = { path: hit.photo_path, auto: true };
+  if (pack.photo) { pack.photo = null; pack.early = null; pack.photoFirst = false; }   // keep one photo per color: the one already saved
+  return true;
 }
 function mergeTag(f, t){
   f = { ...f, sizes: [...(f.sizes || [])], more: [...(f.more || [])] };
@@ -2935,6 +2950,7 @@ const act = {
           const [full, thumb] = await Promise.all([shrink(pack.photo, 1400, .82), shrink(pack.photo, 280, .72)]);
           await Promise.all([uploadPhoto(path, full), uploadPhoto('thumb/' + path, thumb)]);
         }
+        f.color = sameColorAs(pack.style, f.color);
         const row = { style_number: pack.style, box_id: pack.box, item_type: f.type, color: f.color, brand: f.brand, tag_number: f.tag,
           gender: f.gender, season: f.season, photo_path: path, created_by: me.name };
         // one line per size, all with this photo; the same ids are reused if Save is tapped again after a lost reply
@@ -3319,13 +3335,13 @@ document.addEventListener('change', e => {
   if (e.target.dataset && e.target.dataset.fk && fDraft) { const k = e.target.dataset.fk; fDraft[k] = e.target.value; if (k === 'pallet' && fDraft.pallet && fDraft.box && idx.box.get(+fDraft.box) && String(idx.box.get(+fDraft.box).pallet_id) !== fDraft.pallet) fDraft.box = ''; drawFilters(); return; }
   if (e.target.id === 'k-itemfirst' && e.target.files[0]) {
     const f = e.target.files[0]; e.target.value = '';
-    pack.photo = f; if (pack.photoUrl) URL.revokeObjectURL(pack.photoUrl); pack.photoUrl = URL.createObjectURL(f);
+    pack.photo = f; pack.photoFirst = true; if (pack.photoUrl) URL.revokeObjectURL(pack.photoUrl); pack.photoUrl = URL.createObjectURL(f);
     if (canEdit()) startEarlyPolish(f);
     keepInputs(render);
     detectColors(f).then(names => { if (pack.photo === f) pack.colors = names.filter(n => n !== 'White' || names.length === 1).slice(0, 1); });
   }
   if (e.target.id === 'k-photo' && e.target.files[0]) {
-    const f = e.target.files[0]; pack.photo = f; if (canEdit()) startEarlyPolish(f); showPhoto(f); const r = $('#k-photo-wrap img[src^="http"]'); if (r) r.remove();
+    const f = e.target.files[0]; pack.photo = f; pack.photoFirst = false; if (pack.reuse) pack.reuse = null; if (canEdit()) startEarlyPolish(f); showPhoto(f); const r = $('#k-photo-wrap img[src^="http"]'); if (r) r.remove();
     detectColors(f).then(names => {
       if (pack.photo !== f) return;
       pack.colors = names.filter(n => n !== 'White' || names.length === 1).slice(0, 1);
@@ -3406,7 +3422,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.49';
+const APP_VERSION = '2026-11-23.50';
 let newVersion = false;
 async function checkVersion(){
   try {
