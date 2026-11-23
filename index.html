@@ -317,6 +317,18 @@ body.signing #view{max-width:440px;padding:0 20px}
 .flink:disabled{color:#A3ADBB;text-decoration:none;cursor:default}
 .fx{width:40px;height:40px;border-radius:50%;border:0;background:var(--paper);display:grid;place-items:center;cursor:pointer;margin-left:4px}
 .fx svg{width:20px;height:20px;fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round}
+.fgrp{padding:18px 0}.fgrp+.fgrp{border-top:1px solid var(--line)}
+.fgrp h3{font:700 13px/1 var(--body);color:var(--ink2);margin-bottom:12px}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px 12px}
+.fsel{display:flex;flex-direction:column;gap:6px;min-width:0}
+.fsel>span:first-child{font-size:14px;font-weight:600;color:var(--ink)}
+.fwrap{position:relative;display:block}
+.fsel select{width:100%;min-height:48px;margin:0;border:1.5px solid var(--line);border-radius:10px;background-color:var(--paper);font-size:16px;text-overflow:ellipsis}
+.fsel select:disabled{color:#A3ADBB;background-color:#F1F4F6}
+.fsel.on select{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink);font-weight:600;padding-right:72px}
+.fclr{position:absolute;right:36px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;border:0;background:var(--floor);display:grid;place-items:center;cursor:pointer}
+.fclr svg{width:14px;height:14px;fill:none;stroke:var(--ink);stroke-width:2.6;stroke-linecap:round}
+.fclr:focus-visible{outline:3px solid var(--placard);outline-offset:1px}
 .fsec{padding:16px 0;border-bottom:1px solid var(--line)}
 .fsec header{display:flex;align-items:center;justify-content:space-between;min-height:24px;margin-bottom:10px}
 .fsec h3{font:700 15px/1.2 var(--body);color:var(--ink)}
@@ -342,6 +354,7 @@ body.signing #view{max-width:440px;padding:0 20px}
 .fduo .fsec{border-bottom:0}
 .ffoot{position:sticky;bottom:0;z-index:2;background:var(--floor);padding:14px 0 calc(16px + env(safe-area-inset-bottom));margin-top:2px;box-shadow:0 -10px 16px -12px rgba(19,33,58,.25)}
 .ffoot .btn{margin:0}.ffoot .btn:disabled{opacity:.5}
+@media (max-width:360px){.fgrid{grid-template-columns:1fr}}
 @media (max-width:480px){.fduo{grid-template-columns:1fr;gap:0}.fduo .fsec+.fsec{border-top:1px solid var(--line)}}
 @media (prefers-reduced-motion:reduce){.fc{transition:none}}
 .irow{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px 8px 8px;margin-bottom:6px}
@@ -1645,34 +1658,22 @@ function drawFilters(){
   const facet = k => { const m = new Map(); rows.forEach(i => { if (!passes(i, fDraft, k)) return; const v = FFIELD[k](i); if (v) m.set(v, (m.get(v) || 0) + (i.quantity || 0)); }); return m; };
   const nOn = Object.keys(FLABEL).filter(k => fDraft[k]).length;
   const result = rows.filter(i => passes(i, fDraft)), pcs = sumQty(result);
-  const chips = (k, order, label = v => v, cap = 12) => {
-    const m = facet(k), cur = String(fDraft[k] || '');
-    let vals = order(Array.from(new Set(rows.map(FFIELD[k]).filter(Boolean))));
-    vals.sort((x, y) => (m.get(String(y)) ? 1 : 0) - (m.get(String(x)) ? 1 : 0) || 0);
-    if (!vals.length) return `<p class="fnone">Nothing recorded yet</p>`;
-    const more = vals.length > cap && !fMore[k] && !(cur && vals.indexOf(cur) >= cap);
-    const shown = more ? vals.slice(0, cap) : vals;
-    return `<div class="fchipset" role="radiogroup" aria-label="${FLABEL[k]}">${shown.map(v => { const on = String(v) === cur, c = m.get(String(v)) || 0;
-      return `<button type="button" class="fc${on ? ' on' : ''}" role="radio" aria-checked="${on}" data-act="fpick" data-k="${k}" data-v="${esc(v)}" ${!c && !on ? 'disabled' : ''}>${on ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>' : ''}<span>${esc(label(v))}</span><small>${nf(c)}</small></button>`; }).join('')}
-      ${more ? `<button type="button" class="fc fmore" data-act="fmore" data-k="${k}">Show all ${nf(vals.length)}</button>` : ''}</div>`;
-  };
-  const sec = (k, body, title = FLABEL[k]) => `<section class="fsec"><header><h3>${title}</h3>${fDraft[k] ? `<button type="button" class="flink" data-act="fpick" data-k="${k}" data-v="">Clear</button>` : ''}</header>${body}</section>`;
   const az = a => a.sort((x, y) => String(x).localeCompare(String(y), undefined, { numeric: true }));
-  const pm = facet('pallet'), bm = facet('box');
-  const sel = (k, vals, lab, m) => `<label class="fsel"><span>${FLABEL[k]}</span><select data-fk="${k}"><option value="">Any ${FLABEL[k].toLowerCase()}</option>${vals.map(v => `<option value="${v}" ${String(fDraft[k]) === String(v) ? 'selected' : ''} ${!m.get(String(v)) && String(fDraft[k]) !== String(v) ? 'disabled' : ''}>${esc(lab(v))}  (${nf(m.get(String(v)) || 0)})</option>`).join('')}</select></label>`;
+  const all = k => Array.from(new Set(rows.map(FFIELD[k]).filter(Boolean)));
+  // a labelled dropdown; each choice shows how many pieces it would give with the other filters
+  const sel = (k, vals, lab = v => v) => { const m = facet(k), cur = String(fDraft[k] || '');
+    return `<label class="fsel${cur ? ' on' : ''}"><span>${FLABEL[k]}</span><span class="fwrap"><select data-fk="${k}" ${vals.length ? '' : 'disabled'}><option value="">${vals.length ? 'All' : 'None recorded'}</option>${vals.map(v => { const c = m.get(String(v)) || 0, on = String(v) === cur;
+      return `<option value="${esc(v)}" ${on ? 'selected' : ''} ${!c && !on ? 'disabled' : ''}>${esc(lab(v))}  ·  ${nf(c)}</option>`; }).join('')}</select>
+      ${cur ? `<button type="button" class="fclr" data-act="fpick" data-k="${k}" data-v="${esc(cur)}" aria-label="Clear ${FLABEL[k]}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button>` : ''}</span></label>`; };
   const sorts = [['new', 'Newest'], ['style', 'Style number'], ['where', 'Pallet and box']];
+  const boxes = data.boxes.filter(b => !fDraft.pallet || String(b.pallet_id) === String(fDraft.pallet)).map(b => b.id).sort((a, b) => a - b);
   host.innerHTML = `<div class="fhead"><h2>Filters${nOn ? `<span class="fbadge">${nOn}</span>` : ''}</h2>
       <button type="button" class="flink" data-act="fclear" ${nOn ? '' : 'disabled'}>Clear all</button>
       <button type="button" class="fx" data-act="close-sheet" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-    <section class="fsec"><header><h3>Sort by</h3></header><div class="fseg" role="radiogroup" aria-label="Sort by">${sorts.map(([v, t]) => `<button type="button" role="radio" aria-checked="${fSortDraft === v}" class="${fSortDraft === v ? 'on' : ''}" data-act="fsort" data-v="${v}">${t}</button>`).join('')}</div></section>
-    <section class="fsec"><header><h3>Location</h3>${fDraft.pallet || fDraft.box ? '<button type="button" class="flink" data-act="floc">Clear</button>' : ''}</header>
-      <div class="fpair">${sel('pallet', data.pallets.map(p => p.id).sort((a, b) => a - b), pCode, pm)}${sel('box', data.boxes.filter(b => !fDraft.pallet || String(b.pallet_id) === String(fDraft.pallet)).map(b => b.id).sort((a, b) => a - b), bCode, bm)}</div></section>
-    ${sec('item_type', chips('item_type', az))}
-    ${sec('size', chips('size', a => a.sort(bySize), v => v, 18))}
-    ${sec('color', chips('color', az))}
-    ${sec('brand', chips('brand', az))}
-    <div class="fduo">${sec('gender', chips('gender', az))}${sec('season', chips('season', az))}</div>
-    ${sec('by', chips('by', az))}
+    <section class="fgrp"><h3>Location</h3><div class="fgrid">${sel('pallet', data.pallets.map(p => p.id).sort((a, b) => a - b), pCode)}${sel('box', boxes, bCode)}</div></section>
+    <section class="fgrp"><h3>Item</h3><div class="fgrid">${sel('item_type', az(all('item_type')))}${sel('size', all('size').sort(bySize))}${sel('color', az(all('color')))}${sel('brand', az(all('brand')))}</div></section>
+    <section class="fgrp"><h3>More and sorting</h3><div class="fgrid">${sel('gender', az(all('gender')))}${sel('season', az(all('season')))}${sel('by', az(all('by')))}
+      <label class="fsel"><span>Sort by</span><span class="fwrap"><select data-fsort>${sorts.map(([v, t]) => `<option value="${v}" ${fSortDraft === v ? 'selected' : ''}>${t}</option>`).join('')}</select></span></label></div></section>
     <div class="ffoot"><button type="button" class="btn" data-act="apply-filters" ${pcs ? '' : 'disabled'}>${pcs ? `Show ${nf(pcs)} ${unit(pcs, 'piece')}` : 'No items match'}</button></div>`;
   card.scrollTop = y;
 }
@@ -3110,6 +3111,7 @@ document.addEventListener('click', e => {
   if (e.target.id === 'zoom') act['zoom-close']();
 });
 document.addEventListener('change', e => {
+  if (e.target.dataset && 'fsort' in e.target.dataset) { fSortDraft = e.target.value; return; }
   if (e.target.dataset && e.target.dataset.fk && fDraft) { const k = e.target.dataset.fk; fDraft[k] = e.target.value; if (k === 'pallet' && fDraft.pallet && fDraft.box && idx.box.get(+fDraft.box) && String(idx.box.get(+fDraft.box).pallet_id) !== fDraft.pallet) fDraft.box = ''; drawFilters(); return; }
   if (e.target.id === 'k-itemfirst' && e.target.files[0]) {
     const f = e.target.files[0]; e.target.value = '';
@@ -3200,7 +3202,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.43';
+const APP_VERSION = '2026-11-23.44';
 let newVersion = false;
 async function checkVersion(){
   try {
