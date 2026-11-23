@@ -315,6 +315,8 @@ body.signing #view{max-width:440px;padding:0 20px}
 .irow .loc{text-align:right;font:700 17px/1.25 var(--sign)}
 .irow .loc em{display:block;font-style:normal;font-size:24px}
 .irow .wide{display:none}
+.irow .szl{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.irow .szw{display:none}
 @media (min-width:980px){
   .irow{grid-template-columns:64px 160px 1.2fr 1fr 1fr 1fr 1fr 120px 64px}
   .irow .wide{display:block;font-size:15px}
@@ -323,13 +325,11 @@ body.signing #view{max-width:440px;padding:0 20px}
   .irow .lc{display:none}
   .irow .loc em{font-size:24px}
 }
-.irow .szl{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .zc{display:inline-flex;flex-direction:column;align-items:center;min-width:46px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:#fff}
 .zc small{display:block;width:100%;text-align:center;background:var(--ink);color:#fff;font-size:12px;font-weight:600;padding:2px 5px;white-space:nowrap}
 .zc b{display:block;font:700 17px/1.3 var(--sign);padding:1px 6px 2px;white-space:nowrap}
 .zc u,.irow .loc em u{text-decoration:none;font:500 11px var(--body);color:var(--ink2);margin-left:2px}
 .irow .loc em u{font-size:13px}
-.irow .szw{display:none}
 .szgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;margin-top:8px}
 .szgrid div{background:#fff;border:1px solid var(--line);border-radius:8px;text-align:center;padding:6px 4px}
 .szgrid b{display:block;font-size:15px}
@@ -345,6 +345,92 @@ body.signing #view{max-width:440px;padding:0 20px}
 #sheet{position:fixed;inset:0;z-index:40;background:rgba(19,33,58,.55);display:none;align-items:flex-end;justify-content:center}
 #sheet.on{display:flex}
 #sheet .card{background:var(--floor);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));animation:up .18s ease-out}
+
+/* ===== desktop: sidebar app layout (phones keep the layout above) ===== */
+.deskonly{display:none}
+.ihead{display:none}
+@media (min-width:1100px){
+  body.shell{background:#EEF1F4}
+  body.shell #top{position:fixed;left:0;top:0;bottom:0;width:236px;flex-direction:column;align-items:stretch;gap:0;padding:26px 18px 18px;z-index:30;
+    background:linear-gradient(180deg,#14233F 0%,#101C33 100%)}
+  body.shell #top .name{font-size:30px;padding:0 10px}
+  body.shell #sync{padding:6px 10px 0;font-size:13px}
+  body.shell #top .who{order:3;margin:auto 0 0;text-align:left}
+  body.shell #top .who b{display:flex;align-items:center;gap:10px;padding:10px;border-radius:10px;font-size:15px;cursor:pointer}
+  body.shell #top .who b:hover{background:rgba(255,255,255,.07)}
+  body.shell #top .who b::before{content:attr(data-i);width:34px;height:34px;flex:none;border-radius:50%;display:grid;place-items:center;background:var(--placard);color:var(--ink);font:700 16px/1 var(--sign)}
+  body.shell #help{order:4;position:static;align-self:flex-start;margin:8px 10px 0;width:auto;height:auto;border:0;background:none;color:#93A2BB;font-size:14px;padding:0}
+  body.shell #help::after{content:" How to use Packout"}
+  body.shell #nav{position:fixed;left:0;top:118px;bottom:auto;width:236px;z-index:31;background:none;border:0;display:flex;flex-direction:column;gap:2px;padding:0 14px}
+  body.shell #nav button{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:10px;font-size:16px;font-weight:500;color:#B6C1D3;position:relative}
+  body.shell #nav button:hover{background:rgba(255,255,255,.06);color:#fff}
+  body.shell #nav svg{width:22px;height:22px}
+  body.shell #nav button[aria-current=page]{background:rgba(255,255,255,.1);color:#fff;font-weight:600}
+  body.shell #nav button[aria-current=page]::before{content:"";position:absolute;left:-14px;top:9px;bottom:9px;width:4px;border-radius:0 4px 4px 0;background:var(--placard)}
+  body.shell #nav button[aria-current=page] span{box-shadow:none}
+  body.shell #view,body.shell #view.wide{margin:0 0 0 236px;max-width:none;padding:34px 44px 60px}
+  body.shell #view > *{max-width:1280px}
+  body.shell .h{font-size:40px;margin:0 0 6px}
+  body.shell .lead{font-size:16px;max-width:760px}
+  body.shell .panel{border-radius:14px;padding:22px;border-color:#DCE2E8;box-shadow:0 1px 2px rgba(19,33,58,.04)}
+  body.shell .deskonly{display:block}
+  body.shell .btn{cursor:pointer}
+  body.shell .row .btn{width:auto;flex:none;padding:0 20px}
+  body.shell #toast{bottom:24px;left:236px}
+  body.shell .savebar{bottom:0;margin:0;border-radius:12px 12px 0 0}
+  body.shell .trail{top:0;margin:0 0 14px;border-radius:12px;border:1px solid var(--line);padding:10px 14px}
+
+  /* pack: form on the left, what was just packed on the right */
+  body.shell .packgrid{display:grid;grid-template-columns:minmax(0,640px) minmax(300px,1fr);gap:32px;align-items:start}
+  body.shell .packside{position:sticky;top:24px}
+  .packside h2{font:700 22px/1.1 var(--sign);margin:0 0 4px}
+  .packside .sub{color:var(--ink2);font-size:14px;margin:0 0 14px}
+  .recent{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+  .recent li{display:grid;grid-template-columns:48px 1fr auto;gap:12px;align-items:center;padding:8px;border-radius:10px}
+  .recent li:hover{background:#F4F6F9}
+  .recent img,.recent .noimg{width:48px;height:48px;border-radius:8px;object-fit:cover;background:#E3E9EF}
+  .recent b{font:700 18px/1.1 var(--sign);display:block}
+  .recent small{display:block;color:var(--ink2);font-size:13px;line-height:1.3}
+  .recent .q{text-align:right;font:700 20px/1 var(--sign)}
+  .recent .q small{font:500 12px var(--body)}
+  .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+  .kpis div{background:var(--ink);color:#fff;border-radius:12px;padding:12px 14px;font-size:13px;color:#B6C1D3}
+  .kpis b{display:block;font:700 28px/1 var(--sign);color:#fff;margin-bottom:2px}
+
+  /* pallets */
+  body.shell .pgrid{grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+  body.shell .ptile{padding:18px 20px 16px;border-radius:14px;min-height:120px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;transition:transform .12s,box-shadow .12s}
+  body.shell .ptile:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(19,33,58,.14)}
+  body.shell .ptile .code{font-size:46px}
+  body.shell .ptile p{font-size:15px}
+  .pfill{height:6px;border-radius:3px;background:rgba(19,33,58,.15);margin-top:14px;overflow:hidden}
+  .pfill i{display:block;height:100%;background:var(--ink);border-radius:3px}
+  .pmeta{font-size:13px;margin-top:8px;color:rgba(19,33,58,.75)}
+  body.shell .ptile.closed .pfill{background:#E3E9EF}
+  body.shell .boxes{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:16px;align-items:start}
+  body.shell .boxes .panel{margin:0}
+
+  /* inventory: a real table */
+  body.shell .totals{border-radius:14px;margin-bottom:16px}
+  body.shell .totals div{padding:16px 8px;font-size:14px}
+  body.shell .totals b{font-size:36px}
+  body.shell .tools input{min-height:48px}
+  body.shell .ihead{display:grid;grid-template-columns:56px 210px 1fr 1fr .7fr .6fr 2fr 110px 70px;gap:14px;padding:4px 14px 8px 10px;font-size:12px;font-weight:600;color:var(--ink2);text-transform:none}
+  body.shell #inv-list{background:#fff;border:1px solid #DCE2E8;border-radius:14px;overflow:hidden}
+  body.shell #inv-list .irow{grid-template-columns:56px 210px 1fr 1fr .7fr .6fr 2fr 110px 70px;gap:14px;margin:0;border:0;border-bottom:1px solid #EDF0F3;border-radius:0;padding:8px 14px 8px 10px;cursor:pointer}
+  body.shell #inv-list .irow:hover{background:#F6F8FA}
+  body.shell #inv-list .irow img,body.shell #inv-list .irow .noimg{width:56px;height:56px;border-radius:8px}
+  body.shell #inv-list .irow .szl,body.shell #inv-list .irow .mid>.d,body.shell #inv-list .irow .lc{display:none}
+  body.shell #inv-list .irow .wide{display:block;font-size:15px}
+  body.shell #inv-list .irow .wide.szw{display:flex;flex-wrap:wrap;gap:4px}
+  body.shell #inv-list .irow .st{font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+  body.shell #inv-list > .btn{margin:12px;width:calc(100% - 24px)}
+  body.shell #inv-list .empty{margin:0;border:0}
+
+  /* export: panels side by side */
+  body.shell .xgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+  body.shell .xgrid .panel{margin:0}
+}
 @media (min-width:700px){#sheet{align-items:center}#sheet .card{border-radius:16px}}
 @keyframes up{from{transform:translateY(24px);opacity:.4}}
 @media (prefers-reduced-motion:reduce){#sheet .card{animation:none}}
@@ -806,26 +892,29 @@ const joined = () => data.items.map(i => ({ ...i, box: idx.box.get(i.box_id), pa
 /* ---------- screens: setup ---------- */
 function render(){
   $('#who').innerHTML = me ? (staff === 'in' ? `<b data-act="account" role="button" tabindex="0">${esc(me.name)} ›</b>` : `<b>${esc(me.name)}</b>`) : '';
-  const v = $('#view'); v.classList.toggle('wide', tab === 'inventory' && !!cfg && !!me);
+  const v = $('#view'); v.classList.toggle('wide', tab === 'inventory' && !!cfg && !!me); document.body.classList.remove('shell');
   document.body.classList.toggle('signing', !!cfg && !cfg.view && staff === 'out');
   if (!cfg) { $('#nav').hidden = true; return v.innerHTML = connectHTML(); }
   if (cfg.view) { if (!me || !me.view) { me = { name: 'View only', view: true }; store.set('me', me); } if (tab === 'pack') tab = 'inventory'; $('#who').innerHTML = '<b>View only</b>'; }
   if (!cfg.view && staff === 'checking') { $('#nav').hidden = true; return v.innerHTML = '<p class="lead" style="margin-top:30px">Checking who is signed in</p>'; }
   if (!cfg.view && staff === 'out') { $('#nav').hidden = true; $('#help').hidden = true; return v.innerHTML = signinHTML(); }
   if (!me)  { $('#nav').hidden = true; return v.innerHTML = whoHTML(); }
-  $('#nav').hidden = false; $('#help').hidden = !!cfg.view;
+  $('#nav').hidden = false; $('#help').hidden = !!cfg.view; document.body.classList.add('shell');
+  const wb = $('#who b'); if (wb) wb.dataset.i = initials(me.name || '?');
   $('#nav').style.gridTemplateColumns = cfg.view ? 'repeat(3,1fr)' : ''; $('#nav [data-tab=pack]').hidden = !!cfg.view;
   document.querySelectorAll('#nav button').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   validatePack();
-  v.innerHTML = ({ pack: packHTML, pallets: palletsHTML, inventory: inventoryHTML, more: moreHTML })[tab]();
+  v.innerHTML = tab === 'pack' && isDesk() ? `<div class="packgrid"><div class="packmain">${packHTML()}</div><aside class="packside">${recentHTML()}</aside></div>`
+    : ({ pack: packHTML, pallets: palletsHTML, inventory: inventoryHTML, more: moreHTML })[tab]();
   if (tab === 'pack' && pack.stage === 'item' && pack.photo && !$('#k-photo-wrap img')) showPhoto(pack.photo);
   if (tab === 'inventory') renderInvList();
   setBars();
 }
 function setBars(){
   const r = document.documentElement.style;
-  r.setProperty('--toph', $('#top').offsetHeight + 'px');
-  r.setProperty('--navh', ($('#nav').hidden ? 0 : $('#nav').offsetHeight) + 'px');
+  const desk = document.body.classList.contains('shell') && isDesk();
+  r.setProperty('--toph', (desk ? 0 : $('#top').offsetHeight) + 'px');
+  r.setProperty('--navh', (desk || $('#nav').hidden ? 0 : $('#nav').offsetHeight) + 'px');
   r.setProperty('--saveh', ($('.savebar') ? $('.savebar').offsetHeight : 0) + 'px');
 }
 window.addEventListener('resize', setBars);
@@ -1086,6 +1175,7 @@ function packFail(e){ pack.err = isDenied(e) ? DENIED_MSG : e.message; render();
 function recheckSignin(){ if (staff === 'in') checkStaff().then(() => { if (staff === 'out') render(); }); }
 
 /* ---------- screens: pallets ---------- */
+const BOXES_PER_PALLET = 30;
 function palletsHTML(){
   if (palView && idx.pal.get(palView)) return palletDetailHTML(idx.pal.get(palView));
   palView = null;
@@ -1098,6 +1188,8 @@ function palletsHTML(){
       <div class="code">${pCode(p.id)}</div>
       ${p.status === 'closed' ? '<p><span class="badge closed">Closed</span></p>' : ''}
       <p>${plural(data.boxes.filter(b => b.pallet_id === p.id).length, 'box')}, ${plural(sumQty(its), 'piece')}</p>
+      <span class="deskonly pfill"><i style="width:${Math.min(100, Math.round(data.boxes.filter(b => b.pallet_id === p.id).length / BOXES_PER_PALLET * 100))}%"></i></span>
+      <span class="deskonly pmeta">${plural(data.styles.filter(st => st.pallet_id === p.id).length, 'style')} · ${data.boxes.filter(b => b.pallet_id === p.id).length} of ${BOXES_PER_PALLET} box spots · by ${esc(p.created_by || '')}</span>
     </button>`; }).join('')}</div>` : `<div class="empty"><b>No pallets yet</b>Pallets appear here when someone starts one from the Pack tab.</div>`}`;
 }
 function palletDetailHTML(p){
@@ -1119,14 +1211,30 @@ function palletDetailHTML(p){
   ${styles.length ? `<div class="panel"><h2>Styles on this pallet</h2><ul class="lines">${styles.map(s => { const si = itemsOf('style_number', s.style_number); return `
     <li><span><b>${esc(s.style_number)}</b><br><span class="muted small">${plural(sumQty(si), 'piece')} in ${plural(new Set(si.map(i => i.box_id)).size, 'box')}</span></span>
       ${canEdit() ? `<button class="btn quiet sm" style="margin-left:auto" data-act="open-style" data-style="${esc(s.style_number)}">Move or edit</button>` : ''}</li>`; }).join('')}</ul></div>` : ''}
-  ${boxes.map(b => { const bi = itemsOf('box_id', b.id); return `
+  <div class="boxes">${boxes.map(b => { const bi = itemsOf('box_id', b.id); return `
     <div class="panel"><div class="boxhead"><span class="code">${bCode(b.id)}</span>
       <span class="muted small">${plural(sumQty(bi), 'piece')}, by ${esc(b.created_by)}</span>
       ${b.status === 'closed' ? '<span class="badge closed">Closed</span>' : ''}
       ${canEdit() ? `<button class="linkbtn small" style="margin-left:auto" data-act="${bi.length ? 'toggle-box' : 'del-box'}" data-id="${b.id}">${bi.length ? (b.status === 'open' ? 'Close box' : 'Reopen box') : 'Delete empty box'}</button>` : '<span style="margin-left:auto"></span>'}
       ${bi.length ? `<button class="linkbtn small" data-act="print-labels" data-box="${b.id}">Print label</button>` : ''}</div>
       ${bi.length ? `<ul class="lines">${bi.map(i => `<li><span><b>${esc(i.style_number)}</b> ${esc(i.color)}${i.size ? ', ' + esc(i.size) : ''}<br><span class="muted small">${esc([i.item_type, i.brand].filter(Boolean).join(', '))}</span></span><span class="n">${nf(i.quantity)}</span></li>`).join('')}</ul>` : ''}
-    </div>`; }).join('') || `<div class="empty"><b>No boxes on this pallet yet</b></div>`}`;
+    </div>`; }).join('') || `<div class="empty"><b>No boxes on this pallet yet</b></div>`}</div>`;
+}
+
+/* ---------- desktop: what was just packed, beside the Pack form ---------- */
+const isDesk = () => matchMedia('(min-width:1100px)').matches;
+let deskWas = null;
+addEventListener('resize', () => { const d = isDesk(); if (deskWas !== null && d !== deskWas && cfg && me && !sheetOpen() && !(tab === 'pack' && pack.stage === 'item')) render(); deskWas = d; });
+function ago(t){ const m = Math.round((Date.now() - new Date(t)) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : new Date(t).toLocaleDateString(); }
+function recentHTML(){
+  const today = new Date().toDateString(), its = data.items.filter(i => new Date(i.created_at).toDateString() === today);
+  const mine = its.filter(i => i.created_by === me.name);
+  const last = [...data.items].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 8);
+  return `<div class="kpis"><div><b>${nf(sumQty(its))}</b>pieces today</div><div><b>${nf(sumQty(mine))}</b>packed by you</div><div><b>${nf(new Set(its.map(i => i.box_id)).size)}</b>boxes today</div></div>
+  <div class="panel"><h2>Just packed</h2><p class="sub">Everyone's latest saves, live.</p>
+  ${last.length ? `<ul class="recent">${last.map(i => `<li>${i.photo_path ? `<img loading="lazy" alt="" src="${esc(thumbUrl(i))}" data-act="zoom-photo" data-id="${i.id}">` : '<span class="noimg"></span>'}
+    <span><b>${esc(i.style_number)}</b><small>${esc([i.color, i.size].filter(Boolean).join(', '))}</small><small>${esc(bCode(i.box_id))} · ${esc(i.created_by || '')} · ${ago(i.created_at)}</small></span>
+    <span class="q">${nf(i.quantity)}<small> pcs</small></span></li>`).join('')}</ul>` : '<p class="muted small">Nothing packed yet. Saved items appear here.</p>'}</div>`;
 }
 
 /* ---------- screens: inventory ---------- */
@@ -1148,6 +1256,7 @@ function inventoryHTML(){
   <div class="tools"><input id="inv-q" type="search" placeholder="Search style, color, brand, tag, pallet" value="${esc(filt.q)}" aria-label="Search inventory">
     <button class="btn alt" data-act="open-filters">Filter</button><button class="btn alt" data-act="inv-export" aria-label="Export this list">Export</button></div>
   <div id="inv-chips" class="fchips"></div>
+  <div class="ihead" aria-hidden="true"><span>Photo</span><span>Style</span><span>Color</span><span>Brand</span><span>Gender</span><span>Season</span><span>Sizes</span><span>Where</span><span style="text-align:right">Pieces</span></div>
   <div id="inv-list"></div>`;
 }
 function renderInvList(){
@@ -1818,7 +1927,7 @@ function moreHTML(){
   const nF = filtered().length, any = Object.keys(FLABEL).some(k => filt[k]) || filt.q;
   return `<h1 class="h">Export</h1>
   <p class="lead">A full list of every pallet, every box and every item, with a style index at the end.</p>
-  <div class="panel">
+  <div class="xgrid"><div class="panel">
     <label class="f" for="x-title">Title on the report</label><input id="x-title" type="text" value="${esc(exTitle)}">
     <label class="f">What to include</label>
     <div class="chips"><label><input type="radio" name="x-scope" value="all" checked><span>Everything (${nf(data.items.length)})</span></label>
@@ -1862,7 +1971,7 @@ function moreHTML(){
   <div class="panel"><h2>This phone</h2>
     <dl class="facts"><dt>Name</dt><dd>${esc(me.name)}</dd><dt>Access</dt><dd>${cfg.view ? 'View only' : cfg.team ? 'Team (can pack)' : 'Team'}</dd><dt>Database</dt><dd style="word-break:break-all">${esc(cfg.url.replace('https://', ''))}</dd></dl>
     ${!canEdit() ? '' : staff === 'in' ? '<button class="btn quiet" data-act="sign-out">Sign out</button>' : '<button class="btn quiet" data-act="change-who">Change name</button>'}
-    <button class="btn quiet" data-act="disconnect">Disconnect this phone</button></div>`;
+    <button class="btn quiet" data-act="disconnect">Disconnect this phone</button></div></div>`;
 }
 function exportRows(){
   exTitle = $('#x-title').value.trim() || 'Store inventory'; store.set('title', exTitle);
@@ -2580,6 +2689,7 @@ function softRender(){            // show changes from other phones without dist
   if (v !== 'bar' && (pack.stage === 'box' || pack.stage === 'style')) return keepInputs(render);
   if (pack.stage !== 'item') return render();
   // item form: never redraw the form (the photo would be lost); refresh the bar at the top and the saved message
+  const ps = $('.packside'); if (ps) ps.innerHTML = recentHTML();
   const t = $('.trail'); if (t) t.outerHTML = trailHTML();
   const sv = $('.savedacts'); if (sv && idx.box.get(pack.box)?.status !== 'open') sv.remove();
 }
@@ -2593,7 +2703,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.27';
+const APP_VERSION = '2026-11-22.28';
 let newVersion = false;
 async function checkVersion(){
   try {
