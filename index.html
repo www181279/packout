@@ -364,6 +364,46 @@ body.signing #view{max-width:440px;padding:0 20px}
 @media (max-width:480px){.fduo{grid-template-columns:1fr;gap:0}.fduo .fsec+.fsec{border-top:1px solid var(--line)}}
 @media (prefers-reduced-motion:reduce){.fc{transition:none}}
 .irow{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 12px 8px 8px;margin-bottom:6px}
+/* swipe actions */
+.sw{position:relative;margin-bottom:6px;border-radius:10px}
+.sw>.irow{position:relative;z-index:1;margin-bottom:0;touch-action:pan-y;will-change:transform}
+.swa{position:absolute;top:0;right:0;bottom:0;display:flex;border-radius:10px;overflow:hidden;visibility:hidden}
+.sw.open .swa{visibility:visible}
+.swa button{width:88px;border:0;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:600 13.5px/1 var(--body);cursor:pointer}
+.swa svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.swe{background:#3A4A63}.swd{background:#C62D2D}
+@media (hover:hover) and (pointer:fine){
+  .swa{visibility:visible;top:50%;bottom:auto;right:10px;transform:translateY(-50%);z-index:2;gap:6px;opacity:0;pointer-events:none;transition:opacity .12s;border-radius:0;overflow:visible}
+  .sw:hover .swa,.sw:focus-within .swa{opacity:1;pointer-events:auto}
+  .swa button{width:auto;height:38px;flex-direction:row;padding:0 12px;border-radius:9px;box-shadow:0 2px 8px rgba(19,33,58,.18)}
+  .swa svg{width:17px;height:17px}
+}
+@media (prefers-reduced-motion:reduce){.sw>.irow{transition:none!important}}
+/* edit / delete sheets */
+.rhead{display:flex;gap:14px;align-items:center;margin-bottom:12px}
+.rhead img,.rhead .noimg{width:64px;height:64px;border-radius:10px;object-fit:cover;background:#E3E9EF;flex:none}
+.rhead .rk{font:600 13px/1 var(--body);color:var(--ink2);margin:0 0 4px}
+.rhead h2{margin:0!important;font:700 26px/1.05 var(--sign)}
+.rhead p:last-child{margin:3px 0 0;color:var(--ink2);font-size:14.5px}
+.dlines,.elines{display:grid;gap:8px;margin:14px 0 18px}
+.dl{display:grid;grid-template-columns:24px 64px 1fr auto;gap:10px;align-items:center;padding:12px 14px;background:var(--paper);border:1.5px solid var(--line);border-radius:12px;cursor:pointer}
+.dl input{position:absolute;opacity:0;pointer-events:none}
+.dl .ck{width:22px;height:22px;border-radius:6px;border:2px solid #AEB8C4;display:grid;place-items:center}
+.dl:has(input:checked){border-color:#E7A3A3;background:#FFF6F6}
+.dl:has(input:checked) .ck{background:#C62D2D;border-color:#C62D2D}
+.dl:has(input:checked) .ck::after{content:'';width:10px;height:5px;border:solid #fff;border-width:0 0 2.5px 2.5px;transform:rotate(-45deg) translate(1px,-1px)}
+.dl:has(input:focus-visible){outline:3px solid var(--placard);outline-offset:2px}
+.dsz{font:700 18px/1 var(--sign)}.dbx{color:var(--ink2);font-size:14px}
+.dl b{font:700 18px/1 var(--sign)}.dl b u,.el u{text-decoration:none;font:500 12px var(--body);color:var(--ink2)}
+.rsx .btn.danger{background:#C62D2D;border-color:#C62D2D;color:#fff}.rsx .btn.danger:disabled{opacity:.45}
+.dconf{text-align:center}.dconf .lead{margin-bottom:20px}
+.dicon{width:56px;height:56px;border-radius:50%;background:#FDE8E8;color:#C62D2D;display:grid;place-items:center;margin:4px auto 12px}
+.dicon svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.egrid{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px}.egrid .f{margin-top:8px}
+.egrid input,.egrid select{width:100%}
+.el{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;padding:8px 8px 8px 14px;background:var(--paper);border:1.5px solid var(--line);border-radius:12px}
+.el .qty{margin:0;grid-template-columns:44px 60px 44px;gap:6px}.el .qty button{height:44px;font-size:22px}.el .qty input{height:44px;font-size:20px;padding:0;min-height:0}
+@media (max-width:400px){.egrid{grid-template-columns:1fr}}
 .irow img,.irow .noimg{width:64px;height:64px;border-radius:6px;object-fit:cover;background:#E3E9EF}
 .irow .st{font:700 22px/1.1 var(--sign)}
 .irow .d{font-size:14px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1586,7 +1626,9 @@ function renderInvList(){
     box.innerHTML = !data.items.length ? `<div class="empty"><b>Nothing packed yet</b>Items show up here the moment someone saves them.</div>` : `<div class="empty"><b>No items match</b>Change the search or remove a filter.</div>`;
     return;
   }
-  const rows = groups.slice(0, invLimit).map(g => { const i = g.first; return { key: g.key, html: `
+  const sw = canManage();
+  const rows = groups.slice(0, invLimit).map(g => { const i = g.first; return { key: g.key, html: `${sw ? `<div class="sw">
+      <div class="swa"><button class="swe" data-act="row-edit" data-k="${esc(g.key)}" aria-label="Edit ${esc(i.style_number)} ${esc(i.color)}" tabindex="-1">${ICON_EDIT}<span>Edit</span></button><button class="swd" data-act="row-del" data-k="${esc(g.key)}" aria-label="Delete ${esc(i.style_number)} ${esc(i.color)}" tabindex="-1">${ICON_DEL}<span>Delete</span></button></div>` : ''}
       <button class="irow" data-act="open-group" data-k="${esc(g.key)}">
         ${i.photo_path ? `<img loading="lazy" alt="Enlarge photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(thumbUrl(i))}" data-act="zoom-photo" data-id="${i.id}">` : '<span class="noimg"></span>'}
         <span class="mid"><span class="st">${esc(i.style_number)}</span>${i.item_type ? `<span class="tp">${esc(i.item_type)}</span>` : ''}
@@ -1595,7 +1637,7 @@ function renderInvList(){
         <span class="wide wt">${esc(i.item_type || '')}</span><span class="wide">${esc(i.color)}</span><span class="wide">${esc(i.brand)}</span><span class="wide">${esc(i.gender)}</span><span class="wide">${esc(i.season)}</span><span class="wide tg">${tagsText(g)}</span><span class="wide szw">${sizeLineHTML(g)}</span>
         <span class="loc wide" style="text-align:left">${locText(g)}</span>
         <span class="loc"><span class="lc">${locText(g)}</span><em>${nf(g.qty)}<u>pcs</u></em></span>
-      </button>` }; });
+      </button>${sw ? '</div>' : ''}` }; });
   if (groups.length > invLimit) rows.push({ key: '__more', html: `<button class="btn quiet" data-act="inv-more">Show more (${nf(groups.length - invLimit)} left)</button>` });
   patchList(box, rows);
 }
@@ -1628,6 +1670,42 @@ function tagsText(g){
   return show + (t.length > 3 ? `<small>+${t.length - 3} more</small>` : '');
 }
 // one row per style and color; the sizes are shown together in that row
+const ICON_EDIT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
+const ICON_DEL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+const groupOf = key => groupItems(joined()).find(g => g.key === key);
+const lineSort = (a, b) => a.box_id - b.box_id || bySize(a.size || '', b.size || '');
+function rowHead(g, title){ const i = g.first; return `<div class="rhead">${i.photo_path ? `<img alt="" src="${esc(thumbUrl(i))}">` : '<span class="noimg"></span>'}
+  <div><p class="rk">${title}</p><h2>${esc(i.style_number)}</h2><p>${esc(i.color)}${i.brand ? ', ' + esc(i.brand) : ''}</p></div></div>`; }
+// Swipe a row, then Delete: choose which sizes go, then confirm
+function rowDelSheet(key){
+  const g = groupOf(key); if (!g) return;
+  const lines = g.items.slice().sort(lineSort);
+  openSheet(`<div class="rsx">${rowHead(g, 'Delete from inventory')}
+    <p class="lead">Untick anything you want to keep. Deleted pieces are removed for everyone and can't be brought back.</p>
+    <div class="dlines">${lines.map(x => `<label class="dl"><input type="checkbox" data-id="${x.id}" data-q="${x.quantity}" checked><span class="ck" aria-hidden="true"></span>
+      <span class="dsz">${esc(x.size || 'No size')}</span><span class="dbx">${bCode(x.box_id)} · ${pCode(x.pallet_id)}</span><b>${nf(x.quantity)} <u>pcs</u></b></label>`).join('')}</div>
+    <div class="rfoot"><button class="btn quiet" data-act="close-sheet">Keep everything</button><button class="btn danger" id="del-go" data-act="row-del-ask" data-k="${esc(key)}"></button></div></div>`);
+  delCount();
+}
+function delCount(){
+  const on = [...document.querySelectorAll('.dl input:checked')], q = on.reduce((a, c) => a + +c.dataset.q, 0), b = $('#del-go'); if (!b) return;
+  b.disabled = !on.length; b.textContent = on.length ? `Delete ${nf(q)} ${unit(q, 'piece')}` : 'Nothing selected';
+}
+function rowEditSheet(key){
+  const g = groupOf(key); if (!g) return; const i = g.first;
+  const lines = g.items.slice().sort(lineSort);
+  openSheet(`<div class="rsx">${rowHead(g, 'Edit')}
+    <div class="egrid"><div><label class="f" for="g-color">Color</label><input id="g-color" type="text" value="${esc(i.color)}"></div>
+      <div><label class="f" for="g-brand">Brand</label><input id="g-brand" type="text" value="${esc(i.brand)}"></div>
+      <div><label class="f" for="e-type">Type</label>${typeSelect('e-type', i.item_type)}<input id="e-type-other" type="text" autocomplete="off" placeholder="For example: Overalls" hidden></div>
+      <div><label class="f" for="g-gender">Gender</label><select id="g-gender"><option value="">Not set</option>${GENDERS.map(x => `<option ${x === i.gender ? 'selected' : ''}>${x}</option>`).join('')}</select></div></div>
+    <p class="f" style="margin-top:16px">Quantities</p>
+    <div class="elines">${lines.map(x => `<div class="el" data-id="${x.id}"><span class="dsz">${esc(x.size || 'No size')}</span><span class="dbx">${bCode(x.box_id)}</span>
+      <div class="qty"><button type="button" data-act="qty" data-for="gq-${x.id}" data-d="-1" aria-label="One less">&minus;</button><input id="gq-${x.id}" type="number" inputmode="numeric" min="1" value="${x.quantity}" aria-label="Quantity ${esc(x.size || '')} in ${bCode(x.box_id)}"><button type="button" data-act="qty" data-for="gq-${x.id}" data-d="1" aria-label="One more">+</button></div></div>`).join('')}</div>
+    <p class="small muted" style="margin-top:8px">To change a size or tag number, open the row and tap that line.</p>
+    <div id="g-err"></div>
+    <div class="rfoot"><button class="btn quiet" data-act="close-sheet">Cancel</button><button class="btn" data-act="row-edit-save" data-k="${esc(key)}">Save changes</button></div></div>`);
+}
 function groupItems(list){
   const m = new Map();
   for (const i of list){
@@ -2906,6 +2984,37 @@ const act = {
     if (!patch.color || !patch.brand || !(patch.quantity >= 1)) return $('#e-err').innerHTML = '<div class="err">Color, brand and a quantity of 1 or more are needed.</div>';
     closeSheet(); await mutate('Saving changes', () => db.update('items', 'id=' + eq(el.dataset.id), patch), 'Saved changes');
   },
+  'row-edit'(el){ swClose(); rowEditSheet(el.dataset.k); },
+  'row-del'(el){ swClose(); rowDelSheet(el.dataset.k); },
+  'row-del-ask'(el){
+    const on = [...document.querySelectorAll('.dl input:checked')]; if (!on.length) return;
+    const ids = on.map(c => c.dataset.id), q = on.reduce((a, c) => a + +c.dataset.q, 0), g = groupOf(el.dataset.k);
+    window._delIds = ids;
+    openSheet(`<div class="rsx dconf"><div class="dicon">${ICON_DEL}</div><h2>Delete ${nf(q)} ${unit(q, 'piece')}?</h2>
+      <p class="lead">${esc(g ? g.first.style_number + ' ' + g.first.color : '')}${ids.length > 1 ? `, ${ids.length} lines` : ''}. This can't be undone.</p>
+      <div class="rfoot"><button class="btn quiet" data-act="row-del" data-k="${esc(el.dataset.k)}">Go back</button><button class="btn danger" data-act="row-del-yes">Yes, delete</button></div></div>`);
+  },
+  async 'row-del-yes'(){
+    const ids = window._delIds || []; window._delIds = null; closeSheet(); if (!ids.length) return;
+    const its = data.items.filter(i => ids.includes(i.id));
+    await mutate('Deleting', async () => {
+      await db.remove('items', 'id=in.(' + ids.map(encodeURIComponent).join(',') + ')');
+      const gone = [...new Set(its.map(i => i.photo_path).filter(Boolean))].filter(p => !data.items.some(i => !ids.includes(i.id) && i.photo_path === p));
+      if (gone.length) await removePhotos(gone);
+    }, `Deleted ${nf(sumQty(its))} ${unit(sumQty(its), 'piece')}`);
+  },
+  async 'row-edit-save'(el){
+    const g = groupOf(el.dataset.k); if (!g) return closeSheet();
+    const color = $('#g-color').value.trim(), brand = $('#g-brand').value.trim(), et = $('#e-type').value, type = et === '__other' ? $('#e-type-other').value.trim() : et, gender = $('#g-gender').value;
+    const qs = [...document.querySelectorAll('.el')].map(r => [r.dataset.id, parseInt(r.querySelector('input').value, 10)]);
+    if (!color || !brand || qs.some(([, q]) => !(q >= 1))) return $('#g-err').innerHTML = '<div class="err">Color, brand and a quantity of 1 or more on every line are needed.</div>';
+    const jobs = qs.map(([id, q]) => { const it = g.items.find(x => x.id === id); const patch = {};
+      if (it.color !== color) patch.color = color; if (it.brand !== brand) patch.brand = brand; if (type && it.item_type !== type) patch.item_type = type;
+      if ((it.gender || '') !== gender) patch.gender = gender; if (it.quantity !== q) patch.quantity = q;
+      return Object.keys(patch).length ? [id, patch] : null; }).filter(Boolean);
+    closeSheet(); if (!jobs.length) return toast('Nothing changed.');
+    await mutate('Saving changes', () => Promise.all(jobs.map(([id, patch]) => db.update('items', 'id=' + eq(id), patch))), 'Saved changes');
+  },
   'del-item'(el){
     openSheet(`<h2>Delete this item?</h2><p class="lead">It is removed from the inventory for everyone. This can't be undone.</p>
       <div class="row"><button class="btn alt" data-act="open-item" data-id="${el.dataset.id}">Keep it</button><button class="btn danger" data-act="del-item-yes" data-id="${el.dataset.id}">Delete</button></div>`);
@@ -3125,6 +3234,42 @@ function showPhoto(file){
   else if (e) w.insertAdjacentHTML('beforeend', `<span class="cleanstate ${e.done ? 'ok' : ''}">${e.done ? '✓ Cleaned photo' : 'Photo will be cleaned after saving'}</span>`);
 }
 
+/* ---------- swipe a list row to show Edit and Delete ---------- */
+const SW_W = 176; let swOpen = null, swEat = false;
+function swSet(row, x, anim){ row.style.transition = anim ? 'transform .22s cubic-bezier(.2,.8,.2,1)' : 'none'; row.style.transform = x ? `translateX(${x}px)` : ''; }
+function swClose(){ if (swOpen) { swSet(swOpen, 0, true); swOpen.parentElement.classList.remove('open'); swOpen = null; } }
+(() => {
+  let row = null, x0 = 0, y0 = 0, base = 0, dx = 0, mode = null;
+  document.addEventListener('pointerdown', e => {
+    const r = e.target.closest && e.target.closest('.sw > .irow'); if (!r || e.button > 0) { row = null; return; }
+    if (e.pointerType === 'mouse' && matchMedia('(hover:hover)').matches) { row = null; return; }   // desktop uses the hover buttons
+    row = r; x0 = e.clientX; y0 = e.clientY; base = r === swOpen ? -SW_W : 0; dx = 0; mode = null;
+  }, { passive: true });
+  document.addEventListener('pointermove', e => {
+    if (!row) return; const mx = e.clientX - x0, my = e.clientY - y0;
+    if (!mode) { if (Math.abs(mx) < 8 && Math.abs(my) < 8) return; mode = Math.abs(mx) > Math.abs(my) ? 'x' : 'y'; if (mode === 'x' && swOpen && swOpen !== row) swClose(); }
+    if (mode !== 'x') return;
+    dx = mx; let x = base + dx; if (x > 0) x = x / 4; if (x < -SW_W) x = -SW_W + (x + SW_W) / 4;
+    swSet(row, x, false); row.parentElement.classList.add('open');
+  }, { passive: true });
+  const end = () => {
+    if (!row) return; const r = row; row = null;
+    if (mode !== 'x') return;
+    swEat = true; setTimeout(() => { swEat = false; }, 350);
+    const open = base + dx < -SW_W / 2.5;
+    swSet(r, open ? -SW_W : 0, true);
+    if (open) { swOpen = r; r.parentElement.classList.add('open'); if (navigator.vibrate) navigator.vibrate(8); } else { if (swOpen === r) swOpen = null; r.parentElement.classList.remove('open'); }
+  };
+  document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
+  // a tap right after a swipe, or anywhere while a row is open, only closes the row
+  document.addEventListener('click', e => {
+    if (swEat) { e.stopPropagation(); e.preventDefault(); return; }
+    if (swOpen && !(e.target.closest && e.target.closest('.sw.open .swa'))) { e.stopPropagation(); e.preventDefault(); swClose(); }
+  }, true);
+  addEventListener('scroll', () => { if (swOpen && !row) swClose(); }, { passive: true });
+})();
+document.addEventListener('change', e => { if (e.target.closest && e.target.closest('.dl')) delCount(); });
+
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-tab]');
@@ -3226,7 +3371,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.45';
+const APP_VERSION = '2026-11-23.46';
 let newVersion = false;
 async function checkVersion(){
   try {
