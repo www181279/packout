@@ -399,6 +399,21 @@ button.xpr{cursor:pointer}button.xpr:hover{border-color:var(--ink)}
 .xlrow{display:flex;gap:8px;margin-top:10px}
 .xlrow select{flex:1;min-height:40px}
 .xlrow .btn{width:auto;margin:0;min-height:40px;padding:0 18px}
+/* roles */
+.rolep.pk{background:#E7EEF8;color:#1E3A66}
+.stat{display:flex!important;align-items:center;gap:6px}
+.stat i{width:7px;height:7px;border-radius:50%;background:#B9C3CF;flex:none}
+.stat.on i{background:var(--go)}.stat.bad i{background:var(--stop)}.stat.bad{color:var(--stop)!important;font-weight:600}
+.ropt{display:block;width:100%;text-align:left;background:#fff;border:1.5px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.ropt:hover{border-color:#8FA0B5}
+.ropt.on{border-color:var(--ink);box-shadow:0 0 0 3px rgba(19,33,58,.08)}
+.rtop{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.rtop b{font:700 19px/1.1 var(--sign)}
+.rcur{font:600 12px var(--body);background:var(--ink);color:#fff;border-radius:999px;padding:4px 9px}
+.rl{display:flex;gap:8px;font-size:14px;line-height:1.4;color:var(--ink2);margin-top:4px}
+.rl::before{flex:none;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font:700 11px/18px var(--body);text-align:center}
+.rl.yes::before{content:"✓";background:var(--go-bg);color:var(--go)}
+.rl.no::before{content:"✕";background:#F1F3F6;color:#7A8698}
 /* settings v2 */
 .sprof{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;background:linear-gradient(135deg,#14233F,#1E3157);color:#fff;border-radius:18px;padding:20px;margin:0 0 26px}
 .sprof .av{width:64px;height:64px;border-radius:50%;background:var(--placard);color:var(--ink);display:grid;place-items:center;font:700 26px/1 var(--sign)}
@@ -2166,7 +2181,7 @@ function exportSummaryHTML(scope){
     <p>${nf(rows.length)} ${rows.length === 1 ? 'line' : 'lines'}, ${nf(photos)} ${photos === 1 ? 'photo' : 'photos'}${scope === 'filt' ? ', using your current inventory filter' : ''}.</p>`;
 }
 /* ---------- settings ---------- */
-const ROLE = () => cfg.view ? 'View only' : me.owner ? 'Owner' : me.del === false ? 'Guest: can pack new items, no edits or deletes' : 'Team member';
+const ROLE = () => cfg.view ? 'View only' : me.owner ? 'Owner' : me.del === false ? 'Guest' : 'Packer';
 const ic = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
 function settingsHTML(){
   const owner = isOwner(), phone = matchMedia('(pointer:coarse)').matches;
@@ -2176,13 +2191,13 @@ function settingsHTML(){
   let h = `<h1 class="h">Settings</h1>`;
   // profile
   h += `<section class="sprof"><span class="av">${esc(initials(me.name || '?'))}</span>
-    <div class="spx"><b>${esc(me.name)}</b><span class="rolep ${owner ? 'own' : me.del === false ? 'gst' : ''}">${cfg.view ? 'View only' : owner ? 'Owner' : me.del === false ? 'Guest' : 'Team member'}</span>
-      <small>${cfg.view ? 'You can look at everything, but not change anything.' : owner ? 'Full control: people, settings, exports and everything packed.' : me.del === false ? 'You can pack new items and export. Saved items can\'t be changed or deleted.' : 'You can pack, edit and move items.'}</small></div>
+    <div class="spx"><b>${esc(me.name)}</b><span class="rolep ${owner ? 'own' : me.del === false ? 'gst' : ''}">${cfg.view ? 'View only' : owner ? 'Owner' : me.del === false ? 'Guest' : 'Packer'}</span>
+      <small>${cfg.view ? 'You can look at everything, but not change anything.' : owner ? 'Full control: people, settings, exports and everything packed.' : me.del === false ? 'You can pack new items and export. Saved items can\'t be changed or deleted.' : 'You can pack, and edit, move or delete packed items.'}</small></div>
     <div class="spa">${staff === 'in' && faceSupported ? (faceId() ? `<button class="btn sm ghost" data-act="faceid-off">${FACE_SVG}Face ID on</button>` : `<button class="btn sm ghost" data-act="faceid-on">${FACE_SVG}Turn on Face ID</button>`) : ''}
       ${canEdit() && staff === 'in' ? `<button class="btn sm ghost" data-act="sign-out">Sign out</button>` : ''}</div></section>`;
   h += '<div class="sgrid">';
   if (owner) {
-    h += sec('s-team', 'Team', 'Everyone who can sign in. Guests can pack new items and export, but can\'t edit, delete or change settings. Several people can share one login.',
+    h += sec('s-team', 'Team', 'Everyone who can sign in. Tap a role to change it. Only you can change settings and manage people. Several people can share one login.',
       `<div id="st-list" class="stlist"><p class="muted small" style="padding:16px">Loading</p></div>
        <div class="srow add"><span class="sic">${ic('M12 5v14M5 12h14')}</span><input id="st-new" type="text" autocomplete="off" placeholder="Add a person" aria-label="New person's name"><button class="btn sm" data-act="staff-add">Add and make a PIN</button></div>`);
     h += sec('s-links', 'Links', 'Anyone with a link can use it, so send them only to your team.',
@@ -2208,10 +2223,10 @@ async function settingsAfter(){
 }
 function staffRowsHTML(rows){
   const n = rows.filter(r => r.active).length, g = rows.filter(r => r.active && r.can_delete === false).length;
-  const hd = document.querySelector('#s-team header p'); if (hd && !hd.dataset.c) { hd.dataset.c = 1; hd.insertAdjacentHTML('beforebegin', `<div class="scount">${nf(n)} active · ${nf(g)} ${g === 1 ? 'guest' : 'guests'}</div>`); }
+  const hd = document.querySelector('#s-team header p'); if (hd && !hd.dataset.c) { hd.dataset.c = 1; hd.insertAdjacentHTML('beforebegin', `<div class="scount">${nf(n)} active · ${nf(n - g - 1)} ${n - g - 1 === 1 ? 'packer' : 'packers'} · ${nf(g)} ${g === 1 ? 'guest' : 'guests'}</div>`); }
   return rows.map(r => `<div class="srow st ${r.active ? '' : 'off'}"><span class="av sm">${esc(initials(r.name))}</span>
-    <div class="stx"><b>${esc(r.name)} ${r.is_owner ? '<span class="rolep own">Owner</span>' : r.can_delete == null ? '' : `<button class="rolep ${r.can_delete ? '' : 'gst'}" data-act="staff-del" data-n="${esc(r.name)}" data-v="${r.can_delete ? '0' : '1'}" title="${r.can_delete ? 'Switch to Guest' : 'Give full access'}">${r.can_delete ? 'Full access' : 'Guest'}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>`}</b>
-      <small>${!r.active ? 'Turned off' : r.locked ? '<span class="warn">Locked after 5 wrong PINs</span>' : r.phones ? `Signed in on ${plural(r.phones, 'device')}` : 'Not signed in yet'}</small></div>
+    <div class="stx"><b>${esc(r.name)} ${r.is_owner ? '<span class="rolep own">Owner</span>' : r.can_delete == null ? '' : `<button class="rolep ${r.can_delete ? 'pk' : 'gst'}" data-act="staff-role" data-n="${esc(r.name)}" data-v="${r.can_delete ? 'packer' : 'guest'}" aria-haspopup="dialog">${r.can_delete ? 'Packer' : 'Guest'}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>`}</b>
+      <small class="stat ${!r.active ? 'off' : r.locked ? 'bad' : r.phones ? 'on' : ''}"><i></i>${!r.active ? 'Turned off' : r.locked ? 'Locked after 5 wrong PINs' : r.phones ? `Signed in on ${plural(r.phones, 'device')}` : 'Not signed in yet'}</small></div>
     <div class="sact">
       ${r.locked && r.active ? `<button class="btn sm" data-act="staff-unlock" data-n="${esc(r.name)}">Unlock</button>` : ''}
       <button class="btn alt sm" data-act="staff-pin" data-n="${esc(r.name)}">New PIN</button>
@@ -2447,6 +2462,17 @@ const act = {
     try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_pin: pin }); showPin(el.dataset.n, pin); } catch (e) { toast(e.message, 'bad'); }
   },
   async 'staff-unlock'(el){ try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_unlock: true }); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
+  'staff-role'(el){
+    const n = el.dataset.n, cur = el.dataset.v;
+    const opt = (v, title, can, cant) => `<button class="ropt ${cur === v ? 'on' : ''}" data-act="staff-role-set" data-n="${esc(n)}" data-v="${v}" aria-pressed="${cur === v}">
+      <span class="rtop"><b>${title}</b>${cur === v ? '<span class="rcur">Current</span>' : ''}</span>
+      <span class="rl yes">${can}</span><span class="rl no">${cant}</span></button>`;
+    openSheet(`<h2>Role for ${esc(n)}</h2><p class="lead">Changes apply right away on every device.</p>
+      ${opt('packer', 'Packer', 'Packs items, and can edit, move or delete what is packed', 'Can\'t export, change settings or manage people')}
+      ${opt('guest', 'Guest', 'Packs new items and exports reports', 'Can\'t edit or delete anything, change settings or manage people')}
+      <button class="btn quiet" data-act="close-sheet">Cancel</button>`);
+  },
+  async 'staff-role-set'(el){ try { await rpc('packout_staff_delete_rights', { p_name: el.dataset.n, p_can: el.dataset.v === 'packer' }); closeSheet(); toast(`${el.dataset.n} is now a ${el.dataset.v === 'packer' ? 'Packer' : 'Guest'}`, 'good'); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
   async 'staff-del'(el){ try { await rpc('packout_staff_delete_rights', { p_name: el.dataset.n, p_can: el.dataset.v === '1' }); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
   'staff-remove'(el){
     const n = esc(el.dataset.n);
@@ -2982,7 +3008,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.38';
+const APP_VERSION = '2026-11-23.39';
 let newVersion = false;
 async function checkVersion(){
   try {
