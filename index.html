@@ -163,6 +163,20 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .faceid{display:flex;gap:10px;align-items:center;justify-content:space-between;background:#F4F6F8;border-radius:8px;padding:10px 12px;margin-bottom:12px}
 .faceid span{font-size:14px}
 .faceid .btn{width:auto;flex:none;margin:0}
+.signin .names{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-bottom:6px}
+.signin .names button{min-height:48px;border:1.5px solid var(--line);background:#fff;border-radius:10px;font:600 16px var(--body);color:var(--ink)}
+.signin .names button[aria-checked=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.pinarea{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.dots{display:flex;justify-content:center;gap:14px;margin:6px 0 16px}
+.dots i{width:16px;height:16px;border-radius:50%;border:2px solid var(--ink);transition:background .12s}
+.dots i.on{background:var(--ink)}
+.dots.shake{animation:shake .4s}
+@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:300px;margin:0 auto}
+.keypad button{height:64px;border-radius:50%;width:64px;justify-self:center;border:1.5px solid var(--line);background:#fff;font:600 26px var(--sign);color:var(--ink);-webkit-tap-highlight-color:transparent}
+.keypad button:active{background:var(--ink);color:#fff}
+.keypad button[data-k=del]{border:0;background:transparent;font-size:24px}
+@media (prefers-reduced-motion:reduce){.dots.shake{animation:none}}
 .morebox{margin-top:4px}.morerow{display:flex;gap:8px}.morerow input{flex:1;text-align:center;font:700 24px/1 var(--sign)}.morerow .btn{width:auto;flex:none;min-height:50px}
 .addmore{display:block;margin-top:10px}
 .savedacts{margin-top:10px}.savedacts .btn{flex:1;font-size:15px}
@@ -782,7 +796,7 @@ function connectHTML(err = ''){
   <p class="small muted">Employees don't need to do this. Send them the invite link from the Export tab after you connect.</p>`;
 }
 /* ---------- sign-in: each person has a name and a 6-digit PIN ---------- */
-let staff = null, staffNames = [], signinErr = '', signinPick = '', faceSupported = false;     // staff: null (old name mode) | 'checking' | 'out' | 'in'
+let staff = null, staffNames = [], signinErr = '', signinPick = '', faceSupported = false, pinBuf = '';     // staff: null (old name mode) | 'checking' | 'out' | 'in'
 async function checkStaff(){
   if (!cfg || cfg.view) return;
   staff = 'checking';
@@ -795,19 +809,30 @@ async function checkStaff(){
     else staff = null;
   } catch { staff = null; }          // sign-in not set up on this database: keep the simple name screen
 }
+function drawPinDots(){
+  const d = $('.dots'); if (!d) return;
+  d.classList.remove('shake'); d.querySelectorAll('i').forEach((x, n) => x.classList.toggle('on', n < pinBuf.length));
+  d.setAttribute('aria-label', pinBuf.length + ' of 6 digits'); $('#si-pin').value = pinBuf;
+}
 function signinHTML(){
   const last = signinPick || store.get('lastName') || '';
+  pinBuf = '';
   return `<h1 class="h">Sign in</h1>
-  <p class="lead">Choose your name and type your 6-digit PIN. You stay signed in on this phone.</p>
-  <div class="panel">
-    <label class="f" for="si-name">Your name</label>
-    <select id="si-name"><option value="">Choose your name</option>${staffNames.map(n => `<option ${n === last ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
-    <label class="f" for="si-pin">PIN</label>
-    <input id="si-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password" enterkeyhint="go">
-    ${signinErr ? `<div class="err">${esc(signinErr)}</div>` : ''}
-    <button class="btn" data-act="sign-in" style="margin-top:16px">Sign in</button>
+  <div class="panel signin">
+    <p class="f" id="si-label">Who are you?</p>
+    <div class="names" role="radiogroup" aria-labelledby="si-label">${staffNames.map(n => `<button type="button" role="radio" aria-checked="${n === last}" data-act="si-name" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+    <input id="si-name" type="hidden" value="${esc(staffNames.includes(last) ? last : '')}">
+    <input id="si-pin" type="hidden" value="">
+    <div class="pinarea" ${staffNames.includes(last) ? '' : 'hidden'}>
+      <p class="f" style="text-align:center">Your PIN</p>
+      <div class="dots ${signinErr ? 'shake' : ''}" aria-live="polite" aria-label="0 of 6 digits">${'<i></i>'.repeat(6)}</div>
+      ${signinErr ? `<div class="err" style="text-align:center">${esc(signinErr)}</div>` : ''}
+      <div class="keypad">${['1','2','3','4','5','6','7','8','9','','0','del'].map(k => k === '' ? '<span></span>'
+        : k === 'del' ? '<button type="button" data-act="pin-key" data-k="del" aria-label="Delete last digit">⌫</button>'
+        : `<button type="button" data-act="pin-key" data-k="${k}">${k}</button>`).join('')}</div>
+    </div>
   </div>
-  <p class="small muted">Forgot your PIN? Ask Avigdor for a new one.</p>`;
+  <p class="small muted" style="text-align:center">Forgot your PIN? Ask Avigdor for a new one.</p>`;
 }
 async function staffSheet(){
   openSheet(`<h2>Employees</h2><div id="st-list"><p class="lead">Loading</p></div>
@@ -1873,10 +1898,22 @@ const act = {
     if (!store.get('seenGuide')) { store.set('seenGuide', 1); guideSheet(true); }
   },
   'change-who'(){ me = null; render(); },
+  'si-name'(el){
+    signinPick = el.dataset.n; signinErr = ''; $('#si-name').value = signinPick; pinBuf = ''; drawPinDots();
+    document.querySelectorAll('.names button').forEach(b => b.setAttribute('aria-checked', b === el));
+    $('.pinarea').hidden = false; $('.pinarea').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  },
+  'pin-key'(el){
+    if (pack.signingIn) return;
+    const k = el.dataset.k;
+    if (k === 'del') pinBuf = pinBuf.slice(0, -1); else if (pinBuf.length < 6) pinBuf += k;
+    drawPinDots(); if (navigator.vibrate) navigator.vibrate(8);
+    if (pinBuf.length === 6) { $('#si-pin').value = pinBuf; setTimeout(() => act['sign-in'](), 120); }
+  },
   async 'sign-in'(){
     const name = $('#si-name').value, pin = $('#si-pin').value.trim(); signinPick = name;
     if (!name) { signinErr = 'Choose your name.'; return render(); }
-    if (!/^\d{6}$/.test(pin)) { signinErr = 'Type your 6-digit PIN.'; render(); return $('#si-pin').focus(); }
+    if (!/^\d{6}$/.test(pin)) { signinErr = 'Type your 6-digit PIN.'; return render(); }
     await withBusy('Signing in', async () => {
       try {
         const r = await rpc('packout_login', { p_name: name, p_pin: pin });
@@ -2395,7 +2432,7 @@ document.addEventListener('input', e => { if (e.target.id === 'inv-q') { filt.q 
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'os') { e.preventDefault(); act['other-size-add'](); }
   if (e.key === 'Enter' && e.target.id === 'k-style') act['check-style']();
-  if (e.key === 'Enter' && e.target.id === 'si-pin') { e.preventDefault(); act['sign-in'](); }
+  if ($('.keypad') && !$('.pinarea').hidden && /^[0-9]$|^Backspace$/.test(e.key) && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { e.preventDefault(); act['pin-key']({ dataset: { k: e.key === 'Backspace' ? 'del' : e.key } }); }
   if (e.key === 'Enter' && e.target.id === 'k-color') { e.preventDefault(); const q = $('.szq'); if (q) { q.focus(); q.select(); } else e.target.blur(); }
   if (e.key === 'Enter' && (['k-tag', 'k-brand'].includes(e.target.id) || e.target.classList.contains('szq') || e.target.classList.contains('szt'))) { e.preventDefault(); e.target.blur(); }
   if (e.key === 'Escape' && !$('#zoom').hidden) { act['zoom-close'](); return; }
@@ -2437,7 +2474,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.21';
+const APP_VERSION = '2026-11-22.22';
 let newVersion = false;
 async function checkVersion(){
   try {
