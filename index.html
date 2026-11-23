@@ -153,6 +153,16 @@ input:focus,select:focus{border-color:var(--ink);outline:3px solid rgba(255,198,
 .photo .cleanstate .spin{width:14px;height:14px;border-width:2px}
 .photo .cleanstate.ok{background:#E7F4EC;color:#1B6B3A}
 @media (prefers-reduced-motion:reduce){.spin,.rbar i,.photo .scan{animation:none}.photo .scan{display:none}}
+#lock{position:fixed;inset:0;z-index:70;background:var(--ink);display:flex;align-items:center;justify-content:center;padding:24px}
+#lock[hidden]{display:none}
+#lock .lockcard{background:#fff;border-radius:16px;padding:28px 22px 18px;width:min(92vw,380px);text-align:center}
+#lock img{border-radius:16px;margin-bottom:12px}
+#lock h2{margin:0 0 4px}
+#lock #lock-who{color:var(--ink2);margin:0 0 18px;font-weight:600}
+#lock #lock-err{color:#B42318;margin:10px 0 0}
+.faceid{display:flex;gap:10px;align-items:center;justify-content:space-between;background:#F4F6F8;border-radius:8px;padding:10px 12px;margin-bottom:12px}
+.faceid span{font-size:14px}
+.faceid .btn{width:auto;flex:none;margin:0}
 .morebox{margin-top:4px}.morerow{display:flex;gap:8px}.morerow input{flex:1;text-align:center;font:700 24px/1 var(--sign)}.morerow .btn{width:auto;flex:none;min-height:50px}
 .addmore{display:block;margin-top:10px}
 .savedacts{margin-top:10px}.savedacts .btn{flex:1;font-size:15px}
@@ -411,6 +421,10 @@ dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
   <button data-tab="more"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span>Export</span></button>
 </nav>
 <div id="sheet"><div class="card" role="dialog" aria-modal="true"></div></div>
+<div id="lock" hidden role="dialog" aria-modal="true" aria-label="Packout is locked"><div class="lockcard">
+  <img src="icon-192.png" alt="" width="72" height="72"><h2>Packout is locked</h2><p id="lock-who"></p>
+  <button class="btn" data-act="faceid-unlock">Unlock with Face ID</button>
+  <button class="btn quiet" data-act="faceid-usepin">Use my PIN instead</button><p id="lock-err" class="small"></p></div></div>
 <div id="zoom" hidden role="dialog" aria-modal="true" aria-label="Photo"><div class="zcard"><button id="zoom-x" data-act="zoom-close" aria-label="Close photo">&times;</button><img id="zoom-img" alt=""><p id="zoom-cap"></p></div></div>
 <div id="toast" role="status"></div>
 <div id="busy"><div><i></i><span></span></div></div>
@@ -768,7 +782,7 @@ function connectHTML(err = ''){
   <p class="small muted">Employees don't need to do this. Send them the invite link from the Export tab after you connect.</p>`;
 }
 /* ---------- sign-in: each person has a name and a 6-digit PIN ---------- */
-let staff = null, staffNames = [], signinErr = '', signinPick = '';     // staff: null (old name mode) | 'checking' | 'out' | 'in'
+let staff = null, staffNames = [], signinErr = '', signinPick = '', faceSupported = false;     // staff: null (old name mode) | 'checking' | 'out' | 'in'
 async function checkStaff(){
   if (!cfg || cfg.view) return;
   staff = 'checking';
@@ -1400,6 +1414,42 @@ function readingSteps(){
   }, 1400);
 }
 
+/* ---------- optional Face ID: locks the app on this phone; the person unlocks it with their face ---------- */
+const faceIdAvailable = async () => { try { return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch { return false; } };
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+const rnd = n => crypto.getRandomValues(new Uint8Array(n));
+const faceId = () => { const f = store.get('faceid'); return f && me && f.name === me.name ? f : null; };
+let lockedAt = 0, hiddenAt = 0;
+async function faceIdTurnOn(){
+  try {
+    const c = await navigator.credentials.create({ publicKey: {
+      challenge: rnd(32), rp: { name: 'Packout', id: location.hostname },
+      user: { id: rnd(16), name: me.name, displayName: me.name },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' }, timeout: 60000 } });
+    store.set('faceid', { name: me.name, id: b64u(c.rawId) });
+    toast('Face ID is on. The app asks for it when you open it.', 'good'); render();
+  } catch (e) { if (e && e.name !== 'NotAllowedError') toast('Face ID could not be turned on: ' + e.message, 'bad'); }
+}
+function lockNow(){
+  if (!faceId() || staff === 'out' || cfg.view) return;
+  $('#lock-who').textContent = me.name; $('#lock-err').textContent = ''; $('#lock').hidden = false; lockedAt = Date.now();
+  setTimeout(faceIdUnlock, 300);      // ask for the face straight away; the button stays for a second try
+}
+async function faceIdUnlock(){
+  const f = faceId(); if (!f) { $('#lock').hidden = true; return; }
+  try {
+    await navigator.credentials.get({ publicKey: { challenge: rnd(32), rpId: location.hostname, allowCredentials: [{ type: 'public-key', id: unb64u(f.id) }], userVerification: 'required', timeout: 60000 } });
+    $('#lock').hidden = true;
+  } catch (e) { $('#lock-err').textContent = e && e.name === 'NotAllowedError' ? 'Face ID was cancelled. Try again, or use your PIN.' : 'Face ID did not work. Use your PIN instead.'; }
+}
+// lock again when the app comes back after 5 minutes away
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) hiddenAt = Date.now();
+  else if (hiddenAt && Date.now() - hiddenAt > 5 * 60000) lockNow();
+});
+
 /* ---------- clean the photo right after it is taken, so the packer sees the result before saving ---------- */
 function startEarlyPolish(file){
   const path = uuid() + '.jpg';
@@ -1659,6 +1709,9 @@ function moreHTML(){
     <button class="btn" data-act="join-code">Show join code</button>
     <button class="btn alt" data-act="invite">Share invite link</button></div>` : ''}
   <div class="panel"><h2>This phone</h2>
+    ${staff === 'in' && faceSupported ? `<div class="faceid">${faceId()
+      ? `<span><b>Face ID is on.</b> The app asks for it when you open it.</span><button class="btn quiet sm" data-act="faceid-off">Turn off</button>`
+      : `<span><b>Face ID</b> (optional): lock the app on this phone and open it with your face.</span><button class="btn alt sm" data-act="faceid-on">Turn on</button>`}</div>` : ''}
     <dl class="facts"><dt>Name</dt><dd>${esc(me.name)}</dd><dt>Access</dt><dd>${cfg.view ? 'View only' : cfg.team ? 'Team (can pack)' : 'Team'}</dd><dt>Database</dt><dd style="word-break:break-all">${esc(cfg.url.replace('https://', ''))}</dd></dl>
     ${!canEdit() ? '' : staff === 'in' ? '<button class="btn quiet" data-act="sign-out">Sign out</button>' : '<button class="btn quiet" data-act="change-who">Change name</button>'}
     <button class="btn quiet" data-act="disconnect">Disconnect this phone</button></div>`;
@@ -1829,6 +1882,7 @@ const act = {
         const r = await rpc('packout_login', { p_name: name, p_pin: pin });
         if (!r.ok) { signinErr = r.left ? `Wrong PIN. ${r.left} ${r.left === 1 ? 'try' : 'tries'} left.` : 'Wrong PIN. This name is now locked. Ask Avigdor to unlock it.'; render(); const i = $('#si-pin'); if (i) i.focus(); return; }
         cfg.session = r.token; store.set('cfg', cfg); store.set('lastName', r.name);
+        const fid = store.get('faceid'); if (fid && fid.name !== r.name) store.del('faceid');
         me = { name: r.name, owner: !!r.owner }; store.set('me', me); staff = 'in'; signinErr = '';
         await refresh(); render(); startLive();
         if (!store.get('seenGuide')) { store.set('seenGuide', 1); guideSheet(true); }
@@ -1838,6 +1892,10 @@ const act = {
       }
     });
   },
+  'faceid-on'(){ faceIdTurnOn(); },
+  'faceid-off'(){ store.del('faceid'); toast('Face ID is off on this phone.', 'good'); render(); },
+  'faceid-unlock'(){ faceIdUnlock(); },
+  async 'faceid-usepin'(){ store.del('faceid'); $('#lock').hidden = true; await act['sign-out'](); },
   async 'sign-out'(){
     try { await rpc('packout_logout', {}); } catch {}
     delete cfg.session; store.set('cfg', cfg); me = null; store.del('me'); await checkStaff(); render();
@@ -2379,7 +2437,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.20';
+const APP_VERSION = '2026-11-22.21';
 let newVersion = false;
 async function checkVersion(){
   try {
@@ -2402,7 +2460,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
       if (cfg && cfg.team) setTimeout(() => toast('This phone already has the team link, so the view-only link was not applied.', 'bad'), 800);
       else { cfg = { url: j.u, key: j.k, view: true }; store.set('cfg', cfg); }
     } } catch {} if (!isStandalone()) history.replaceState(null, '', location.pathname); }
-  if (cfg && !cfg.view) { staff = 'checking'; render(); await checkStaff(); }
+  if (cfg && !cfg.view) { staff = 'checking'; render(); await checkStaff(); faceSupported = await faceIdAvailable(); if (staff === 'in') lockNow(); }
   render();
   if (cfg && staff !== 'out') {
     if (await loadCache()) { render(); refresh(true).then(ok => { if (ok && !sheetOpen()) softRender(); }); }   // open instantly, then catch up quietly
