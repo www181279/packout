@@ -920,3 +920,28 @@ drop policy if exists "packout settings add" on public.settings;
 create policy "packout settings add" on public.settings for insert to anon, authenticated with check (public.packout_can_delete());
 drop policy if exists "packout settings change" on public.settings;
 create policy "packout settings change" on public.settings for update to anon, authenticated using (public.packout_can_delete()) with check (public.packout_can_delete());
+-- 12. Only the owner changes settings and removes people.
+create or replace function public.packout_is_owner()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select packout_private.team_ok()
+     and coalesce((select s.is_owner from packout_private.staff s where s.name = packout_private.session_name()), false);
+$$;
+revoke all on function public.packout_is_owner() from public;
+grant execute on function public.packout_is_owner() to anon, authenticated;
+
+drop policy if exists "packout settings add" on public.settings;
+create policy "packout settings add" on public.settings for insert to anon, authenticated with check (public.packout_is_owner());
+drop policy if exists "packout settings change" on public.settings;
+create policy "packout settings change" on public.settings for update to anon, authenticated using (public.packout_is_owner()) with check (public.packout_is_owner());
+drop policy if exists "packout settings remove" on public.settings;
+create policy "packout settings remove" on public.settings for delete to anon, authenticated using (public.packout_is_owner());
+
+create or replace function public.packout_staff_remove(p_name text)
+returns void language plpgsql volatile security definer set search_path = '' as $$
+begin
+  perform packout_private.require_owner();
+  delete from packout_private.staff where name = p_name and not is_owner;   -- sessions and Face ID go with it
+end;
+$$;
+revoke all on function public.packout_staff_remove(text) from public;
+grant execute on function public.packout_staff_remove(text) to anon, authenticated;

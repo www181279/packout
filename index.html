@@ -970,7 +970,9 @@ function render(){
   if (!me)  { $('#nav').hidden = true; return v.innerHTML = whoHTML(); }
   $('#nav').hidden = false; $('#help').hidden = !!cfg.view; document.body.classList.add('shell');
   const wb = $('#who b'); if (wb) wb.dataset.i = initials(me.name || '?');
-  $('#nav').style.gridTemplateColumns = cfg.view ? 'repeat(4,1fr)' : ''; $('#nav [data-tab=pack]').hidden = !!cfg.view;
+  $('#nav [data-tab=pack]').hidden = !!cfg.view; $('#nav [data-tab=more]').hidden = !canExport();
+  if (tab === 'more' && !canExport()) tab = 'inventory';
+  $('#nav').style.gridTemplateColumns = `repeat(${[...$('#nav').children].filter(b => !b.hidden).length},1fr)`;
   document.querySelectorAll('#nav button').forEach(b => b.dataset.tab === tab ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
   validatePack();
   if (tab === 'pack' && isDesk()) tab = 'inventory';      // packing happens on phones; the computer is for looking things up
@@ -1326,7 +1328,7 @@ function inventoryHTML(){
   return `<h1 class="h">Inventory</h1>
   <div id="inv-totals"></div>
   <div class="tools"><input id="inv-q" type="search" placeholder="Search style, color, brand, tag, pallet" value="${esc(filt.q)}" aria-label="Search inventory">
-    <button class="btn alt" data-act="open-filters">Filter</button><button class="btn alt" data-act="inv-export" aria-label="Export this list">Export</button></div>
+    <button class="btn alt" data-act="open-filters">Filter</button>${canExport() ? '<button class="btn alt" data-act="inv-export" aria-label="Export this list">Export</button>' : ''}</div>
   <div id="inv-chips" class="fchips"></div>
   <div class="ihead" aria-hidden="true"><span>Photo</span><span>Style</span><span>Type</span><span>Color</span><span>Brand</span><span>Gender</span><span>Season</span><span>UPC barcode</span><span>Sizes</span><span>Where</span><span style="text-align:right">Pieces</span></div>
   <div id="inv-list"></div>`;
@@ -2071,7 +2073,7 @@ function settingsHTML(){
       + row(ic('M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'), 'View-only link', `<span class="url">${esc(viewLink())}</span><br>Sees pallets, boxes, inventory and exports. Cannot change anything.`,
         `<button class="btn alt sm" data-act="copy-view">Copy</button>`));
   }
-  if (canManage()) h += sec('Item photos', 'Every saved photo is cleaned up on its own. The garment itself is never changed, and the original is kept.',
+  if (isOwner()) h += sec('Item photos', 'Every saved photo is cleaned up on its own. The garment itself is never changed, and the original is kept.',
     row(ic('M3 8h4l2-3h6l2 3h4v11H3zM12 16.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z'), 'Polished photos', `<span id="pol-count">${polishCountText()}</span>`, `<button class="btn alt sm" data-act="polish-all">Polish the rest</button>`)
     + `<label class="srow switchrow"><span class="sic">${ic('M12 3v18M3 12h18')}</span><span class="stx"><b>Correct the color tint</b><small>Uses the white backdrop to remove a yellow or blue tint from the camera.</small></span><input type="checkbox" id="set-cc" ${setting('color_correct') ? 'checked' : ''}></label>`);
   h += sec('This device', '',
@@ -2093,6 +2095,7 @@ function staffRowsHTML(rows){
       ${r.locked && r.active ? `<button class="btn sm" data-act="staff-unlock" data-n="${esc(r.name)}">Unlock</button>` : ''}
       <button class="btn alt sm" data-act="staff-pin" data-n="${esc(r.name)}">New PIN</button>
       ${r.is_owner || r.can_delete == null ? '' : `<button class="btn quiet sm" data-act="staff-del" data-n="${esc(r.name)}" data-v="${r.can_delete ? '0' : '1'}">${r.can_delete ? 'Make guest' : 'Full access'}</button>`}
+      ${r.is_owner ? '' : `<button class="btn quiet danger-t sm" data-act="staff-remove" data-n="${esc(r.name)}">Remove</button>`}
       ${r.is_owner ? '' : `<button class="btn ${r.active ? 'quiet danger-t' : 'alt'} sm" data-act="staff-active" data-n="${esc(r.name)}" data-v="${r.active ? '0' : '1'}">${r.active ? 'Turn off' : 'Turn on'}</button>`}
     </div></div>`).join('');
 }
@@ -2193,7 +2196,9 @@ async function inviteLink(){
 }
 const canEdit = () => !!cfg && !cfg.view;
 const canDelete = () => canEdit() && !(me && me.del === false);      // full access: edit, move and delete
-const canManage = canDelete;                                           // a Guest login can only pack new items; no edits, no deletes, no settings
+const canManage = canDelete;
+const isOwner = () => !!(me && me.owner) && !cfg.view;
+const canExport = () => !!cfg && (cfg.view || isOwner() || (me && me.del === false));   // owner, guests and the view-only link                                           // a Guest login can only pack new items; no edits, no deletes, no settings
 const isDenied = e => e && (e.code === '42501' || /row-level security|permission denied/i.test(e.message || ''));
 const DENIED_MSG = 'This phone is not allowed to make changes. Sign in again, or open the team link from Avigdor.';
 const fileStamp = () => new Date().toISOString().slice(0, 10);
@@ -2323,6 +2328,12 @@ const act = {
   },
   async 'staff-unlock'(el){ try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_unlock: true }); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
   async 'staff-del'(el){ try { await rpc('packout_staff_delete_rights', { p_name: el.dataset.n, p_can: el.dataset.v === '1' }); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
+  'staff-remove'(el){
+    const n = esc(el.dataset.n);
+    openSheet(`<h2>Remove ${n}?</h2><p class="lead">${n} disappears from the sign-in list and is signed out everywhere. Everything ${n} packed stays in the inventory. This can't be undone; to come back, add the name again with a new PIN.</p>
+      <div class="row"><button class="btn alt" data-act="close-sheet">Keep</button><button class="btn danger" data-act="staff-remove-yes" data-n="${n}">Remove</button></div>`);
+  },
+  async 'staff-remove-yes'(el){ try { await rpc('packout_staff_remove', { p_name: el.dataset.n }); toast('Removed ' + el.dataset.n, 'good'); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
   async 'staff-active'(el){ try { await rpc('packout_staff_save', { p_name: el.dataset.n, p_active: el.dataset.v === '1' }); refreshStaff(); } catch (e) { toast(e.message, 'bad'); } },
   disconnect(){
     openSheet(`<h2>Disconnect this phone?</h2><p class="lead">Nothing is deleted from the database. This phone will need the invite link again.</p>
@@ -2500,7 +2511,7 @@ const act = {
   'inv-more'(){ invLimit += 150; renderInvList(); },
   'open-item'(el){ itemSheet(el.dataset.id); },
   'open-group'(el){ groupSheet(el.dataset.k); },
-  'inv-export'(){
+  'inv-export'(){ if (!canExport()) return;
     const groups = groupItems(filtered()); if (!groups.length) return toast('There is nothing to export in this list.', 'bad');
     const f = filterSummary();
     openSheet(`<h2>Export this list</h2>
@@ -2850,7 +2861,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.35';
+const APP_VERSION = '2026-11-23.36';
 let newVersion = false;
 async function checkVersion(){
   try {
