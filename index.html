@@ -312,6 +312,10 @@ body.signing #view{max-width:440px;padding:0 20px}
 .fchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .fchips button{border:0;background:var(--ink);color:#fff;border-radius:20px;padding:5px 12px;font-size:14px}
 @media (max-width:430px){.fbtn .ft{display:none}.fbtn{padding:0 12px}}
+.bpick{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.bpick button{min-height:44px;padding:0 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink);font:600 15px/1 var(--body);cursor:pointer}
+.bpick button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.bpick button:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
 .fbtn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
 .fbadge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--placard);color:var(--ink);font:700 12px/1 var(--body);margin-left:2px}
 /* filter sheet */
@@ -925,6 +929,7 @@ dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
 const PRESET_URL = '';   // e.g. 'https://abcd1234.supabase.co'
 const PRESET_KEY = '';   // the anon / publishable key
 const BUCKET = 'item-photos';
+const QUICK_BRANDS = ['Jordache', 'U.S. Polo Assn.'];   // one tap when the tag reader can't find the brand
 const GENDERS = ['Women','Men','Girls','Boys','Baby','Unisex'];
 const SEASONS = ['Spring','Summer','Fall','Winter','All year'];
 const TYPES = {
@@ -1499,6 +1504,7 @@ function packHTML(){
       <input id="k-type-other" type="text" autocomplete="off" placeholder="For example: Overalls" value="${typeOther && f.type !== '__other' ? esc(f.type) : ''}" ${typeOther ? '' : 'hidden'}>
       <label class="f" for="k-brand">Brand</label>
       <input id="k-brand" type="text" list="l-brand" autocomplete="off" enterkeyhint="done" value="${esc(f.brand)}">
+      <div class="bpick" role="group" aria-label="Quick brand">${QUICK_BRANDS.map(b => `<button type="button" data-act="use-brand" data-v="${esc(b)}" aria-pressed="${f.brand === b}">${esc(b)}</button>`).join('')}</div>
       <datalist id="l-brand">${uniq('brand').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <label class="f">Gender</label>
       <div class="chips">${GENDERS.map(g => `<label><input type="radio" name="k-gender" value="${g}" ${f.gender === g ? 'checked' : ''}><span>${g}</span></label>`).join('')}</div>
@@ -3040,6 +3046,7 @@ const act = {
   scan(el){ openScanner(el.dataset.target); },
   guide(){ guideSheet(false); },
   'join-code'(){ joinCodeSheet(); },
+  'use-brand'(el){ const i = $('#k-brand'); if (!i) return; i.value = el.dataset.v; document.querySelectorAll('.bpick button').forEach(b => b.setAttribute('aria-pressed', b === el)); },
   'use-color'(el){ const i = $('#k-color'); if (i) { i.value = el.dataset.v; delete i.dataset.auto; } },
   'tag-use'(){
     const L = pack.lastTag; if (sheetOpen()) closeSheet(); if (!L) return;
@@ -3387,7 +3394,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.47';
+const APP_VERSION = '2026-11-23.48';
 let newVersion = false;
 async function checkVersion(){
   try {
