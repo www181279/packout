@@ -881,3 +881,42 @@ $$;
 revoke all on function public.packout_join(text), public.packout_join_code() from public;
 grant execute on function public.packout_join(text), public.packout_join_code() to anon, authenticated;
 select join_code from packout_private.app_secret where id = 1;
+-- 11. Guests (can_delete = false) can pack new items only: no edits, no deletes, no settings.
+create or replace function packout_private.is_guest()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select coalesce((select not s.can_delete from packout_private.staff s where s.name = packout_private.session_name()), false);
+$$;
+
+-- Saved items: a guest may only mark a photo as polished (the app does this on its own).
+create or replace function packout_private.guest_item_guard()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if packout_private.is_guest() and (to_jsonb(new) - 'photo_pro' - 'updated_at') is distinct from (to_jsonb(old) - 'photo_pro' - 'updated_at') then
+    raise exception 'Guests can''t change saved items.' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists guest_item_guard on public.items;
+create trigger guest_item_guard before update on public.items for each row execute function packout_private.guest_item_guard();
+
+-- Styles and pallets: no moving, renaming, closing or reopening for guests. Boxes: closing a full box is part of packing.
+create or replace function packout_private.guest_no_update()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if packout_private.is_guest() then
+    raise exception 'Guests can''t change saved items.' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists guest_no_update on public.styles;
+create trigger guest_no_update before update on public.styles for each row execute function packout_private.guest_no_update();
+drop trigger if exists guest_no_update on public.pallets;
+create trigger guest_no_update before update on public.pallets for each row execute function packout_private.guest_no_update();
+
+-- Settings: only people with full access.
+drop policy if exists "packout settings add" on public.settings;
+create policy "packout settings add" on public.settings for insert to anon, authenticated with check (public.packout_can_delete());
+drop policy if exists "packout settings change" on public.settings;
+create policy "packout settings change" on public.settings for update to anon, authenticated using (public.packout_can_delete()) with check (public.packout_can_delete());

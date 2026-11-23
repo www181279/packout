@@ -1067,11 +1067,11 @@ async function staffSheet(){
   try {
     const rows = await rpc('packout_staff_list', {});
     if ($('#st-list')) $('#st-list').innerHTML = rows.map(r => `<div class="staffrow">
-      <div><b>${esc(r.name)}</b>${r.is_owner ? ' <span class="badge">Owner</span>' : ''}<br><span class="small muted">${!r.active ? 'Turned off' : r.locked ? 'Locked after 5 wrong PINs' : r.phones ? `Signed in on ${plural(r.phones, 'phone')}` : 'Not signed in yet'}${r.can_delete === false ? ' · <b>Cannot delete</b>' : ''}</span></div>
+      <div><b>${esc(r.name)}</b>${r.is_owner ? ' <span class="badge">Owner</span>' : ''}<br><span class="small muted">${!r.active ? 'Turned off' : r.locked ? 'Locked after 5 wrong PINs' : r.phones ? `Signed in on ${plural(r.phones, 'phone')}` : 'Not signed in yet'}${r.can_delete === false ? ' · <b>Guest: pack only</b>' : ''}</span></div>
       <div class="row">
         ${r.locked && r.active ? `<button class="btn sm" data-act="staff-unlock" data-n="${esc(r.name)}">Unlock</button>` : ''}
         <button class="btn alt sm" data-act="staff-pin" data-n="${esc(r.name)}">New PIN</button>
-        ${r.is_owner || r.can_delete == null ? '' : `<button class="btn quiet sm" data-act="staff-del" data-n="${esc(r.name)}" data-v="${r.can_delete ? '0' : '1'}">${r.can_delete ? 'No deleting' : 'Allow deleting'}</button>`}
+        ${r.is_owner || r.can_delete == null ? '' : `<button class="btn quiet sm" data-act="staff-del" data-n="${esc(r.name)}" data-v="${r.can_delete ? '0' : '1'}">${r.can_delete ? 'Make guest' : 'Full access'}</button>`}
         ${r.is_owner ? '' : `<button class="btn ${r.active ? 'danger' : 'alt'} sm" data-act="staff-active" data-n="${esc(r.name)}" data-v="${r.active ? '0' : '1'}">${r.active ? 'Turn off' : 'Turn on'}</button>`}
       </div></div>`).join('');
   } catch (e) { if ($('#st-list')) $('#st-list').innerHTML = `<div class="err">${esc(e.message)}</div>`; }
@@ -1159,7 +1159,7 @@ function packHTML(){
         <span><b>${plural(sumQty(its), 'piece')} inside</b><small>Started by ${esc(b.created_by)}</small></span></button>`; }).join('')}
     <button class="pick new" data-act="new-box">Start a new box on ${pCode(p.id)}</button>
     ${n === 0 ? `<p class="small muted" style="margin-top:14px">Picked the wrong pallet? Nothing is packed for this style yet. <button class="linkbtn" data-act="release-style">Undo this pallet choice</button></p>`
-      : `<p class="small muted" style="margin-top:14px">Pallet full, or a mistake in this style? <button class="linkbtn" data-act="open-style" data-style="${esc(pack.style)}">Move, edit or delete this style</button></p>`}`;
+      : !canManage() ? '' : `<p class="small muted" style="margin-top:14px">Pallet full, or a mistake in this style? <button class="linkbtn" data-act="open-style" data-style="${esc(pack.style)}">Move, edit or delete this style</button></p>`}`;
   }
 
   // item form: the fields that change every time come first; the ones that carry over sit below
@@ -1273,7 +1273,7 @@ function palletDetailHTML(p){
     <div class="code">${pCode(p.id)}</div>
     <p>${plural(boxes.length, 'box')}, ${plural(styles.length, 'style')}, ${plural(sumQty(its), 'piece')}. Started by ${esc(p.created_by)}.</p>
   </div></div>
-  ${canEdit() ? `<div class="row" style="margin-bottom:12px">
+  ${canManage() ? `<div class="row" style="margin-bottom:12px">
     <button class="btn alt sm" data-act="toggle-pallet" data-id="${p.id}">${p.status === 'open' ? 'Close pallet' : 'Reopen pallet'}</button>
     ${!boxes.length && !styles.length && canDelete() ? `<button class="btn danger sm" data-act="del-pallet" data-id="${p.id}">Delete</button>` : ''}
   </div>` : ''}
@@ -1282,7 +1282,7 @@ function palletDetailHTML(p){
     <button class="btn quiet sm" data-act="print-labels" data-id="${p.id}">Print box labels</button></div>` : ''}
   ${styles.length ? `<div class="panel"><h2>Styles on this pallet</h2><ul class="lines">${styles.map(s => { const si = itemsOf('style_number', s.style_number); return `
     <li><span><b>${esc(s.style_number)}</b><br><span class="muted small">${plural(sumQty(si), 'piece')} in ${plural(new Set(si.map(i => i.box_id)).size, 'box')}</span></span>
-      ${canEdit() ? `<button class="btn quiet sm" style="margin-left:auto" data-act="open-style" data-style="${esc(s.style_number)}">Move or edit</button>` : ''}</li>`; }).join('')}</ul></div>` : ''}
+      ${canManage() ? `<button class="btn quiet sm" style="margin-left:auto" data-act="open-style" data-style="${esc(s.style_number)}">Move or edit</button>` : ''}</li>`; }).join('')}</ul></div>` : ''}
   <div class="boxes">${boxes.map(b => { const bi = itemsOf('box_id', b.id); return `
     <div class="panel"><div class="boxhead"><span class="code">${bCode(b.id)}</span>
       <span class="muted small">${plural(sumQty(bi), 'piece')}, by ${esc(b.created_by)}</span>
@@ -1412,10 +1412,10 @@ function groupSheet(key){
     <h2>${esc(i.style_number)} <span class="muted" style="font-weight:500">${esc(i.color)}</span></h2>
     <dl class="facts"><dt>Type</dt><dd>${esc(i.item_type || 'Not set')}</dd><dt>Brand</dt><dd>${esc(i.brand)}</dd><dt>Gender</dt><dd>${esc(i.gender)}</dd><dt>Season</dt><dd>${esc(i.season)}</dd><dt>Total</dt><dd>${plural(g.qty, 'piece')}</dd></dl>
     <div class="szgrid">${sizeTotals(g).map(([z, q]) => `<div><b>${esc(z || 'No size')}</b><span>${nf(q)}</span></div>`).join('')}</div>
-    <h3 class="small muted" style="margin:14px 0 6px">By box${canEdit() ? ' (tap a line to edit it)' : ''}</h3>
+    <h3 class="small muted" style="margin:14px 0 6px">By box${canManage() ? ' (tap a line to edit it)' : ''}</h3>
     <div class="glines">${g.items.slice().sort((a, b) => a.box_id - b.box_id || bySize(a.size, b.size)).map(x => `
       <button class="gline" data-act="open-item" data-id="${x.id}"><span>${bCode(x.box_id)}</span><span>${esc(x.size || 'No size')}</span><span>${x.tag_number ? esc(x.tag_number) : ''}</span><b>${nf(x.quantity)}</b></button>`).join('')}</div>
-    ${canEdit() ? `<button class="btn quiet" data-act="open-style" data-style="${esc(i.style_number)}" style="margin-top:10px">Move, edit or delete the whole style</button>` : ''}
+    ${canManage() ? `<button class="btn quiet" data-act="open-style" data-style="${esc(i.style_number)}" style="margin-top:10px">Move, edit or delete the whole style</button>` : ''}
     <button class="btn" data-act="close-sheet" style="margin-top:10px">Done</button>`);
 }
 function filterSheet(){
@@ -1438,7 +1438,7 @@ function itemSheet(id, edit){
       <dt>Type</dt><dd>${esc(i.item_type || 'Not set')}</dd><dt>Size</dt><dd>${esc(i.size || 'Not set')}</dd><dt>Color</dt><dd>${esc(i.color)}</dd><dt>Brand</dt><dd>${esc(i.brand)}</dd><dt>Tag number</dt><dd>${esc(i.tag_number || 'None')}</dd>
       <dt>Quantity</dt><dd>${nf(i.quantity)}</dd><dt>Gender</dt><dd>${esc(i.gender)}</dd><dt>Season</dt><dd>${esc(i.season)}</dd>
       <dt>Packed by</dt><dd>${esc(i.created_by)}, ${new Date(i.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</dd></dl>
-    ${canEdit() ? `<div class="row"><button class="btn alt" data-act="edit-item" data-id="${i.id}">Edit</button><button class="btn" data-act="close-sheet">Done</button></div>
+    ${canManage() ? `<div class="row"><button class="btn alt" data-act="edit-item" data-id="${i.id}">Edit</button><button class="btn" data-act="close-sheet">Done</button></div>
     <button class="btn quiet" data-act="open-style" data-style="${esc(i.style_number)}" style="margin-top:10px">Move, edit or delete the whole style</button>` : '<button class="btn" data-act="close-sheet">Done</button>'}`);
   const sel = (id, vals, cur) => `<select id="${id}">${vals.map(v => `<option ${v === cur ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
   openSheet(`<h2>Edit ${esc(i.style_number)}</h2>
@@ -2050,7 +2050,7 @@ function moreHTML(){
   </div>`;
 }
 /* ---------- settings ---------- */
-const ROLE = () => cfg.view ? 'View only' : me.owner ? 'Owner' : me.del === false ? 'Guest · cannot delete' : 'Team member';
+const ROLE = () => cfg.view ? 'View only' : me.owner ? 'Owner' : me.del === false ? 'Guest: can pack new items, no edits or deletes' : 'Team member';
 const ic = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
 function settingsHTML(){
   const owner = !!(me && me.owner), phone = matchMedia('(pointer:coarse)').matches;
@@ -2062,7 +2062,7 @@ function settingsHTML(){
     ${staff === 'in' && faceSupported ? row(FACE_SVG, 'Face ID', faceId() ? 'On for this phone. You can sign in with your face.' : 'Sign in on this phone with your face instead of your PIN.',
       faceId() ? `<button class="btn quiet sm" data-act="faceid-off">Turn off</button>` : `<button class="btn sm" data-act="faceid-on">Turn on</button>`) : ''}`);
   if (owner) {
-    h += sec('Team', 'People who can sign in. A new PIN or turning someone off signs them out everywhere.',
+    h += sec('Team', 'People who can sign in. Guests can pack new items but cannot edit, delete or change settings. Several people can share one login. A new PIN or turning someone off signs them out everywhere.',
       `<div id="st-list" class="stlist"><p class="muted small" style="padding:14px 16px">Loading</p></div>
        <div class="srow add"><input id="st-new" type="text" autocomplete="off" placeholder="Add a person, e.g. Maria" aria-label="New person's name"><button class="btn sm" data-act="staff-add">Add and make a PIN</button></div>`);
     h += sec('Links', 'Send these to give someone access. Anyone with a link can use it, so share them only with your team.',
@@ -2071,7 +2071,7 @@ function settingsHTML(){
       + row(ic('M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'), 'View-only link', `<span class="url">${esc(viewLink())}</span><br>Sees pallets, boxes, inventory and exports. Cannot change anything.`,
         `<button class="btn alt sm" data-act="copy-view">Copy</button>`));
   }
-  if (canEdit()) h += sec('Item photos', 'Every saved photo is cleaned up on its own. The garment itself is never changed, and the original is kept.',
+  if (canManage()) h += sec('Item photos', 'Every saved photo is cleaned up on its own. The garment itself is never changed, and the original is kept.',
     row(ic('M3 8h4l2-3h6l2 3h4v11H3zM12 16.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z'), 'Polished photos', `<span id="pol-count">${polishCountText()}</span>`, `<button class="btn alt sm" data-act="polish-all">Polish the rest</button>`)
     + `<label class="srow switchrow"><span class="sic">${ic('M12 3v18M3 12h18')}</span><span class="stx"><b>Correct the color tint</b><small>Uses the white backdrop to remove a yellow or blue tint from the camera.</small></span><input type="checkbox" id="set-cc" ${setting('color_correct') ? 'checked' : ''}></label>`);
   h += sec('This device', '',
@@ -2087,12 +2087,12 @@ async function settingsAfter(){
 }
 function staffRowsHTML(rows){
   return rows.map(r => `<div class="srow st ${r.active ? '' : 'off'}"><span class="av sm">${esc(initials(r.name))}</span>
-    <div class="stx"><b>${esc(r.name)}${r.is_owner ? ' <span class="badge">Owner</span>' : ''}${r.can_delete === false ? ' <span class="badge g">Cannot delete</span>' : ''}</b>
+    <div class="stx"><b>${esc(r.name)}${r.is_owner ? ' <span class="badge">Owner</span>' : ''}${r.can_delete === false ? ' <span class="badge g">Guest: pack only</span>' : ''}</b>
       <small>${!r.active ? 'Turned off' : r.locked ? 'Locked after 5 wrong PINs' : r.phones ? `Signed in on ${plural(r.phones, 'device')}` : 'Not signed in yet'}</small></div>
     <div class="sact">
       ${r.locked && r.active ? `<button class="btn sm" data-act="staff-unlock" data-n="${esc(r.name)}">Unlock</button>` : ''}
       <button class="btn alt sm" data-act="staff-pin" data-n="${esc(r.name)}">New PIN</button>
-      ${r.is_owner || r.can_delete == null ? '' : `<button class="btn quiet sm" data-act="staff-del" data-n="${esc(r.name)}" data-v="${r.can_delete ? '0' : '1'}">${r.can_delete ? 'No deleting' : 'Allow deleting'}</button>`}
+      ${r.is_owner || r.can_delete == null ? '' : `<button class="btn quiet sm" data-act="staff-del" data-n="${esc(r.name)}" data-v="${r.can_delete ? '0' : '1'}">${r.can_delete ? 'Make guest' : 'Full access'}</button>`}
       ${r.is_owner ? '' : `<button class="btn ${r.active ? 'quiet danger-t' : 'alt'} sm" data-act="staff-active" data-n="${esc(r.name)}" data-v="${r.active ? '0' : '1'}">${r.active ? 'Turn off' : 'Turn on'}</button>`}
     </div></div>`).join('');
 }
@@ -2192,7 +2192,8 @@ async function inviteLink(){
   return appUrl() + joinHash(false);
 }
 const canEdit = () => !!cfg && !cfg.view;
-const canDelete = () => canEdit() && !(me && me.del === false);      // a Guest login can pack and edit, but not delete
+const canDelete = () => canEdit() && !(me && me.del === false);      // full access: edit, move and delete
+const canManage = canDelete;                                           // a Guest login can only pack new items; no edits, no deletes, no settings
 const isDenied = e => e && (e.code === '42501' || /row-level security|permission denied/i.test(e.message || ''));
 const DENIED_MSG = 'This phone is not allowed to make changes. Sign in again, or open the team link from Avigdor.';
 const fileStamp = () => new Date().toISOString().slice(0, 10);
@@ -2486,7 +2487,7 @@ const act = {
   /* pallets */
   'pal-mine'(el){ palMine = el.dataset.v === '1'; render(); },
   'open-pallet'(el){ palView = el.dataset.id ? +el.dataset.id : null; render(); scrollTo(0, 0); },
-  async 'toggle-pallet'(el){ const p = idx.pal.get(+el.dataset.id); await setStatus('pallets', p.id, p.status === 'open' ? 'closed' : 'open'); },
+  async 'toggle-pallet'(el){ if (!canManage()) return toast('Guests can\'t change saved items.', 'bad'); const p = idx.pal.get(+el.dataset.id); await setStatus('pallets', p.id, p.status === 'open' ? 'closed' : 'open'); },
   async 'toggle-box'(el){ const b = idx.box.get(+el.dataset.id); await setStatus('boxes', b.id, b.status === 'open' ? 'closed' : 'open'); },
   async 'del-pallet'(el){ palView = null; await mutate('Deleting', () => db.remove('pallets', 'id=' + eq(el.dataset.id))); },
   async 'del-box'(el){ await mutate('Deleting', () => db.remove('boxes', 'id=' + eq(el.dataset.id))); },
@@ -2525,7 +2526,7 @@ const act = {
       toast('Downloaded', 'good');
     });
   },
-  'edit-item'(el){ itemSheet(el.dataset.id, true); },
+  'edit-item'(el){ if (!canManage()) return toast('Guests can\'t change saved items.', 'bad'); itemSheet(el.dataset.id, true); },
   async 'save-edit'(el){
     const patch = { color: $('#e-color').value.trim(), brand: $('#e-brand').value.trim(), tag_number: $('#e-tag').value.trim(),
       quantity: parseInt($('#e-qty').value, 10), gender: $('#e-gender').value, season: $('#e-season').value };
@@ -2581,9 +2582,9 @@ const act = {
   },
 
   /* styles */
-  'open-style'(el){ styleSheet(el.dataset.style); },
-  'move-style'(el){ moveSheet(el.dataset.style); },
-  'edit-style'(el){ editStyleSheet(el.dataset.style); },
+  'open-style'(el){ if (!canManage()) return toast('Guests can\'t change saved items.', 'bad'); styleSheet(el.dataset.style); },
+  'move-style'(el){ if (!canManage()) return toast('Guests can\'t change saved items.', 'bad'); moveSheet(el.dataset.style); },
+  'edit-style'(el){ if (!canManage()) return toast('Guests can\'t change saved items.', 'bad'); editStyleSheet(el.dataset.style); },
   'move-pick'(el){
     const st = el.dataset.style, id = el.dataset.id, { pieces } = styleStats(st), to = id ? pCode(id) : 'a new pallet';
     openSheet(`<h2>Move ${esc(st)} to ${to}?</h2>
@@ -2849,7 +2850,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-22.34';
+const APP_VERSION = '2026-11-23.35';
 let newVersion = false;
 async function checkVersion(){
   try {
