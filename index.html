@@ -892,6 +892,17 @@ dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
 .lb-write i{display:block;border-bottom:1.5px solid #8C97A8;min-height:.26in}
 .lb-write .sig{margin-top:.08in;color:#13213A}
 .lb-t46 .lb-page{display:block}
+/* Avery 5168: 2 x 2 labels of 3.5 x 5 in, 0.5 in page margins, 0.5 in between the columns */
+.lb-a5168 .lb-page{width:8.5in;height:11in;padding:.5in .5in 0;display:grid;grid-template-columns:3.5in 3.5in;grid-template-rows:5in 5in;gap:0 .5in}
+.lb-a5168 .lbl{width:3.5in;height:5in;border:0;border-radius:0;padding:.3in .3in .28in;align-items:stretch;gap:.12in}
+.av-pal{display:flex;align-items:center;justify-content:space-between;background:#FFC629;border-radius:.1in;padding:.06in .18in .04in}
+.av-pal span{font:600 15pt/1 "Barlow",system-ui,sans-serif;letter-spacing:.02em}
+.av-pal b{font:700 44pt/1 "Barlow Condensed","Arial Narrow",sans-serif}
+.lb-a5168 .lb-box{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;min-height:0;line-height:.84}
+.lb-a5168 .lb-box .w{font:600 24pt/1 "Barlow",system-ui,sans-serif;color:#55627A;margin-bottom:.06in}
+.lb-a5168 .lb-box .n{font-size:170pt;letter-spacing:-.01em}
+.lb-a5168 .lb-box.d4 .n{font-size:132pt}.lb-a5168 .lb-box.d5 .n{font-size:106pt}
+.av-stripes{height:.2in;border-radius:.05in;background:repeating-linear-gradient(-45deg,#13213A 0 .1in,#FFC629 .1in .2in)}
 /* 4 x 6: fill the whole label. Pallet on top, a giant box number in the middle, contents at the bottom */
 .lb-t46 .lbl{width:4in;height:5.95in;border:0;border-radius:0;padding:.2in .2in .18in}
 .lb-t46 .lb-top{align-items:center;font-size:15pt}
@@ -2568,8 +2579,8 @@ function manifestHTML(rows, { title, img, sheets }){
 }
 /* ---------- printing: pallet breakdowns and box labels ---------- */
 const LETTER = 'size:letter;margin:.5in';
-const LABELS = { l4: ['4 per Letter page', 'size:letter;margin:.5in', 4, 7], l2: ['2 per Letter page (large)', 'size:letter;margin:.5in', 2, 7], t46: ['4 x 6 inch label printer', 'size:4in 6in;margin:0', 1, 8] };
-let labelSize = store.get('labels') || 'l4';
+const LABELS = { a5168: ['Avery 5168 (4 per sheet, 3.5 x 5 in)', 'size:letter;margin:0', 4, 0], l4: ['4 per Letter page', 'size:letter;margin:.5in', 4, 7], l2: ['2 per Letter page (large)', 'size:letter;margin:.5in', 2, 7], t46: ['4 x 6 inch label printer', 'size:4in 6in;margin:0', 1, 8] };
+let labelSize = store.get('labels') || 'a5168';
 async function printHTML(html, page){
   await withBusy('Getting it ready to print', async () => {
     let st = $('#print-page'); if (!st) { st = document.createElement('style'); st.id = 'print-page'; document.head.appendChild(st); }
@@ -2586,12 +2597,12 @@ async function printHTML(html, page){
 function fitLabels(root){
   const lb = root.querySelector('.lb'); if (!lb) return;
   const size = (lb.className.match(/lb-(\w+)/) || [])[1], ctx = document.createElement('canvas').getContext('2d');
-  const avail = { t46: 3.5, l4: 3.1, l2: 6.9 }[size] * 96;
+  const avail = { t46: 3.5, l4: 3.1, l2: 6.9, a5168: 2.85 }[size] * 96;
   root.querySelectorAll('.lb-box').forEach(el => {
     const n = el.querySelector('.n'), w = el.querySelector('.w'), cs = getComputedStyle(n), px = parseFloat(cs.fontSize);
     ctx.font = `${cs.fontWeight} ${px}px ${cs.fontFamily}`;
-    const width = ctx.measureText(size === 't46' ? n.textContent : 'Box ' + n.textContent).width;
-    if (width > avail) { const k = avail / width; n.style.fontSize = px * k + 'px'; if (size !== 't46') w.style.fontSize = px * k + 'px'; }
+    const solo = size === 't46' || size === 'a5168', width = ctx.measureText(solo ? n.textContent : 'Box ' + n.textContent).width;
+    if (width > avail) { const k = avail / width; n.style.fontSize = px * k + 'px'; if (!solo) w.style.fontSize = px * k + 'px'; }
   });
 }
 const palletIds = scope => data.pallets.filter(p => scope !== 'closed' || p.status === 'closed').map(p => p.id).sort((a, b) => a - b);
@@ -2606,6 +2617,8 @@ function labelsHTML(boxes, size){
     const m = new Map(); itemsOf('box_id', b.id).forEach(i => { const g = m.get(i.style_number) || m.set(i.style_number, { colors: new Set(), sizes: [], type: i.item_type, qty: 0 }).get(i.style_number); g.colors.add(i.color); g.sizes.push(i); g.qty += i.quantity; });
     const list = [...m].sort((a, c) => a[0].localeCompare(c[0], undefined, { numeric: true })), total = list.reduce((n, [, g]) => n + g.qty, 0);
     const num = `<div class="lb-box d${String(b.id).length}"><span class="w">Box </span><span class="n">${b.id}</span></div>`;
+    // Avery 5168: the number only, big enough to read across the room
+    if (size === 'a5168') return `<div class="lbl av"><div class="av-pal"><span>Pallet</span><b>${b.pallet_id}</b></div>${num}<div class="av-stripes"></div></div>`;
     if (b.blank) return `<div class="lbl blank"><div class="lb-top"><span class="lb-pal">${pCode(b.pallet_id)}</span><span>Pieces: ______</span></div>${num}
       <div class="lb-write"><span>Contents</span>${'<i></i>'.repeat(size === 't46' ? 5 : 4)}<span class="sig">Packed by ____________________</span></div></div>`;
     return `<div class="lbl${list.length > 4 ? ' tight' : ''}"><div class="lb-top"><span class="lb-pal">${pCode(b.pallet_id)}</span><span>${list.length ? plural(total, 'piece') : 'Nothing recorded yet'}</span></div>
@@ -3453,7 +3466,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.01';
+const APP_VERSION = '2026-11-24.02';
 let newVersion = false;
 async function checkVersion(){
   try {
