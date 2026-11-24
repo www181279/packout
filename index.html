@@ -375,7 +375,33 @@ body.signing #view{max-width:440px;padding:0 20px}
 .sw.open .swa{visibility:visible}
 .swa button{width:88px;border:0;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:600 13.5px/1 var(--body);cursor:pointer}
 .swa svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-.swe{background:#3A4A63}.swd{background:#C62D2D}
+.swe{background:#3A4A63}.swm{background:#1F6E8C}.swd{background:#C62D2D}
+.swa button{width:84px}
+/* move sheet */
+.mvhead .rk{font:600 13px/1 var(--body);color:var(--ink2);margin:0 0 4px}.mvhead h2{margin:0!important;font:700 28px/1.05 var(--sign)}.mvhead p:last-child{margin:4px 0 0;color:var(--ink2)}
+.mvh{font:700 15px/1.2 var(--body);margin:20px 0 10px}
+.mvlines{display:grid;gap:8px}
+.mvl{background:var(--paper);border:1.5px solid var(--line);border-radius:12px;overflow:hidden}
+.mvl.on{border-color:var(--ink)}
+.mvpick{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:none;border:0;padding:12px 14px;font:inherit;color:var(--ink);cursor:pointer}
+.mvpick .ck{width:22px;height:22px;flex:none;border-radius:6px;border:2px solid #AEB8C4;display:grid;place-items:center}
+.mvl.on .ck{background:var(--ink);border-color:var(--ink)}
+.mvl.on .ck::after{content:'';width:10px;height:5px;border:solid #fff;border-width:0 0 2.5px 2.5px;transform:rotate(-45deg) translate(1px,-1px)}
+.mvt{font-size:15px;line-height:1.3}.mvt b{font-family:var(--sign);font-size:17px}.mvt span{color:var(--ink2);font-size:14px}
+.mvq{display:flex;align-items:center;gap:12px;padding:0 14px 12px 48px;flex-wrap:wrap}
+.mvq>span{font-size:14px;color:var(--ink2)}
+.mvq .qty{margin:0;grid-template-columns:44px 64px 44px;gap:6px}.mvq .qty button{height:44px;font-size:22px}.mvq .qty input{height:44px;font-size:20px;padding:0;min-height:0}
+.mvallbtn{margin-top:8px}
+.mvx .rfoot{position:sticky;bottom:0;z-index:2;background:var(--floor);padding:12px 0 calc(14px + env(safe-area-inset-bottom));margin-top:8px;box-shadow:0 -10px 16px -12px rgba(19,33,58,.25)}
+.mvto{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:10px}
+.mvd{display:grid;grid-template-columns:44px 1fr 22px;gap:12px;align-items:center;text-align:left;padding:12px;background:var(--paper);border:1.5px solid var(--line);border-radius:12px;font:inherit;color:var(--ink);cursor:pointer}
+.mvd b{font:700 17px/1.1 var(--sign)}.mvd small{display:block;color:var(--ink2);font-size:13px;margin-top:2px}
+.mvn{width:44px;height:44px;border-radius:10px;background:var(--floor);display:grid;place-items:center;font:700 18px/1 var(--sign)}
+.mvd[data-v=new] .mvn{background:var(--placard);font-size:24px}
+.mvd .rr{width:22px;height:22px;border-radius:50%;border:2px solid #AEB8C4}
+.mvd.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}.mvd.on .rr{border:7px solid var(--ink)}
+.mvd:disabled{opacity:.5;cursor:default}
+.mvpick:focus-visible,.mvd:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
 @media (hover:hover) and (pointer:fine){
   /* desktop: a quiet actions column at the end of each row, never covering the row */
   .sw>.irow{touch-action:auto}
@@ -385,9 +411,10 @@ body.signing #view{max-width:440px;padding:0 20px}
   body.shell #inv-list .sw>.irow{padding-right:54px}
   body.shell:has(#inv-list .sw) .ihead{padding-right:54px}
   .swa{top:50%;right:8px;bottom:auto;transform:translateY(-50%);z-index:2;visibility:visible;display:flex;flex-direction:column;align-items:center;gap:2px;border-radius:0;overflow:visible}
-  .swa button{width:34px;height:32px;padding:0;border-radius:8px;background:transparent;color:#7B879A;transition:background .12s,color .12s}
+  .swa button{width:32px;height:26px;padding:0;border-radius:7px;background:transparent;color:#7B879A;transition:background .12s,color .12s}
   .swa button span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-  .swa svg{width:18px;height:18px}
+  .swa svg{width:17px;height:17px}
+  .swm:hover,.swm:focus-visible{background:#E1F0F5;color:#1F6E8C}
   .swe:hover,.swe:focus-visible{background:#E3E9F0;color:var(--ink)}
   .swd:hover,.swd:focus-visible{background:#FDE8E8;color:#C62D2D}
   .swa button:focus-visible{outline:3px solid var(--placard);outline-offset:1px}
@@ -1615,6 +1642,7 @@ function palletDetailHTML(p){
       <span class="muted small">${plural(sumQty(bi), 'piece')}, by ${esc(b.created_by)}</span>
       ${b.status === 'closed' ? '<span class="badge closed">Closed</span>' : ''}
       ${canEdit() ? `<button class="linkbtn small" style="margin-left:auto" data-act="${bi.length || !canDelete() ? 'toggle-box' : 'del-box'}" data-id="${b.id}">${bi.length || !canDelete() ? (b.status === 'open' ? 'Close box' : 'Reopen box') : 'Delete empty box'}</button>` : '<span style="margin-left:auto"></span>'}
+      ${bi.length && canManage() ? `<button class="linkbtn small" data-act="mv-open" data-box="${b.id}">Move items</button>` : ''}
       ${bi.length ? `<button class="linkbtn small" data-act="print-labels" data-box="${b.id}">Print label</button>` : ''}</div>
       ${bi.length ? `<ul class="lines">${bi.map(i => `<li><span><b>${esc(i.style_number)}</b> ${esc(i.color)}${i.size ? ', ' + esc(i.size) : ''}<br><span class="muted small">${esc([i.item_type, i.brand].filter(Boolean).join(', '))}</span></span><span class="n">${nf(i.quantity)}</span></li>`).join('')}</ul>` : ''}
     </div>`; }).join('') || `<div class="empty"><b>No boxes on this pallet yet</b></div>`}</div>`;
@@ -1675,7 +1703,7 @@ function renderInvList(){
   }
   const sw = canManage();
   const rows = groups.slice(0, invLimit).map(g => { const i = g.first; return { key: g.key, html: `${sw ? `<div class="sw">
-      <div class="swa"><button class="swe" data-act="row-edit" data-k="${esc(g.key)}" aria-label="Edit ${esc(i.style_number)} ${esc(i.color)}" title="Edit">${ICON_EDIT}<span>Edit</span></button><button class="swd" data-act="row-del" data-k="${esc(g.key)}" aria-label="Delete ${esc(i.style_number)} ${esc(i.color)}" title="Delete">${ICON_DEL}<span>Delete</span></button></div>` : ''}
+      <div class="swa"><button class="swe" data-act="row-edit" data-k="${esc(g.key)}" aria-label="Edit ${esc(i.style_number)} ${esc(i.color)}" title="Edit">${ICON_EDIT}<span>Edit</span></button><button class="swm" data-act="mv-open" data-k="${esc(g.key)}" aria-label="Move ${esc(i.style_number)} ${esc(i.color)} to another box" title="Move to another box">${ICON_MOVE}<span>Move</span></button><button class="swd" data-act="row-del" data-k="${esc(g.key)}" aria-label="Delete ${esc(i.style_number)} ${esc(i.color)}" title="Delete">${ICON_DEL}<span>Delete</span></button></div>` : ''}
       <button class="irow" data-act="open-group" data-k="${esc(g.key)}">
         ${i.photo_path ? `<img loading="lazy" alt="Enlarge photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(thumbUrl(i))}" data-act="zoom-photo" data-id="${i.id}">` : '<span class="noimg"></span>'}
         <span class="mid"><span class="st">${esc(i.style_number)}</span>${i.item_type ? `<span class="tp">${esc(i.item_type)}</span>` : ''}
@@ -1718,11 +1746,72 @@ function tagsText(g){
 }
 // one row per style and color; the sizes are shown together in that row
 const ICON_EDIT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
+const ICON_MOVE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l5-4 5 4v9H3z"/><path d="M13 13h8M18 10l3 3-3 3"/></svg>';
 const ICON_DEL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
 const groupOf = key => groupItems(joined()).find(g => g.key === key);
 const lineSort = (a, b) => a.box_id - b.box_id || bySize(a.size || '', b.size || '');
 function rowHead(g, title){ const i = g.first; return `<div class="rhead">${i.photo_path ? `<img alt="" src="${esc(thumbUrl(i))}">` : '<span class="noimg"></span>'}
   <div><p class="rk">${title}</p><h2>${esc(i.style_number)}</h2><p>${esc(i.color)}${i.brand ? ', ' + esc(i.brand) : ''}</p></div></div>`; }
+// Move pieces to another box on the same pallet (a style lives on one pallet), or into a new box
+let mv = null;
+function mvOpen(o){
+  const its = (o.box ? itemsOf('box_id', +o.box) : (groupOf(o.k) || { items: [] }).items).slice().sort(lineSort);
+  if (!its.length) return toast('There is nothing to move.', 'bad');
+  const pallet = its[0].pallet_id;
+  mv = { from: o.box ? +o.box : null, pallet, lines: its.map(i => ({ id: i.id, max: i.quantity, n: 0 })), to: 'new' };
+  if (its.length === 1) mv.lines[0].n = mv.lines[0].max;
+  openSheet('<div class="rsx mvx" id="mvx"></div>'); mvDraw();
+}
+function mvDraw(){
+  const host = $('#mvx'); if (!host || !mv) return; const card = $('#sheet .card'), y = card.scrollTop;
+  const its = mv.lines.map(l => ({ l, i: joined().find(x => x.id === l.id) })).filter(x => x.i);
+  const boxes = data.boxes.filter(b => b.pallet_id === mv.pallet && b.id !== mv.from).sort((a, b) => (a.status === 'closed') - (b.status === 'closed') || a.id - b.id);
+  const per = boxesPerPallet(), used = new Set(data.boxes.map(b => b.id));
+  let nextNo = null; for (let k = (mv.pallet - 1) * per + 1; k <= mv.pallet * per; k++) if (!used.has(k)) { nextNo = k; break; }
+  const pcs = mv.lines.reduce((a, l) => a + l.n, 0);
+  if (mv.to !== 'new' && !boxes.some(b => b.id === mv.to)) mv.to = 'new';
+  const toName = mv.to === 'new' ? (nextNo ? bCode(nextNo) : 'a new box') : bCode(mv.to);
+  const one = its.length === 1 && mv.lines[0].max === 1;
+  host.innerHTML = `<div class="mvhead"><p class="rk">Move to another box</p><h2>${mv.from ? `From ${bCode(mv.from)}` : esc(its[0].i.style_number + ' ' + its[0].i.color)}</h2><p>${pCode(mv.pallet)}</p></div>
+    <h3 class="mvh">1. What moves</h3>
+    <div class="mvlines">${its.map(({ l, i }) => `<div class="mvl${l.n ? ' on' : ''}">
+      <button type="button" class="mvpick" data-act="mv-line" data-id="${l.id}" role="checkbox" aria-checked="${!!l.n}"><span class="ck" aria-hidden="true"></span>
+        <span class="mvt"><b>${esc(i.style_number)}</b> ${esc(i.color)}<br><span>${esc(i.size || 'No size')}${mv.from ? '' : ' · ' + bCode(i.box_id)} · ${nf(l.max)} ${unit(l.max, 'piece')}</span></span></button>
+      ${l.n && l.max > 1 ? `<div class="mvq"><span>How many</span><div class="qty"><button type="button" data-act="mv-n" data-id="${l.id}" data-d="-1" aria-label="One less">&minus;</button><input type="number" inputmode="numeric" min="1" max="${l.max}" value="${l.n}" data-mvn="${l.id}" aria-label="How many to move"><button type="button" data-act="mv-n" data-id="${l.id}" data-d="1" aria-label="One more">+</button></div><button type="button" class="linkbtn small" data-act="mv-all" data-id="${l.id}">All ${nf(l.max)}</button></div>` : ''}
+    </div>`).join('')}</div>
+    ${its.length > 1 ? `<button type="button" class="linkbtn small mvallbtn" data-act="mv-every">${mv.lines.every(l => l.n === l.max) ? 'Clear all' : 'Select everything'}</button>` : ''}
+    <h3 class="mvh">2. Where to</h3>
+    <div class="mvto">
+      <button type="button" class="mvd${mv.to === 'new' ? ' on' : ''}" data-act="mv-to" data-v="new" role="radio" aria-checked="${mv.to === 'new'}" ${nextNo ? '' : 'disabled'}>
+        <span class="mvn">+</span><span><b>${nextNo ? `New box (${bCode(nextNo)})` : 'New box'}</b><small>${nextNo ? `Starts a new box on ${pCode(mv.pallet)}` : `${pCode(mv.pallet)} has no free box numbers`}</small></span><span class="rr" aria-hidden="true"></span></button>
+      ${boxes.map(b => { const n = sumQty(itemsOf('box_id', b.id)); return `<button type="button" class="mvd${mv.to === b.id ? ' on' : ''}" data-act="mv-to" data-v="${b.id}" role="radio" aria-checked="${mv.to === b.id}">
+        <span class="mvn">${b.id}</span><span><b>${bCode(b.id)}</b><small>${n ? plural(n, 'piece') : 'Empty'}${b.status === 'closed' ? ' · Closed' : ''}</small></span><span class="rr" aria-hidden="true"></span></button>`; }).join('')}
+    </div>
+    <p class="small muted">A style stays on one pallet, so only boxes on ${pCode(mv.pallet)} are shown. To move a whole style to another pallet, open the style.</p>
+    <div class="rfoot"><button class="btn quiet" data-act="close-sheet">Cancel</button><button class="btn" data-act="mv-go" ${pcs && (mv.to !== 'new' || nextNo) ? '' : 'disabled'}>${pcs ? `Move ${nf(pcs)} ${unit(pcs, 'piece')} to ${toName}` : 'Choose what moves'}</button></div>`;
+  card.scrollTop = y;
+}
+async function mvGo(){
+  const lines = mv.lines.filter(l => l.n > 0); if (!lines.length) return;
+  const KEEP = ['style_number', 'item_type', 'size', 'color', 'brand', 'tag_number', 'gender', 'season', 'photo_path', 'photo_pro'];
+  const pcs = lines.reduce((a, l) => a + l.n, 0); let ok = false, target = mv.to, done = `Moved ${nf(pcs)} ${unit(pcs, 'piece')} to ${bCode(target)}`;
+  closeSheet();
+  await mutate('Moving', async () => {
+    if (target === 'new') { const b = await db.insert('boxes', { pallet_id: mv.pallet, created_by: me.name }); target = (Array.isArray(b) ? b[0] : b).id; }
+    done = `Moved ${nf(pcs)} ${unit(pcs, 'piece')} to ${bCode(target)}`;
+    for (const l of lines) {
+      const src = data.items.find(i => i.id === l.id); if (!src) continue;
+      const same = data.items.find(i => i.box_id === target && i.id !== src.id && KEEP.every(k => k === 'photo_pro' || (i[k] || '') === (src[k] || '')));
+      if (l.n >= src.quantity && !same) { await db.update('items', 'id=' + eq(src.id), { box_id: target }); continue; }
+      if (same) await db.update('items', 'id=' + eq(same.id), { quantity: same.quantity + l.n });
+      else { const row = { id: uuid(), box_id: target, quantity: l.n, created_by: me.name }; KEEP.forEach(k => { if (src[k] != null) row[k] = src[k]; }); await db.insert('items', row); }
+      if (l.n >= src.quantity) await db.remove('items', 'id=' + eq(src.id)); else await db.update('items', 'id=' + eq(src.id), { quantity: src.quantity - l.n });
+    }
+    ok = true;
+  }, '');
+  if (ok) toast(done, 'good');
+  mv = null;
+}
 // Swipe a row, then Delete: choose which sizes go, then confirm
 function rowDelSheet(key){
   const g = groupOf(key); if (!g) return;
@@ -1775,7 +1864,7 @@ function locText(g){
   return `${pals.map(pCode).join(', ')}<br>${boxes.length > 3 ? `${boxes.length} boxes` : boxes.map(bCode).join(', ')}`;
 }
 function groupSheet(key){
-  const g = groupItems(joined().filter(i => i.style_number + '|' + i.color === key))[0]; if (!g) return closeSheet();
+  const g = groupOf(key); if (!g) return closeSheet();
   const i = g.first;
   openSheet(`
     ${i.photo_path ? `<img class="big" id="big-photo" data-act="zoom-photo" data-id="${i.id}" alt="Photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(fullUrl(i))}">` : ''}
@@ -1785,7 +1874,8 @@ function groupSheet(key){
     <h3 class="small muted" style="margin:14px 0 6px">By box${canManage() ? ' (tap a line to edit it)' : ''}</h3>
     <div class="glines">${g.items.slice().sort((a, b) => a.box_id - b.box_id || bySize(a.size, b.size)).map(x => `
       <button class="gline" data-act="open-item" data-id="${x.id}"><span>${bCode(x.box_id)}</span><span>${esc(x.size || 'No size')}</span><span>${x.tag_number ? esc(x.tag_number) : ''}</span><b>${nf(x.quantity)}</b></button>`).join('')}</div>
-    ${canManage() ? `<button class="btn quiet" data-act="open-style" data-style="${esc(i.style_number)}" style="margin-top:10px">Move, edit or delete the whole style</button>` : ''}
+    ${canManage() ? `<button class="btn alt" data-act="mv-open" data-k="${esc(key)}" style="margin-top:10px">Move to another box</button>
+    <button class="btn quiet" data-act="open-style" data-style="${esc(i.style_number)}" style="margin-top:10px">Move, edit or delete the whole style</button>` : ''}
     <button class="btn" data-act="close-sheet" style="margin-top:10px">Done</button>`);
 }
 let fDraft = null, fSortDraft = 'new', fMore = {};
@@ -3061,6 +3151,13 @@ const act = {
     closeSheet(); await mutate('Saving changes', () => db.update('items', 'id=' + eq(el.dataset.id), patch), 'Saved changes');
   },
   'row-edit'(el){ swClose(); rowEditSheet(el.dataset.k); },
+  'mv-open'(el){ swClose(); if (!canManage()) return toast('Guests can\'t move saved items.', 'bad'); mvOpen(el.dataset.box ? { box: el.dataset.box } : { k: el.dataset.k }); },
+  'mv-line'(el){ const l = mv.lines.find(x => x.id === el.dataset.id); l.n = l.n ? 0 : l.max; mvDraw(); },
+  'mv-all'(el){ const l = mv.lines.find(x => x.id === el.dataset.id); l.n = l.max; mvDraw(); },
+  'mv-every'(){ const all = mv.lines.every(l => l.n === l.max); mv.lines.forEach(l => { l.n = all ? 0 : l.max; }); mvDraw(); },
+  'mv-n'(el){ const l = mv.lines.find(x => x.id === el.dataset.id); l.n = Math.max(1, Math.min(l.max, l.n + +el.dataset.d)); mvDraw(); },
+  'mv-to'(el){ mv.to = el.dataset.v === 'new' ? 'new' : +el.dataset.v; mvDraw(); },
+  async 'mv-go'(){ await mvGo(); },
   'row-del'(el){ swClose(); rowDelSheet(el.dataset.k); },
   'row-del-ask'(el){
     const on = [...document.querySelectorAll('.dl input:checked')]; if (!on.length) return;
@@ -3314,7 +3411,7 @@ function showPhoto(file){
 }
 
 /* ---------- swipe a list row to show Edit and Delete ---------- */
-const SW_W = 176; let swOpen = null, swEat = false;
+const SW_W = 252; let swOpen = null, swEat = false;
 function swSet(row, x, anim){ row.style.transition = anim ? 'transform .22s cubic-bezier(.2,.8,.2,1)' : 'none'; row.style.transform = x ? `translateX(${x}px)` : ''; }
 function swClose(){ if (swOpen) { swSet(swOpen, 0, true); swOpen.parentElement.classList.remove('open'); swOpen = null; } }
 (() => {
@@ -3384,6 +3481,7 @@ function fileIn(e){
   if (e.target.id === 'k-tagphoto' && e.target.files[0]) { const f = e.target.files[0], w = e.target.dataset.where || 'style'; e.target.value = ''; readTag(f, w); }
 }
 
+document.addEventListener('change', e => { const id = e.target.dataset && e.target.dataset.mvn; if (!id || !mv) return; const l = mv.lines.find(x => x.id === id); l.n = Math.max(1, Math.min(l.max, parseInt(e.target.value, 10) || 1)); mvDraw(); });
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-tab]');
@@ -3467,7 +3565,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.05';
+const APP_VERSION = '2026-11-24.06';
 let newVersion = false;
 async function checkVersion(){
   try {
