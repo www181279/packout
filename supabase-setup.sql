@@ -1022,3 +1022,103 @@ create trigger items_photo_pro_follows before insert on public.items
 update public.items i set photo_pro = true
  where not coalesce(i.photo_pro, false) and i.photo_path is not null
    and exists (select 1 from public.items x where x.photo_path = i.photo_path and x.photo_pro);
+
+-- 15. New boxes take the next number in order on their pallet (after the highest one there), so they
+--     follow pre-printed labels. A packer can also ask for a specific number (the one on the label in
+--     hand) through packout_new_box(pallet, number).
+create or replace function public.use_lowest_free_number()
+returns trigger
+language plpgsql
+as $$
+declare
+  n    bigint;
+  per  int;
+  lo   bigint;
+  hi   bigint;
+  want bigint;
+begin
+  perform pg_advisory_xact_lock(hashtext('packout_' || tg_table_name));
+  if tg_table_name = 'boxes' then
+    per := greatest(1, coalesce((select (value #>> '{}')::int from public.settings where key = 'boxes_per_pallet'), 30));
+    lo := (new.pallet_id - 1) * per + 1; hi := new.pallet_id * per;
+    want := nullif(current_setting('packout.box_no', true), '')::bigint;
+    if want is not null then
+      if want < lo or want > hi then
+        raise exception 'Box % is not on Pallet %. Pallet % uses boxes % to %.', want, new.pallet_id, new.pallet_id, lo, hi using errcode = 'P0001';
+      end if;
+      if exists (select 1 from public.boxes b where b.id = want) then
+        raise exception 'Box % already exists.', want using errcode = 'P0001';
+      end if;
+      n := want;
+    else
+      select coalesce(max(b.id), lo - 1) + 1 into n from public.boxes b where b.id between lo and hi;
+      if n > hi then
+        select min(g) into n from generate_series(lo, hi) g where not exists (select 1 from public.boxes b where b.id = g);
+      end if;
+      if n is null then
+        raise exception 'Pallet % is full: it already has % boxes. Start a new pallet for the rest.', new.pallet_id, per;
+      end if;
+    end if;
+  else
+    execute format(
+      'select coalesce(min(s), 1) from (
+         select 1 as s where not exists (select 1 from public.%1$I where id = 1)
+         union all
+         select t.id + 1 from public.%1$I t
+          where not exists (select 1 from public.%1$I x where x.id = t.id + 1)
+       ) q', tg_table_name) into n;
+  end if;
+  new.id := n;
+  return new;
+end;
+$$;
+
+create or replace function public.packout_new_box(p_pallet bigint, p_no bigint default null, p_by text default null)
+returns public.boxes
+language plpgsql
+as $$
+declare r public.boxes;
+begin
+  perform set_config('packout.box_no', coalesce(p_no::text, ''), true);
+  insert into public.boxes (pallet_id, created_by) values (p_pallet, coalesce(p_by, 'Packer')) returning * into r;
+  perform set_config('packout.box_no', '', true);
+  return r;
+end;
+$$;
+
+-- 15. A new box gets the next number after the highest box on its pallet (Box 21 -> Box 22), so numbers
+--     match labels printed in order. Gaps left by deleted boxes are only reused when the pallet's range is full.
+create or replace function public.use_lowest_free_number()
+returns trigger
+language plpgsql
+as $$
+declare
+  n   bigint;
+  per int;
+  lo  bigint;
+  hi  bigint;
+begin
+  perform pg_advisory_xact_lock(hashtext('packout_' || tg_table_name));
+  if tg_table_name = 'boxes' then
+    per := greatest(1, coalesce((select (value #>> '{}')::int from public.settings where key = 'boxes_per_pallet'), 30));
+    lo := (new.pallet_id - 1) * per + 1;  hi := new.pallet_id * per;
+    select coalesce(max(id) + 1, lo) into n from public.boxes where id between lo and hi;
+    if n > hi then
+      select min(g) into n from generate_series(lo, hi) g where not exists (select 1 from public.boxes b where b.id = g);
+    end if;
+    if n is null then
+      raise exception 'Pallet % is full: it already has % boxes. Start a new pallet for the rest.', new.pallet_id, per;
+    end if;
+  else
+    execute format(
+      'select coalesce(min(s), 1) from (
+         select 1 as s where not exists (select 1 from public.%1$I where id = 1)
+         union all
+         select t.id + 1 from public.%1$I t
+          where not exists (select 1 from public.%1$I x where x.id = t.id + 1)
+       ) q', tg_table_name) into n;
+  end if;
+  new.id := n;
+  return new;
+end;
+$$;

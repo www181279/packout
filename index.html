@@ -1894,7 +1894,8 @@ function mvDraw(){
   const its = mv.lines.map(l => ({ l, i: joined().find(x => x.id === l.id) })).filter(x => x.i);
   const boxes = data.boxes.filter(b => b.pallet_id === mv.pallet && b.id !== mv.from).sort((a, b) => (a.status === 'closed') - (b.status === 'closed') || a.id - b.id);
   const per = boxesPerPallet(), used = new Set(data.boxes.map(b => b.id));
-  let nextNo = null; for (let k = (mv.pallet - 1) * per + 1; k <= mv.pallet * per; k++) if (!used.has(k)) { nextNo = k; break; }
+  const lo = (mv.pallet - 1) * per + 1, hi = mv.pallet * per, top = Math.max(lo - 1, ...data.boxes.map(b => b.id).filter(id => id >= lo && id <= hi));
+  let nextNo = top + 1 <= hi ? top + 1 : null; if (!nextNo) for (let k = lo; k <= hi; k++) if (!used.has(k)) { nextNo = k; break; }   // same rule as the database
   const pcs = mv.lines.reduce((a, l) => a + l.n, 0);
   if (mv.to !== 'new' && !boxes.some(b => b.id === mv.to)) mv.to = 'new';
   const toName = mv.to === 'new' ? (nextNo ? bCode(nextNo) : 'a new box') : bCode(mv.to);
@@ -3759,7 +3760,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.13';
+const APP_VERSION = '2026-11-24.14';
 let newVersion = false;
 async function checkVersion(){
   try {
