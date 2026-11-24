@@ -436,18 +436,22 @@ body.signing #view{max-width:440px;padding:0 20px}
 .pkdel:hover{color:#C62D2D}
 /* pallet page: what is in each box, grouped by style and color */
 .bgroups{display:grid;gap:8px;margin-top:12px}
-.bgrp{display:grid;grid-template-columns:52px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:8px 8px 8px 8px;background:var(--floor);border-radius:12px}
+.bgrp{display:grid;grid-template-columns:52px minmax(0,1fr) auto auto auto;gap:12px;align-items:center;padding:8px 8px 8px 8px;background:var(--floor);border-radius:12px}
 .bgrp img,.bgrp .noimg{width:52px;height:52px;border-radius:9px;object-fit:cover;background:#DCE2E8}
 .bgt b{display:block;font:700 18px/1.1 var(--sign)}.bgt>span{display:block;color:var(--ink2);font-size:13.5px;margin-top:2px}
 .bsz{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .bsz span{display:inline-flex;align-items:center;gap:5px;background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:2px 7px 2px 3px;font:600 13px/1.2 var(--body)}
 .bsz i{font-style:normal;background:var(--ink);color:#fff;border-radius:5px;padding:1px 5px;font-size:12px}
+.addph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:62px;min-height:52px;border:1.5px dashed var(--ink);border-radius:10px;background:#FFF8E1;color:var(--ink);font:600 12px/1.1 var(--body);cursor:pointer;text-align:center}
+.addph input,.addph-big input{position:absolute;width:1px;height:1px;opacity:0}
+.addph svg,.addph-big svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linejoin:round}
+.addph-big{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;position:relative}
 .bgq{text-align:right}.bgq b{display:block;font:700 22px/1 var(--sign)}.bgq small{color:var(--ink2);font-size:12px}
 .bmv{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:62px;min-height:52px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font:600 12.5px/1 var(--body);cursor:pointer}
 .bmv svg,.bmvall svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .bmv:hover{border-color:var(--ink)}.bmv:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
 .bmvall{margin-top:10px;display:inline-flex;align-items:center;gap:8px}
-@media (max-width:420px){.bgrp{grid-template-columns:44px minmax(0,1fr) auto;gap:10px}.bgrp img,.bgrp .noimg{width:44px;height:44px}.bmv{grid-column:1/-1;flex-direction:row;width:100%;min-height:40px;gap:6px;font-size:14px}}
+@media (max-width:420px){.addph{grid-column:1/-1;flex-direction:row;width:100%;min-height:40px;gap:6px;font-size:14px}.bgrp{grid-template-columns:44px minmax(0,1fr) auto;gap:10px}.bgrp img,.bgrp .noimg{width:44px;height:44px}.bmv{grid-column:1/-1;flex-direction:row;width:100%;min-height:40px;gap:6px;font-size:14px}}
 .mvx .rfoot{position:sticky;bottom:0;z-index:2;background:var(--floor);padding:12px 0 calc(14px + env(safe-area-inset-bottom));margin-top:8px;box-shadow:0 -10px 16px -12px rgba(19,33,58,.25)}
 .mvto{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:10px}
 .mvd{display:grid;grid-template-columns:44px 1fr 22px;gap:12px;align-items:center;text-align:left;padding:12px;background:var(--paper);border:1.5px solid var(--line);border-radius:12px;font:inherit;color:var(--ink);cursor:pointer}
@@ -1508,7 +1512,7 @@ function whoHTML(){
 /* ---------- screens: pack ---------- */
 function trailHTML(){
   return `<div class="trail">
-    ${pack.stage === 'item' ? `<button class="stylechip" data-act="restart-style" aria-label="Start over with style ${esc(pack.style)}">${esc(pack.style)}<i aria-hidden="true">&times;</i></button>` : `<span>${esc(pack.style)}</span>`}
+    ${pack.stage === 'item' ? `<button class="stylechip" data-act="same-box" aria-label="Done with style ${esc(pack.style)}: start the next style">${esc(pack.style)}<i aria-hidden="true">&times;</i></button>` : `<span>${esc(pack.style)}</span>`}
     ${pack.pallet ? `<span class="p">${pCode(pack.pallet)}</span>` : ''}
     ${pack.box ? `<span>${bCode(pack.box)}</span>` : ''}
     ${pack.stage === 'item'
@@ -1768,6 +1772,7 @@ function palletDetailHTML(p){
         <div class="bgt"><b>${esc(i.style_number)}</b><span>${esc(i.color)}${i.item_type ? ', ' + esc(i.item_type) : ''}</span>
           <div class="bsz">${sizeTotals(g).map(([z, q]) => `<span><i>${esc(z || 'No size')}</i>${nf(q)}</span>`).join('')}</div></div>
         <div class="bgq"><b>${nf(g.qty)}</b><small>pcs</small></div>
+        ${!i.photo_path && canManage() ? `<label class="addph"><input type="file" accept="image/*" capture="environment" onchange="addGroupPhoto(event, '${esc(g.key).replace(/'/g, '&#39;')}')">${PHOTO_ICON}<span>Add photo</span></label>` : ''}
         ${canManage() ? `<button class="bmv" data-act="mv-open" data-box="${b.id}" data-k="${esc(g.key)}" aria-label="Move ${esc(i.style_number)} ${esc(i.color)} from ${bCode(b.id)}">${ICON_MOVE}<span>Move</span></button>` : ''}
       </div>`; }).join('')}</div>
       ${canManage() && groupItems(bi).length > 1 ? `<button class="btn alt sm bmvall" data-act="mv-open" data-box="${b.id}">${ICON_MOVE}Move several items from ${bCode(b.id)}</button>` : ''}` : ''}
@@ -2002,6 +2007,7 @@ function groupSheet(key){
     <h3 class="small muted" style="margin:14px 0 6px">By box${canManage() ? ' (tap a line to edit it)' : ''}</h3>
     <div class="glines">${g.items.slice().sort((a, b) => a.box_id - b.box_id || bySize(a.size, b.size)).map(x => `
       <button class="gline" data-act="open-item" data-id="${x.id}"><span>${bCode(x.box_id)}</span><span>${esc(x.size || 'No size')}</span><span>${x.tag_number ? esc(x.tag_number) : ''}</span><b>${nf(x.quantity)}</b></button>`).join('')}</div>
+    ${canManage() && !i.photo_path ? `<label class="btn addph-big"><input type="file" accept="image/*" capture="environment" onchange="addGroupPhoto(event, '${esc(key).replace(/'/g, '&#39;')}')">${PHOTO_ICON} Add photo for this color</label>` : ''}
     ${canManage() ? `<button class="btn alt" data-act="mv-open" data-k="${esc(key)}" style="margin-top:10px">Move to another box</button>
     <button class="btn quiet" data-act="open-style" data-style="${esc(i.style_number)}" style="margin-top:10px">Move, edit or delete the whole style</button>` : ''}
     <button class="btn" data-act="close-sheet" style="margin-top:10px">Done</button>`);
@@ -2396,6 +2402,21 @@ const colorParts = c => { const t = String(c || '').toLowerCase().replace(/\s+/g
 const colorMatch = (a, b) => { const A = colorParts(a), B = colorParts(b); return A.some(x => B.includes(x)); };
 const digits = v => String(v || '').replace(/\D/g, '');
 // This style was photographed before: one tap picks that color and its photo
+const PHOTO_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+// One photo for every piece of this style and color that has none, in all boxes; polished like any other
+async function addGroupPhoto(e, key){
+  const file = e.target.files && e.target.files[0]; e.target.value = ''; pickDone(); if (!file) return;
+  const g = groupOf(key); if (!g) return;
+  const ids = data.items.filter(i => i.style_number === g.first.style_number && colorMatch(i.color, g.first.color) && !i.photo_path).map(i => i.id);
+  if (!ids.length) return toast('These pieces already have a photo.', 'good');
+  const path = uuid() + '.jpg';
+  await mutate('Adding photo', async () => {
+    const [full, thumb] = await Promise.all([shrink(file, 1400, .82), shrink(file, 280, .72)]);
+    await Promise.all([uploadPhoto(path, full), uploadPhoto('thumb/' + path, thumb)]);
+    await db.update('items', 'id=in.(' + ids.join(',') + ')', { photo_path: path });
+  }, `Photo added to ${g.first.style_number} ${g.first.color} (${plural(ids.length, 'line')}). It is being polished.`);
+  enqueuePolish([path]);
+}
 function seenColorsHTML(){
   const seen = new Map(); data.items.filter(i => i.style_number === pack.style && i.photo_path).sort((a, b) => (b.photo_pro ? 1 : 0) - (a.photo_pro ? 1 : 0))
     .forEach(i => { const k = colorKey(i.color) || i.color; if (!seen.has(k)) seen.set(k, i); });
@@ -3460,10 +3481,13 @@ const act = {
     openSheet(`<h2>Start over with ${esc(st)}?</h2>
       <p class="lead">${its.length ? `This deletes the ${plural(pieces, 'piece')} already saved for ${esc(st)} (in ${boxes.map(bCode).join(', ')}), for everyone, with their photos.` : `Nothing is saved for ${esc(st)} yet.`}
       ${cur ? ` The empty ${bCode(cur)} is removed too.` : ''} Then you enter the style again.${its.length ? " This can't be undone." : ''}</p>
+      ${its.length ? `<label class="f" for="rs-confirm">To delete, type the style number <b>${esc(st)}</b></label><input id="rs-confirm" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false">` : ''}
       <div class="row"><button class="btn alt" data-act="close-sheet">Keep it</button><button class="btn danger" data-act="restart-yes">Delete and start over</button></div>`);
   },
   async 'restart-yes'(){
-    const st = pack.style, cur = pack.box; closeSheet();
+    const st = pack.style, cur = pack.box, ci = $('#rs-confirm');
+    if (ci && normStyle(ci.value) !== st) { ci.focus(); return toast(`Type ${st} to delete it.`, 'bad'); }
+    closeSheet();
     await withBusy('Deleting style ' + st, async () => {
       try {
         const photos = itemsOf('style_number', st).map(i => i.photo_path);
@@ -3760,7 +3784,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.14';
+const APP_VERSION = '2026-11-24.15';
 let newVersion = false;
 async function checkVersion(){
   try {
