@@ -401,6 +401,13 @@ body.signing #view{max-width:440px;padding:0 20px}
 .pkb small{display:block;font:500 12.5px/1.3 var(--body);color:var(--ink2);white-space:nowrap}
 .pkb.pknew{border-style:dashed;border-color:#8C97A8;font-size:22px;font-weight:600}
 .pkb:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
+.seen{margin:0 0 12px;padding:12px;background:#FFF8E1;border:1.5px solid #F2D27A;border-radius:12px}
+.seen p{margin:0 0 10px;font-size:14px;color:var(--ink)}
+.seenrow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}.seenrow::-webkit-scrollbar{display:none}
+.seenc{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;width:96px;padding:6px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);font:600 13px/1.2 var(--body);color:var(--ink);cursor:pointer;text-align:center}
+.seenc img{width:82px;height:82px;object-fit:cover;border-radius:7px;background:#E3E9EF}
+.seenc span{display:block;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seenc:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
 .pkon{background:var(--ink);color:#fff;border-radius:14px;padding:12px 12px 10px;margin:0 0 10px}
 .pkon-t{display:flex;gap:10px;align-items:center}
 .pkon-t svg{width:26px;height:26px;flex:none;fill:none;stroke:var(--placard);stroke-width:1.8;stroke-linejoin:round}
@@ -1569,7 +1576,7 @@ function packHTML(){
   // item form: the fields that change every time come first; the ones that carry over sit below
   const prev = data.items.filter(i => i.style_number === pack.style).slice(-1)[0] || store.get('lastForm') || {};
   let f = pack.form || { type: prev.item_type || prev.type || '', brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', sizes: [], more: [] };
-  if (!pack.form && pack.tagRead) { f = mergeTag(f, pack.tagRead); pack.tagRead = null; pack.form = f; }
+  if (pack.tagRead && (!pack.tagRead.style || pack.tagRead.style === pack.style)) { f = mergeTag(f, pack.tagRead); pack.tagRead = null; pack.form = f; }   // a tag read on the first screen fills the form, even one kept from the last box
   if (pack.stage === 'item' && (!pack.photo || pack.photoFirst) && (!pack.reuse || pack.reuse.auto)) autoReuse(f.color, [f.tag, ...(f.sizes || []).map(z => z.tag)]);
   const sizes = f.sizes || [];
   const typeOther = f.type === '__other' || (f.type && !ALL_TYPES.includes(f.type) && !data.items.some(i => i.item_type === f.type));
@@ -1584,6 +1591,7 @@ function packHTML(){
         <button class="nx" data-act="same-box"><b>Next style</b><span>Start a different style</span></button></div>` : ''}</div>` : ''}
     <div class="boxnow"><span>Packing into</span><b>${bCode(pack.box)}</b><span>${pCode(pack.pallet)}</span></div>
     <div class="panel">
+      ${!pack.photo && !pack.reuse ? seenColorsHTML() : ''}
       <div class="photo" id="k-photo-wrap">${pack.reuse && !pack.photo ? `<img alt="${pack.reuse.auto ? 'Photo of this color from earlier' : 'Same photo as the last box'}" src="${esc(reuseUrl(pack.reuse.path))}"><span class="again">${pack.reuse.auto ? 'This color is already photographed. Tap to retake' : 'Same photo. Tap to retake'}</span>` : '<span>Tap to take a photo of the item</span>'}
         <input id="k-photo" type="file" onchange="fileIn(event)" accept="image/*" capture="environment" aria-label="Take a photo of the item"></div>
       <label class="btn alt filebtn tagbtn2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Read the tag for this color<input id="k-tagphoto" data-where="item" type="file" onchange="fileIn(event)" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in this item"></label>
@@ -2386,6 +2394,13 @@ function sameColorAs(style, color){
 const colorParts = c => { const t = String(c || '').toLowerCase().replace(/\s+/g, ' ').trim(), m = t.match(/^(.*?)\s*\((.*)\)\s*$/); return m ? [m[1].trim(), m[2].trim()].filter(Boolean) : t ? [t] : []; };
 const colorMatch = (a, b) => { const A = colorParts(a), B = colorParts(b); return A.some(x => B.includes(x)); };
 const digits = v => String(v || '').replace(/\D/g, '');
+// This style was photographed before: one tap picks that color and its photo
+function seenColorsHTML(){
+  const seen = new Map(); data.items.filter(i => i.style_number === pack.style && i.photo_path).sort((a, b) => (b.photo_pro ? 1 : 0) - (a.photo_pro ? 1 : 0))
+    .forEach(i => { const k = colorKey(i.color) || i.color; if (!seen.has(k)) seen.set(k, i); });
+  if (!seen.size) return '';
+  return `<div class="seen"><p><b>Packed this style before?</b> Tap the color to use its photo.</p><div class="seenrow">${[...seen.values()].map(i => `<button type="button" class="seenc" data-act="seen-color" data-c="${esc(i.color)}"><img alt="" src="${esc(thumbUrl({ ...i, photo_pro: data.items.some(x => x.photo_path === i.photo_path && x.photo_pro) }))}"><span>${esc(i.color)}</span></button>`).join('')}</div></div>`;
+}
 function autoReuse(color, upcs){
   upcs = (upcs || []).map(digits).filter(u => u.length >= 6);
   if ((pack.photo && !pack.photoFirst) || !pack.style || (!colorKey(color) && !upcs.length)) return false;
@@ -3154,6 +3169,7 @@ const act = {
   'add-more'(){ const f = readForm(); f.more.push(''); pack.form = f; pack.err = ''; const p = pack.photo; render(); if (p) showPhoto(p); const i = document.querySelectorAll('.k-more'); if (i.length) i[i.length - 1].focus(); },
   'del-more'(el){ const f = readForm(); f.more.splice(+el.dataset.n, 1); pack.form = f; const p = pack.photo; render(); if (p) showPhoto(p); },
   qty(el){ const i = $('#' + el.dataset.for); if (!i) return; i.value = Math.max(1, (parseInt(i.value, 10) || 0) + (+el.dataset.d)); updateTotals(); },
+  'seen-color'(el){ const f = readForm(); f.color = el.dataset.c; pack.form = f; autoReuse(f.color); const y = scrollY; render(); scrollTo(0, y); },
   'pack-use'(el){ act['pack-bump']({ dataset: { id: el.dataset.id, d: '1' } }); },
   'pack-bump'(el){ packSet(el.dataset.id, null, +el.dataset.d); },
   'pack-n'(el){ const i = $('#pk-n'); const n = Math.max(1, (parseInt(i.value, 10) || 1) + +el.dataset.d); packUseSheet(i.dataset.pkid, n); },
@@ -3741,7 +3757,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.11';
+const APP_VERSION = '2026-11-24.12';
 let newVersion = false;
 async function checkVersion(){
   try {

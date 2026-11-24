@@ -998,3 +998,27 @@ begin
   update public.boxes set id = id + 1000000 where id between pallet_id * 100 + 1 and pallet_id * 100 + 99;
   update public.boxes set id = (pallet_id - 1) * per + (id - 1000000 - pallet_id * 100) where id > 1000000;
 end $$;
+
+-- 14. A photo used again (same style and color) keeps its polished version: new rows that reuse a
+--     polished photo are marked polished too, and rows saved before this fix are corrected.
+create or replace function packout_private.photo_pro_follows()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.photo_path is not null and not coalesce(new.photo_pro, false)
+     and exists (select 1 from public.items i where i.photo_path = new.photo_path and i.photo_pro) then
+    new.photo_pro := true;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists items_photo_pro_follows on public.items;
+create trigger items_photo_pro_follows before insert on public.items
+  for each row execute function packout_private.photo_pro_follows();
+
+update public.items i set photo_pro = true
+ where not coalesce(i.photo_pro, false) and i.photo_path is not null
+   and exists (select 1 from public.items x where x.photo_path = i.photo_path and x.photo_pro);
