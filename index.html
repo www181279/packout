@@ -392,6 +392,20 @@ body.signing #view{max-width:440px;padding:0 20px}
 .mvq>span{font-size:14px;color:var(--ink2)}
 .mvq .qty{margin:0;grid-template-columns:44px 64px 44px;gap:6px}.mvq .qty button{height:44px;font-size:22px}.mvq .qty input{height:44px;font-size:20px;padding:0;min-height:0}
 .mvallbtn{margin-top:8px}
+/* pallet page: what is in each box, grouped by style and color */
+.bgroups{display:grid;gap:8px;margin-top:12px}
+.bgrp{display:grid;grid-template-columns:52px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:8px 8px 8px 8px;background:var(--floor);border-radius:12px}
+.bgrp img,.bgrp .noimg{width:52px;height:52px;border-radius:9px;object-fit:cover;background:#DCE2E8}
+.bgt b{display:block;font:700 18px/1.1 var(--sign)}.bgt>span{display:block;color:var(--ink2);font-size:13.5px;margin-top:2px}
+.bsz{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.bsz span{display:inline-flex;align-items:center;gap:5px;background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:2px 7px 2px 3px;font:600 13px/1.2 var(--body)}
+.bsz i{font-style:normal;background:var(--ink);color:#fff;border-radius:5px;padding:1px 5px;font-size:12px}
+.bgq{text-align:right}.bgq b{display:block;font:700 22px/1 var(--sign)}.bgq small{color:var(--ink2);font-size:12px}
+.bmv{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:62px;min-height:52px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font:600 12.5px/1 var(--body);cursor:pointer}
+.bmv svg,.bmvall svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.bmv:hover{border-color:var(--ink)}.bmv:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
+.bmvall{margin-top:10px;display:inline-flex;align-items:center;gap:8px}
+@media (max-width:420px){.bgrp{grid-template-columns:44px minmax(0,1fr) auto;gap:10px}.bgrp img,.bgrp .noimg{width:44px;height:44px}.bmv{grid-column:1/-1;flex-direction:row;width:100%;min-height:40px;gap:6px;font-size:14px}}
 .mvx .rfoot{position:sticky;bottom:0;z-index:2;background:var(--floor);padding:12px 0 calc(14px + env(safe-area-inset-bottom));margin-top:8px;box-shadow:0 -10px 16px -12px rgba(19,33,58,.25)}
 .mvto{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:10px}
 .mvd{display:grid;grid-template-columns:44px 1fr 22px;gap:12px;align-items:center;text-align:left;padding:12px;background:var(--paper);border:1.5px solid var(--line);border-radius:12px;font:inherit;color:var(--ink);cursor:pointer}
@@ -1642,9 +1656,15 @@ function palletDetailHTML(p){
       <span class="muted small">${plural(sumQty(bi), 'piece')}, by ${esc(b.created_by)}</span>
       ${b.status === 'closed' ? '<span class="badge closed">Closed</span>' : ''}
       ${canEdit() ? `<button class="linkbtn small" style="margin-left:auto" data-act="${bi.length || !canDelete() ? 'toggle-box' : 'del-box'}" data-id="${b.id}">${bi.length || !canDelete() ? (b.status === 'open' ? 'Close box' : 'Reopen box') : 'Delete empty box'}</button>` : '<span style="margin-left:auto"></span>'}
-      ${bi.length && canManage() ? `<button class="linkbtn small" data-act="mv-open" data-box="${b.id}">Move items</button>` : ''}
       ${bi.length ? `<button class="linkbtn small" data-act="print-labels" data-box="${b.id}">Print label</button>` : ''}</div>
-      ${bi.length ? `<ul class="lines">${bi.map(i => `<li><span><b>${esc(i.style_number)}</b> ${esc(i.color)}${i.size ? ', ' + esc(i.size) : ''}<br><span class="muted small">${esc([i.item_type, i.brand].filter(Boolean).join(', '))}</span></span><span class="n">${nf(i.quantity)}</span></li>`).join('')}</ul>` : ''}
+      ${bi.length ? `<div class="bgroups">${groupItems(bi.map(i => ({ ...i, pallet_id: b.pallet_id }))).map(g => { const i = g.first; return `<div class="bgrp">
+        ${i.photo_path ? `<img alt="" loading="lazy" src="${esc(thumbUrl(i))}">` : '<span class="noimg"></span>'}
+        <div class="bgt"><b>${esc(i.style_number)}</b><span>${esc(i.color)}${i.item_type ? ', ' + esc(i.item_type) : ''}</span>
+          <div class="bsz">${sizeTotals(g).map(([z, q]) => `<span><i>${esc(z || 'No size')}</i>${nf(q)}</span>`).join('')}</div></div>
+        <div class="bgq"><b>${nf(g.qty)}</b><small>pcs</small></div>
+        ${canManage() ? `<button class="bmv" data-act="mv-open" data-box="${b.id}" data-k="${esc(g.key)}" aria-label="Move ${esc(i.style_number)} ${esc(i.color)} from ${bCode(b.id)}">${ICON_MOVE}<span>Move</span></button>` : ''}
+      </div>`; }).join('')}</div>
+      ${canManage() && groupItems(bi).length > 1 ? `<button class="btn alt sm bmvall" data-act="mv-open" data-box="${b.id}">${ICON_MOVE}Move several items from ${bCode(b.id)}</button>` : ''}` : ''}
     </div>`; }).join('') || `<div class="empty"><b>No boxes on this pallet yet</b></div>`}</div>`;
 }
 
@@ -1760,6 +1780,7 @@ function mvOpen(o){
   const pallet = its[0].pallet_id;
   mv = { from: o.box ? +o.box : null, pallet, lines: its.map(i => ({ id: i.id, max: i.quantity, n: 0 })), to: 'new' };
   if (its.length === 1) mv.lines[0].n = mv.lines[0].max;
+  if (o.box && o.k) { const keep = new Set(((groupOf(o.k) || { items: [] }).items).map(i => i.id)); mv.lines.forEach(l => { if (keep.has(l.id)) l.n = l.max; }); }
   openSheet('<div class="rsx mvx" id="mvx"></div>'); mvDraw();
 }
 function mvDraw(){
@@ -3151,7 +3172,7 @@ const act = {
     closeSheet(); await mutate('Saving changes', () => db.update('items', 'id=' + eq(el.dataset.id), patch), 'Saved changes');
   },
   'row-edit'(el){ swClose(); rowEditSheet(el.dataset.k); },
-  'mv-open'(el){ swClose(); if (!canManage()) return toast('Guests can\'t move saved items.', 'bad'); mvOpen(el.dataset.box ? { box: el.dataset.box } : { k: el.dataset.k }); },
+  'mv-open'(el){ swClose(); if (!canManage()) return toast('Guests can\'t move saved items.', 'bad'); mvOpen(el.dataset.box ? { box: el.dataset.box, k: el.dataset.k } : { k: el.dataset.k }); },
   'mv-line'(el){ const l = mv.lines.find(x => x.id === el.dataset.id); l.n = l.n ? 0 : l.max; mvDraw(); },
   'mv-all'(el){ const l = mv.lines.find(x => x.id === el.dataset.id); l.n = l.max; mvDraw(); },
   'mv-every'(){ const all = mv.lines.every(l => l.n === l.max); mv.lines.forEach(l => { l.n = all ? 0 : l.max; }); mvDraw(); },
@@ -3417,17 +3438,26 @@ function swClose(){ if (swOpen) { swSet(swOpen, 0, true); swOpen.parentElement.c
 (() => {
   let row = null, x0 = 0, y0 = 0, base = 0, dx = 0, mode = null;
   document.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch') return;                         // touch is handled below with touch events (iPhone)
     const r = e.target.closest && e.target.closest('.sw > .irow'); if (!r || e.button > 0) { row = null; return; }
-    if (e.pointerType === 'mouse' && matchMedia('(hover:hover)').matches) { row = null; return; }   // desktop uses the hover buttons
+    if (e.pointerType === 'mouse' && matchMedia('(hover:hover)').matches) { row = null; return; }   // desktop uses the row buttons
     row = r; x0 = e.clientX; y0 = e.clientY; base = r === swOpen ? -SW_W : 0; dx = 0; mode = null;
   }, { passive: true });
-  document.addEventListener('pointermove', e => {
-    if (!row) return; const mx = e.clientX - x0, my = e.clientY - y0;
+  const move = (cx, cy, ev) => {
+    if (!row) return; const mx = cx - x0, my = cy - y0;
+    if (ev && ev.cancelable && !mode && Math.abs(mx) > Math.abs(my)) ev.preventDefault();   // sideways from the start: claim it before iOS scrolls
     if (!mode) { if (Math.abs(mx) < 8 && Math.abs(my) < 8) return; mode = Math.abs(mx) > Math.abs(my) ? 'x' : 'y'; if (mode === 'x' && swOpen && swOpen !== row) swClose(); }
     if (mode !== 'x') return;
+    if (ev && ev.cancelable) ev.preventDefault();                 // keep the page still while the row slides
     dx = mx; let x = base + dx; if (x > 0) x = x / 4; if (x < -SW_W) x = -SW_W + (x + SW_W) / 4;
     swSet(row, x, false); row.parentElement.classList.add('open');
+  };
+  document.addEventListener('pointermove', e => { if (e.pointerType !== 'touch') move(e.clientX, e.clientY); }, { passive: true });
+  document.addEventListener('touchstart', e => {
+    const r = e.target.closest && e.target.closest('.sw > .irow'); if (!r || e.touches.length > 1) { row = null; return; }
+    const t = e.touches[0]; row = r; x0 = t.clientX; y0 = t.clientY; base = r === swOpen ? -SW_W : 0; dx = 0; mode = null;
   }, { passive: true });
+  document.addEventListener('touchmove', e => { if (row) move(e.touches[0].clientX, e.touches[0].clientY, e); }, { passive: false });
   const end = () => {
     if (!row) return; const r = row; row = null;
     if (mode !== 'x') return;
@@ -3436,7 +3466,8 @@ function swClose(){ if (swOpen) { swSet(swOpen, 0, true); swOpen.parentElement.c
     swSet(r, open ? -SW_W : 0, true);
     if (open) { swOpen = r; r.parentElement.classList.add('open'); if (navigator.vibrate) navigator.vibrate(8); } else { if (swOpen === r) swOpen = null; r.parentElement.classList.remove('open'); }
   };
-  document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
+  document.addEventListener('pointerup', e => { if (e.pointerType !== 'touch') end(); }); document.addEventListener('pointercancel', e => { if (e.pointerType !== 'touch') end(); });
+  document.addEventListener('touchend', end); document.addEventListener('touchcancel', end);
   // a tap right after a swipe, or anywhere while a row is open, only closes the row
   document.addEventListener('click', e => {
     if (swEat) { e.stopPropagation(); e.preventDefault(); return; }
@@ -3565,7 +3596,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.06';
+const APP_VERSION = '2026-11-24.07';
 let newVersion = false;
 async function checkVersion(){
   try {
