@@ -1598,7 +1598,7 @@ function packHTML(){
       ${!pack.photo && !pack.reuse ? seenColorsHTML() : ''}
       <div class="photo" id="k-photo-wrap">${pack.reuse && !pack.photo ? `<img alt="${pack.reuse.auto ? 'Photo of this color from earlier' : 'Same photo as the last box'}" src="${esc(reuseUrl(pack.reuse.path))}"><span class="again">${pack.reuse.auto ? 'This color is already photographed. Tap to retake' : 'Same photo. Tap to retake'}</span>` : '<span>Tap to take a photo of the item</span>'}
         <input id="k-photo" type="file" onchange="fileIn(event)" accept="image/*" capture="environment" aria-label="Take a photo of the item"></div>
-      <label class="btn alt filebtn tagbtn2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>Read the tag for this color<input id="k-tagphoto" data-where="item" type="file" onchange="fileIn(event)" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in this item"></label>
+      <label class="btn alt filebtn tagbtn2"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>${(pack.tagReads || 0) > 0 ? 'Read the next tag (adds 1 of its size)' : 'Read the tag for this color'}<input id="k-tagphoto" data-where="item" type="file" onchange="fileIn(event)" accept="image/*" capture="environment" aria-label="Take a photo of the tag to fill in this item"></label>
       <div id="tag-status">${pack.tagStatus || ''}</div>
       ${pack.tagNote ? `<div class="note">${esc(pack.tagNote)}</div>` : ''}
       <label class="f" for="k-color">Color</label>
@@ -2163,7 +2163,10 @@ async function openScanner(target){
           if (hit) { pack.tagRead = { style: hit.style_number, upc: digits(val), color: hit.color, size: hit.size }; i.value = hit.style_number; toast(`Found ${hit.style_number} ${hit.color}${hit.size ? ', size ' + hit.size : ''}.`, 'good'); }
           else i.value = val;
           act['check-style'](); }
-        else { const i = target === 'tag' ? $('#k-tag') : document.getElementById(target); if (i) { i.value = val; toast('Tag ' + val, 'good'); } }
+        else {
+          const hit = target === 'tag' && pack.stage === 'item' && data.items.find(x => x.style_number === pack.style && x.tag_number && digits(x.tag_number) === digits(val) && digits(val).length >= 6);
+          if (hit) { pack.form = mergeTag(readForm(), { upc: digits(val), size: hit.size, color: hit.color }); const y = scrollY; render(); scrollTo(0, y); toast(pack.tagNote || `${hit.size} added.`, 'good'); return; }
+          const i = target === 'tag' ? $('#k-tag') : document.getElementById(target); if (i) { i.value = val; toast('Tag ' + val, 'good'); } }
       }, () => {});
     if (scanner !== sc) return sc.stop().then(() => sc.clear()).catch(() => {});   // closed while starting
     say('<p class="lead">Hold the barcode inside the frame. It reads on its own.</p>');
@@ -2449,12 +2452,17 @@ function mergeTag(f, t){
   if (t.color) pack.aiColor = true;
   pack.colorCode = t.color_code && t.color === t.color_code ? t.color_code.toUpperCase() : null;
   const size = t.size && normSize(t.size);
-  if (size && !f.sizes.some(z => z.size === size)) { f.sizes.push({ size, qty: 1, tag: '' }); f.sizes.sort((a, b) => bySize(a.size, b.size)); f.more = []; }
+  // singles: every further tag of the same color on this item adds one piece of its size
+  const counting = (pack.tagReads || 0) > 0 && size && f.color && (!t.color || colorMatch(f.color, t.color));
+  const has = size && f.sizes.find(z => z.size === size);
+  if (counting && has) { has.qty = (+has.qty || 0) + 1; pack.tagCountNote = `${size} is now ${has.qty}.`; }
+  else if (size && !has) { f.sizes.push({ size, qty: 1, tag: '' }); f.sizes.sort((a, b) => bySize(a.size, b.size)); f.more = []; if (counting) pack.tagCountNote = `Added ${size}.`; }
+  pack.tagReads = (pack.tagReads || 0) + 1;
   if (t.upc) {
     if (f.sizes.length > 1) { const z = f.sizes.find(z => z.size === size); if (z && !z.tag) z.tag = t.upc; }
     else if (!f.tag) f.tag = t.upc;
   }
-  pack.tagNote = [pack.colorChanged, t.notes ? 'From the tag: ' + t.notes : ''].filter(Boolean).join(' '); pack.colorChanged = '';
+  pack.tagNote = [pack.tagCountNote, pack.colorChanged, t.notes ? 'From the tag: ' + t.notes : ''].filter(Boolean).join(' '); pack.colorChanged = ''; pack.tagCountNote = '';
   return f;
 }
 function tagFactsHTML(t){
@@ -3159,13 +3167,13 @@ const act = {
   },
   'same-color'(){
     const le = pack.lastEntry; if (!le) return;
-    Object.assign(pack, { id: uuid(), ids: null, photo: null, colors: null, err: '', justSaved: false, reuse: { path: le.path }, runPath: null, tagNote: '', tagStatus: '',
+    Object.assign(pack, { tagReads: 0, id: uuid(), ids: null, photo: null, colors: null, err: '', justSaved: false, reuse: { path: le.path }, runPath: null, tagNote: '', tagStatus: '',
       form: { type: le.type, brand: le.brand, gender: le.gender, season: le.season, color: le.color, tag: '', sizes: [], packs: {}, more: [] },
       saved: `Same photo and color (${le.color}). Tap the next sizes going into ${bCode(pack.box)} and type how many.` });
     render(); const sz = $('.sizechips'); if (sz) sz.scrollIntoView({ block: 'center' }); else scrollTo(0, 0);
   },
   'next-color'(){
-    Object.assign(pack, { justSaved: false, runPath: null, saved: `Next color of ${pack.style}: take its photo, then read its tag.` });
+    Object.assign(pack, { tagReads: 0, justSaved: false, runPath: null, saved: `Next color of ${pack.style}: take its photo, then read its tag.` });
     render(); const w = $('#k-photo-wrap'); if (w) w.scrollIntoView({ block: 'center' });
   },
   async 'continue-box'(){
@@ -3288,7 +3296,7 @@ const act = {
         pack.last = { pallet: pack.pallet, box: pack.box }; store.set('last', pack.last);
         store.set('lastForm', { type: f.type, brand: f.brand, gender: f.gender, season: f.season });
         if (navigator.vibrate) navigator.vibrate(40);
-        Object.assign(pack, { id: uuid(), ids: null, photo: null, early: null, aiColor: false, reuse: null, colors: null, err: '', justSaved: true, runPath: path, tagNote: '', tagStatus: '', colorCode: null,
+        Object.assign(pack, { tagReads: 0, id: uuid(), ids: null, photo: null, early: null, aiColor: false, reuse: null, colors: null, err: '', justSaved: true, runPath: path, tagNote: '', tagStatus: '', colorCode: null,
           lastEntry: { path, color: f.color, type: f.type, brand: f.brand, gender: f.gender, season: f.season },
           form: { ...f, color: '', tag: '', sizes: f.packs && Object.keys(f.packs).length ? f.sizes.map(z => ({ size: z.size, qty: z.qty, tag: '' })) : f.sizes.map(z => ({ size: z.size, qty: 1, tag: '' })), more: [] }, saved: msg });
         render(); scrollTo(0, 0);
@@ -3784,7 +3792,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.15';
+const APP_VERSION = '2026-11-24.16';
 let newVersion = false;
 async function checkVersion(){
   try {
