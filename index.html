@@ -816,7 +816,12 @@ body.signing #view{max-width:440px;padding:0 20px}
 @keyframes up{from{transform:translateY(24px);opacity:.4}}
 @media (prefers-reduced-motion:reduce){#sheet .card{animation:none}}
 #sheet h2{font:700 26px/1.1 var(--sign);margin-bottom:12px}
-.big{width:100%;border-radius:10px;background:#E3E9EF;display:block;margin-bottom:12px;max-height:50vh;object-fit:contain}
+.big{width:100%;border-radius:10px;background:#E3E9EF;display:block;margin-bottom:12px;max-height:38vh;object-fit:contain}
+/* every sheet has a close button that stays in view while scrolling */
+.sheet-x{position:sticky;top:0;float:right;z-index:6;width:40px;height:40px;margin:-6px -4px -34px 8px;border-radius:50%;border:0;background:var(--paper);box-shadow:0 1px 4px rgba(19,33,58,.2);display:grid;place-items:center;cursor:pointer}
+.sheet-x svg{width:20px;height:20px;fill:none;stroke:var(--ink);stroke-width:2.4;stroke-linecap:round}
+.sheet-x:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
+#sheet .card{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 dl.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0 0 14px}
 dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
 #toast{position:fixed;left:16px;right:16px;bottom:calc(var(--navh,64px) + var(--saveh,0px) + 12px);z-index:60;margin:auto;max-width:520px;background:var(--ink);color:#fff;border-radius:8px;padding:12px 14px;font-weight:500;display:none}
@@ -1089,7 +1094,8 @@ async function withBusy(label, fn){
   try { return await fn(); }
   finally { if (--busyN === 0) { $('#busy').classList.remove('on'); if (softPending) { softPending = false; setTimeout(softRender, 0); } } }
 }
-function openSheet(html){ $('#toast').className = ''; $('#sheet .card').innerHTML = html; $('#sheet').classList.add('on'); const f = $('#sheet [autofocus]'); if (f) f.focus(); }
+const SHEET_X = '<button type="button" class="sheet-x" data-act="close-sheet" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+function openSheet(html){ $('#toast').className = ''; try { swClose(); } catch {} $('#sheet .card').innerHTML = (html.includes('class="fhead"') ? '' : SHEET_X) + html; $('#sheet .card').scrollTop = 0; $('#sheet').classList.add('on'); const f = $('#sheet [autofocus]'); if (f) f.focus(); }
 function closeSheet(){ stopScanner(); $('#sheet').classList.remove('on'); $('#sheet .card').innerHTML = ''; if (softPending) { softPending = false; setTimeout(softRender, 0); } }
 const sheetOpen = () => $('#sheet').classList.contains('on');
 
@@ -3596,7 +3602,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.07';
+const APP_VERSION = '2026-11-24.08';
 let newVersion = false;
 async function checkVersion(){
   try {
