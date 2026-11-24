@@ -1698,7 +1698,9 @@ function sizeChipsHTML(f, sizes){
   const set = pack.sizeSet || sizeSetFor(f.type, f.gender), S = SIZESETS[set];
   const chip = z => `<button type="button" data-act="toggle-size" data-size="${esc(z)}" aria-pressed="${sizes.some(x => x.size === z)}">${esc(z)}</button>`;
   const shown = set === 'wl' ? [] : S.list;
-  const extra = sizes.map(z => z.size).filter(z => !shown.includes(z));
+  // sizes already saved for this style, so the next boxes can tap them too (like 8 or 12/14)
+  const used = [...new Set(itemsOf('style_number', pack.style).map(i => normSize(i.size)).filter(Boolean))].sort(bySize);
+  const extra = [...new Set([...used, ...sizes.map(z => z.size)])].filter(z => !shown.includes(z)).sort(bySize);
   const tabs = `<div class="sizetabs">${Object.entries(SIZESETS).map(([k, v]) => `<button type="button" data-act="size-set" data-set="${k}" aria-pressed="${k === set}">${v.name}</button>`).join('')}</div>`;
   if (set === 'wl') return `${tabs}
     ${extra.length ? `<div class="chips sizechips">${extra.map(chip).join('')}</div>` : ''}
@@ -3846,7 +3848,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-25.02';
+const APP_VERSION = '2026-11-25.03';
 let newVersion = false;
 async function checkVersion(){
   try {
