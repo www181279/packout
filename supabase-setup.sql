@@ -1122,3 +1122,31 @@ begin
   return new;
 end;
 $$;
+
+-- 16. When a style's pallet is full (all its box numbers used), the style may continue on another pallet.
+--     Pieces already saved can still be edited where they are.
+create or replace function public.items_enforce_pallet()
+returns trigger
+language plpgsql
+as $$
+declare
+  box_pallet   bigint;
+  style_pallet bigint;
+  per          int;
+begin
+  select pallet_id into box_pallet   from public.boxes  where id = new.box_id;
+  select pallet_id into style_pallet from public.styles where style_number = new.style_number;
+  if box_pallet is distinct from style_pallet
+     and not (tg_op = 'UPDATE' and new.box_id = old.box_id) then
+    per := greatest(1, coalesce((select (value #>> '{}')::int from public.settings where key = 'boxes_per_pallet'), 30));
+    if exists (select 1 from generate_series((style_pallet - 1) * per + 1, style_pallet * per) g
+                where not exists (select 1 from public.boxes b where b.id = g)) then
+      raise exception 'STYLE_PALLET_MISMATCH: style % belongs on pallet %, but box % is on pallet %',
+        new.style_number, style_pallet, new.box_id, box_pallet;
+    end if;
+  end if;
+  new.pallet_id  := box_pallet;
+  new.updated_at := now();
+  return new;
+end;
+$$;
