@@ -377,11 +377,23 @@ body.signing #view{max-width:440px;padding:0 20px}
 .swa svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .swe{background:#3A4A63}.swd{background:#C62D2D}
 @media (hover:hover) and (pointer:fine){
-  .swa{visibility:visible;top:50%;bottom:auto;right:10px;transform:translateY(-50%);z-index:2;gap:6px;opacity:0;pointer-events:none;transition:opacity .12s;border-radius:0;overflow:visible}
-  .sw:hover .swa,.sw:focus-within .swa{opacity:1;pointer-events:auto}
-  .swa button{width:auto;height:38px;flex-direction:row;padding:0 12px;border-radius:9px;box-shadow:0 2px 8px rgba(19,33,58,.18)}
-  .swa svg{width:17px;height:17px}
+  /* desktop: a quiet actions column at the end of each row, never covering the row */
+  .sw>.irow{touch-action:auto}
+  .sw{margin-bottom:6px}
+  body.shell #inv-list .sw{margin:0}
+  .sw>.irow{padding-right:58px}
+  body.shell #inv-list .sw>.irow{padding-right:54px}
+  body.shell:has(#inv-list .sw) .ihead{padding-right:54px}
+  .swa{top:50%;right:8px;bottom:auto;transform:translateY(-50%);z-index:2;visibility:visible;display:flex;flex-direction:column;align-items:center;gap:2px;border-radius:0;overflow:visible}
+  .swa button{width:34px;height:32px;padding:0;border-radius:8px;background:transparent;color:#7B879A;transition:background .12s,color .12s}
+  .swa button span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .swa svg{width:18px;height:18px}
+  .swe:hover,.swe:focus-visible{background:#E3E9F0;color:var(--ink)}
+  .swd:hover,.swd:focus-visible{background:#FDE8E8;color:#C62D2D}
+  .swa button:focus-visible{outline:3px solid var(--placard);outline-offset:1px}
+  .sw:hover>.irow{border-color:#AEB8C4}
 }
+
 @media (prefers-reduced-motion:reduce){.sw>.irow{transition:none!important}}
 /* edit / delete sheets */
 .rhead{display:flex;gap:14px;align-items:center;margin-bottom:12px}
@@ -1652,7 +1664,7 @@ function renderInvList(){
   }
   const sw = canManage();
   const rows = groups.slice(0, invLimit).map(g => { const i = g.first; return { key: g.key, html: `${sw ? `<div class="sw">
-      <div class="swa"><button class="swe" data-act="row-edit" data-k="${esc(g.key)}" aria-label="Edit ${esc(i.style_number)} ${esc(i.color)}" tabindex="-1">${ICON_EDIT}<span>Edit</span></button><button class="swd" data-act="row-del" data-k="${esc(g.key)}" aria-label="Delete ${esc(i.style_number)} ${esc(i.color)}" tabindex="-1">${ICON_DEL}<span>Delete</span></button></div>` : ''}
+      <div class="swa"><button class="swe" data-act="row-edit" data-k="${esc(g.key)}" aria-label="Edit ${esc(i.style_number)} ${esc(i.color)}" title="Edit">${ICON_EDIT}<span>Edit</span></button><button class="swd" data-act="row-del" data-k="${esc(g.key)}" aria-label="Delete ${esc(i.style_number)} ${esc(i.color)}" title="Delete">${ICON_DEL}<span>Delete</span></button></div>` : ''}
       <button class="irow" data-act="open-group" data-k="${esc(g.key)}">
         ${i.photo_path ? `<img loading="lazy" alt="Enlarge photo of ${esc(i.style_number)} ${esc(i.color)}" src="${esc(thumbUrl(i))}" data-act="zoom-photo" data-id="${i.id}">` : '<span class="noimg"></span>'}
         <span class="mid"><span class="st">${esc(i.style_number)}</span>${i.item_type ? `<span class="tp">${esc(i.item_type)}</span>` : ''}
@@ -3441,7 +3453,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-23.52';
+const APP_VERSION = '2026-11-24.01';
 let newVersion = false;
 async function checkVersion(){
   try {
