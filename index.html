@@ -894,7 +894,7 @@ dl.facts dt{color:var(--ink2)}dl.facts dd{margin:0;font-weight:600}
 .lb-t46 .lb-page{display:block}
 /* Avery 5168: 2 x 2 labels of 3.5 x 5 in, 0.5 in page margins, 0.5 in between the columns */
 .lb-a5168 .lb-page{width:8.5in;height:11in;padding:.5in .5in 0;display:grid;grid-template-columns:3.5in 3.5in;grid-template-rows:5in 5in;gap:0 .5in}
-.lb-a5168 .lbl{width:3.5in;height:5in;border:0;border-radius:0;padding:.3in .3in .28in;align-items:stretch;gap:.12in}
+.lb-a5168 .lbl{background:#fff;color:#13213A;width:3.5in;height:5in;border:0;border-radius:0;padding:.3in .3in .28in;align-items:stretch;gap:.12in}
 .av-pal{display:flex;align-items:center;justify-content:space-between;background:#FFC629;border-radius:.1in;padding:.06in .18in .04in}
 .av-pal span{font:600 15pt/1 "Barlow",system-ui,sans-serif;letter-spacing:.02em}
 .av-pal b{font:700 44pt/1 "Barlow Condensed","Arial Narrow",sans-serif}
@@ -2618,7 +2618,7 @@ function labelsHTML(boxes, size){
     const list = [...m].sort((a, c) => a[0].localeCompare(c[0], undefined, { numeric: true })), total = list.reduce((n, [, g]) => n + g.qty, 0);
     const num = `<div class="lb-box d${String(b.id).length}"><span class="w">Box </span><span class="n">${b.id}</span></div>`;
     // Avery 5168: the number only, big enough to read across the room
-    if (size === 'a5168') return `<div class="lbl av"><div class="av-pal"><span>Pallet</span><b>${b.pallet_id}</b></div>${num}<div class="av-stripes"></div></div>`;
+    if (size === 'a5168') return `<div class="lbl lbav"><div class="av-pal"><span>Pallet</span><b>${b.pallet_id}</b></div>${num}<div class="av-stripes"></div></div>`;
     if (b.blank) return `<div class="lbl blank"><div class="lb-top"><span class="lb-pal">${pCode(b.pallet_id)}</span><span>Pieces: ______</span></div>${num}
       <div class="lb-write"><span>Contents</span>${'<i></i>'.repeat(size === 't46' ? 5 : 4)}<span class="sig">Packed by ____________________</span></div></div>`;
     return `<div class="lbl${list.length > 4 ? ' tight' : ''}"><div class="lb-top"><span class="lb-pal">${pCode(b.pallet_id)}</span><span>${list.length ? plural(total, 'piece') : 'Nothing recorded yet'}</span></div>
@@ -3466,7 +3466,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.03';
+const APP_VERSION = '2026-11-24.04';
 let newVersion = false;
 async function checkVersion(){
   try {
