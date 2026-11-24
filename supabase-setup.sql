@@ -945,3 +945,56 @@ end;
 $$;
 revoke all on function public.packout_staff_remove(text) from public;
 grant execute on function public.packout_staff_remove(text) to anon, authenticated;
+
+-- 13. Box numbers start at 1. Pallet 1 has boxes 1-30, Pallet 2 has 31-60, Pallet 3 has 61-90
+--     (30 per pallet by default, from settings 'boxes_per_pallet'). Boxes already numbered the old
+--     way (101, 102 ... 201 ...) are renumbered, and their items follow them.
+do $$
+declare c text;
+begin
+  select conname into c from pg_constraint where conrelid = 'public.items'::regclass and contype = 'f'
+     and confrelid = 'public.boxes'::regclass;
+  if c is not null then execute format('alter table public.items drop constraint %I', c); end if;
+  alter table public.items add constraint items_box_id_fkey foreign key (box_id)
+    references public.boxes(id) on delete restrict on update cascade;
+end $$;
+
+create or replace function public.use_lowest_free_number()
+returns trigger
+language plpgsql
+as $$
+declare
+  n   bigint;
+  per int;
+begin
+  -- one at a time per table, so two phones never get the same number
+  perform pg_advisory_xact_lock(hashtext('packout_' || tg_table_name));
+  if tg_table_name = 'boxes' then
+    per := greatest(1, coalesce((select (value #>> '{}')::int from public.settings where key = 'boxes_per_pallet'), 30));
+    select min(g) into n
+      from generate_series((new.pallet_id - 1) * per + 1, new.pallet_id * per) g
+     where not exists (select 1 from public.boxes b where b.id = g);
+    if n is null then
+      raise exception 'Pallet % is full: it already has % boxes. Start a new pallet for the rest.', new.pallet_id, per;
+    end if;
+  else
+    execute format(
+      'select coalesce(min(s), 1) from (
+         select 1 as s where not exists (select 1 from public.%1$I where id = 1)
+         union all
+         select t.id + 1 from public.%1$I t
+          where not exists (select 1 from public.%1$I x where x.id = t.id + 1)
+       ) q', tg_table_name) into n;
+  end if;
+  new.id := n;
+  return new;
+end;
+$$;
+
+do $$
+declare per int := greatest(1, coalesce((select (value #>> '{}')::int from public.settings where key = 'boxes_per_pallet'), 30));
+begin
+  -- move old-style numbers out of the way first, then give each its new number
+  update public.boxes set id = id + 1000000 where id between pallet_id * 100 + 1 and pallet_id * 100 + 99;
+  update public.boxes set id = (pallet_id - 1) * per + (id - 1000000 - pallet_id * 100) where id > 1000000;
+end $$;

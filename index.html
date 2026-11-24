@@ -2440,7 +2440,7 @@ function moreHTML(){
   const prevWeb = `<div class="pv pv-web"><div class="bw"><div class="bar"><i></i><i></i><i></i><b></b></div><div class="cards">${'<span><em></em><u></u></span>'.repeat(6)}</div></div></div>`;
   const prevCsv = `<div class="pv pv-csv"><div class="sh">${Array.from({ length: 6 }, (_, r) => `<div class="tr${r ? '' : ' th'}">${'<i></i>'.repeat(5)}</div>`).join('')}</div></div>`;
   const prevSheet = `<div class="pv pv-sheet"><div class="pg"><i class="big"></i><i class="ln w7"></i>${'<i class="row"></i>'.repeat(6)}</div></div>`;
-  const prevBlank = `<div class="pv pv-lbl blank"><div class="pg q">${[101, 102, 103, 104].map(n => `<span><em>${n}</em><i></i><i></i></span>`).join('')}</div></div>`;
+  const prevBlank = `<div class="pv pv-lbl blank"><div class="pg q">${[1, 2, 3, 4].map(n => `<span><em>${n}</em><i></i><i></i></span>`).join('')}</div></div>`;
   const sizeSel = id => `<label class="xsel"><span>Size</span><select id="${id}" class="p-label">${Object.entries(LABELS).map(([k, v]) => `<option value="${k}" ${k === labelSize ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></label>`;
   const prevLbl = `<div class="pv pv-lbl"><div class="pg q">${'<span><b></b><i></i><i></i></span>'.repeat(4)}</div></div>`;
   const tile = (act, prev, name, tag, desc, cta, extra = '') => `<div class="xtile">${prev}<div class="xtb"><div class="xtn"><b>${name}</b><span class="xtag">${tag}</span></div><p>${desc}</p>${extra}
@@ -2634,7 +2634,8 @@ function printLabels(boxes){
   if (!boxes.length) return toast('There are no boxes to label yet.', 'bad');
   return printHTML(labelsHTML(boxes, labelSize), LABELS[labelSize][1]);
 }
-// Numbered labels printed before packing: Pallet 1 gets Box 101-130, Pallet 2 gets 201-230 (same numbers the app gives new boxes).
+// Numbered labels printed before packing: Pallet 1 gets Box 1-30, Pallet 2 gets 31-60 (same numbers the app gives new boxes).
+const firstBox = p => (p - 1) * boxesPerPallet() + 1;
 const boxesPerPallet = () => Math.max(1, parseInt(setting('boxes_per_pallet'), 10) || 30);
 const nextPalletNo = () => data.pallets.reduce((m, p) => Math.max(m, p.id), 0) + 1;
 function blankLabelCount(){
@@ -2643,12 +2644,12 @@ function blankLabelCount(){
 }
 function blankHint(){
   const h = $('#bl-hint'); if (!h) return; const { n, from, per } = blankLabelCount();
-  h.innerHTML = n ? `<b>${nf(n * per)} labels</b> for ${n === 1 ? pCode(from) : `Pallets ${from} to ${from + n - 1}`}: Box ${from * 100 + 1} to Box ${(from + n - 1) * 100 + per}.` : 'Type how many pallets you need labels for (up to 50).';
+  h.innerHTML = n ? `<b>${nf(n * per)} labels</b> for ${n === 1 ? pCode(from) : `Pallets ${from} to ${from + n - 1}`}: Box ${firstBox(from)} to Box ${firstBox(from + n - 1) + per - 1}.` : 'Type how many pallets you need labels for (up to 50).';
 }
 function printBlankLabels(){
   const { n, from, per } = blankLabelCount();
   if (!n) return toast('Type how many pallets you need labels for.', 'bad');
-  const boxes = []; for (let p = from; p < from + n; p++) for (let i = 1; i <= per; i++) boxes.push({ id: p * 100 + i, pallet_id: p, blank: true });
+  const boxes = []; for (let p = from; p < from + n; p++) for (let i = 0; i < per; i++) boxes.push({ id: firstBox(p) + i, pallet_id: p, blank: true });
   return printHTML(labelsHTML(boxes, labelSize), LABELS[labelSize][1]);
 }
 
@@ -3466,7 +3467,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.04';
+const APP_VERSION = '2026-11-24.05';
 let newVersion = false;
 async function checkVersion(){
   try {
