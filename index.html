@@ -401,6 +401,20 @@ body.signing #view{max-width:440px;padding:0 20px}
 .pkb small{display:block;font:500 12.5px/1.3 var(--body);color:var(--ink2);white-space:nowrap}
 .pkb.pknew{border-style:dashed;border-color:#8C97A8;font-size:22px;font-weight:600}
 .pkb:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
+.pkon{background:var(--ink);color:#fff;border-radius:14px;padding:12px 12px 10px;margin:0 0 10px}
+.pkon-t{display:flex;gap:10px;align-items:center}
+.pkon-t svg{width:26px;height:26px;flex:none;fill:none;stroke:var(--placard);stroke-width:1.8;stroke-linejoin:round}
+.pkon-t b{display:block;font:700 16px/1.15 var(--body)}.pkon-t small{display:block;color:#C9D3E0;font-size:13px;margin-top:2px}
+.pkon-c{display:grid;grid-template-columns:60px 1fr 88px;gap:8px;margin-top:10px;align-items:stretch}
+.pkon-c button{border:0;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;font:600 30px/1 var(--body);min-height:58px;cursor:pointer}
+.pkon-c button.plus{background:var(--placard);color:var(--ink);font-size:36px}
+.pkon-c button:active{transform:scale(.96)}
+.pkon-c label{display:flex;align-items:baseline;justify-content:center;gap:8px;background:#fff;border-radius:12px;color:var(--ink)}
+.pkon-c input{width:3.2ch;border:0;background:none;text-align:right;font:700 34px/58px var(--sign);color:var(--ink);padding:0;min-height:0;margin:0}
+.pkon-c label span{font:600 15px/1 var(--body);color:var(--ink2)}
+.pkon-c button:focus-visible,.pkon-c input:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
+.pkon-h{margin:8px 0 0;font-size:12.5px;color:#C9D3E0}
+@media (prefers-reduced-motion:reduce){.pkon-c button:active{transform:none}}
 .pkx .rk{font:600 13px/1 var(--body);color:var(--ink2);margin:0 0 4px}.pkx h2{margin-bottom:6px!important}
 .pkq{max-width:260px;margin:6px 0 14px}
 .pkprev{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
@@ -1615,8 +1629,31 @@ const packMix = b => b.sizes.map(z => `${z.size} ${z.qty}`).join(' · ');
 const packPieces = b => b.sizes.reduce((a, z) => a + z.qty, 0);
 function packsStripHTML(sizes){
   const list = prepacks(); if (!list.length && !isOwner()) return '';
-  return `<div class="pkstrip" role="group" aria-label="Packs">${list.map(b => `<button type="button" class="pkb" data-act="pack-use" data-id="${esc(b.id)}">${PACK_ICON}<span><b>${esc(b.name)}</b><small>${esc(packMix(b))}</small></span></button>`).join('')}
-    ${isOwner() ? `<button type="button" class="pkb pknew" data-act="pack-new">+ <span><b>${sizes.length ? 'Save sizes as a pack' : 'New pack'}</b><small>${sizes.length ? sizes.map(z => `${z.size} ${z.qty}`).join(' · ') : 'Set the sizes in one pack'}</small></span></button>` : ''}</div>`;
+  const counts = (pack.form && pack.form.packs) || {};
+  const active = list.filter(b => counts[b.id] > 0);
+  return `${active.map(b => { const n = counts[b.id], pcs = packPieces(b) * n; return `<div class="pkon">
+      <div class="pkon-t">${PACK_ICON}<span><b>${esc(b.name)}</b><small>${nf(pcs)} pieces: ${b.sizes.map(z => `${z.size} ${nf(z.qty * n)}`).join(' · ')}</small></span></div>
+      <div class="pkon-c"><button type="button" data-act="pack-bump" data-id="${esc(b.id)}" data-d="-1" aria-label="One pack less">&minus;</button>
+        <label><input type="number" inputmode="numeric" min="0" value="${n}" data-pkset="${esc(b.id)}" aria-label="Number of ${esc(b.name)} packs"><span>${n === 1 ? 'pack' : 'packs'}</span></label>
+        <button type="button" class="plus" data-act="pack-bump" data-id="${esc(b.id)}" data-d="1" aria-label="One pack more">+</button></div>
+      <p class="pkon-h">Tap + each time you put a pack in ${bCode(pack.box)}.</p></div>`; }).join('')}
+    <div class="pkstrip" role="group" aria-label="Packs">${list.filter(b => !(counts[b.id] > 0)).map(b => `<button type="button" class="pkb" data-act="pack-bump" data-id="${esc(b.id)}" data-d="1">${PACK_ICON}<span><b>${esc(b.name)}</b><small>${esc(packMix(b))}</small></span></button>`).join('')}
+    ${isOwner() && !active.length ? `<button type="button" class="pkb pknew" data-act="pack-new">+ <span><b>${sizes.length ? 'Save sizes as a pack' : 'New pack'}</b><small>${sizes.length ? sizes.map(z => `${z.size} ${z.qty}`).join(' · ') : 'Set the sizes in one pack'}</small></span></button>` : ''}</div>`;
+}
+// Change how many of a pack are on the form; the sizes follow (sizes typed by hand stay as they are).
+function packSet(id, to, by){
+  const b = prepacks().find(x => x.id === id); if (!b) return;
+  const f = readForm(); f.packs = f.packs || {}; f.sizes = [...(f.sizes || [])];
+  const was = f.packs[id] || 0, now = Math.max(0, to != null ? to : was + by), d = now - was; if (!d) return;
+  b.sizes.forEach(z => {
+    const has = f.sizes.find(x => x.size === z.size);
+    if (has) { has.qty = Math.max(0, (+has.qty || 0) + z.qty * d); if (!has.qty) f.sizes.splice(f.sizes.indexOf(has), 1); }
+    else if (d > 0) f.sizes.push({ size: z.size, qty: z.qty * d, tag: '' });
+  });
+  if (now) f.packs[id] = now; else delete f.packs[id];
+  f.sizes.sort((a, c) => bySize(a.size, c.size)); if (f.sizes.length > 1) { f.more = []; f.tag = ''; }
+  pack.form = f; const y = scrollY; render(); scrollTo(0, y);
+  if (navigator.vibrate) navigator.vibrate(10);
 }
 function packUseSheet(id, n = 1){
   const b = prepacks().find(x => x.id === id); if (!b) return;
@@ -1670,7 +1707,7 @@ function readForm(){
   });
   const tagEl = $('#k-tag');
   return { type, color: $('#k-color').value.trim(), brand: $('#k-brand').value.trim(), tag: tagEl ? tagEl.value.trim() : '',
-    sizes, more: [...document.querySelectorAll('.k-more')].map(i => i.value === '' ? '' : parseInt(i.value, 10)), gender: $('input[name=k-gender]:checked')?.value || '', season: $('input[name=k-season]:checked')?.value || '' };
+    sizes, packs: { ...((pack.form && pack.form.packs) || {}) }, more: [...document.querySelectorAll('.k-more')].map(i => i.value === '' ? '' : parseInt(i.value, 10)), gender: $('input[name=k-gender]:checked')?.value || '', season: $('input[name=k-season]:checked')?.value || '' };
 }
 function packFail(e){ pack.err = isDenied(e) ? DENIED_MSG : e.message; render(); if (isDenied(e)) recheckSignin(); }
 function recheckSignin(){ if (staff === 'in') checkStaff().then(() => { if (staff === 'out') render(); }); }
@@ -3073,7 +3110,7 @@ const act = {
   'same-color'(){
     const le = pack.lastEntry; if (!le) return;
     Object.assign(pack, { id: uuid(), ids: null, photo: null, colors: null, err: '', justSaved: false, reuse: { path: le.path }, runPath: null, tagNote: '', tagStatus: '',
-      form: { type: le.type, brand: le.brand, gender: le.gender, season: le.season, color: le.color, tag: '', sizes: [], more: [] },
+      form: { type: le.type, brand: le.brand, gender: le.gender, season: le.season, color: le.color, tag: '', sizes: [], packs: {}, more: [] },
       saved: `Same photo and color (${le.color}). Tap the next sizes going into ${bCode(pack.box)} and type how many.` });
     render(); const sz = $('.sizechips'); if (sz) sz.scrollIntoView({ block: 'center' }); else scrollTo(0, 0);
   },
@@ -3090,7 +3127,7 @@ const act = {
         data.boxes.push(b); idx.box.set(b.id, b);
         pack.last = { pallet: pack.pallet, box: b.id }; store.set('last', pack.last);
         Object.assign(pack, { box: b.id, stage: 'item', id: uuid(), ids: null, photo: null, colors: null, err: '', justSaved: false, reuse: { path: le.path },
-          form: { type: le.type, brand: le.brand, gender: le.gender, season: le.season, color: le.color, tag: '', sizes: [], more: [] },
+          form: { type: le.type, brand: le.brand, gender: le.gender, season: le.season, color: le.color, tag: '', sizes: [], packs: {}, more: [] },
           saved: `${bCode(cur)} is marked full. Write ${bCode(b.id)} on the new box. Same photo and details: tap the sizes going into ${bCode(b.id)} and type how many.` });
         render(); scrollTo(0, 0);
       } catch (e) { packFail(e); }
@@ -3106,7 +3143,8 @@ const act = {
   'add-more'(){ const f = readForm(); f.more.push(''); pack.form = f; pack.err = ''; const p = pack.photo; render(); if (p) showPhoto(p); const i = document.querySelectorAll('.k-more'); if (i.length) i[i.length - 1].focus(); },
   'del-more'(el){ const f = readForm(); f.more.splice(+el.dataset.n, 1); pack.form = f; const p = pack.photo; render(); if (p) showPhoto(p); },
   qty(el){ const i = $('#' + el.dataset.for); if (!i) return; i.value = Math.max(1, (parseInt(i.value, 10) || 0) + (+el.dataset.d)); updateTotals(); },
-  'pack-use'(el){ pack.form = readForm(); packUseSheet(el.dataset.id); },
+  'pack-use'(el){ act['pack-bump']({ dataset: { id: el.dataset.id, d: '1' } }); },
+  'pack-bump'(el){ packSet(el.dataset.id, null, +el.dataset.d); },
   'pack-n'(el){ const i = $('#pk-n'); const n = Math.max(1, (parseInt(i.value, 10) || 1) + +el.dataset.d); packUseSheet(i.dataset.pkid, n); },
   'pack-add'(el){
     const b = prepacks().find(x => x.id === el.dataset.id), n = Math.max(1, parseInt($('#pk-n').value, 10) || 1); if (!b) return closeSheet();
@@ -3201,7 +3239,7 @@ const act = {
         if (navigator.vibrate) navigator.vibrate(40);
         Object.assign(pack, { id: uuid(), ids: null, photo: null, early: null, aiColor: false, reuse: null, colors: null, err: '', justSaved: true, runPath: path, tagNote: '', tagStatus: '', colorCode: null,
           lastEntry: { path, color: f.color, type: f.type, brand: f.brand, gender: f.gender, season: f.season },
-          form: { ...f, color: '', tag: '', sizes: f.sizes.map(z => ({ size: z.size, qty: 1, tag: '' })), more: [] }, saved: msg });
+          form: { ...f, color: '', tag: '', sizes: f.packs && Object.keys(f.packs).length ? f.sizes.map(z => ({ size: z.size, qty: z.qty, tag: '' })) : f.sizes.map(z => ({ size: z.size, qty: 1, tag: '' })), more: [] }, saved: msg });
         render(); scrollTo(0, 0);
       } catch (e) {
         showErr(isDenied(e) ? DENIED_MSG : needsUpdate(e) ? 'The database needs the latest setup script before sizes can be saved.' : /STYLE_PALLET/.test(e.message) ? 'This style belongs on a different pallet. Start the style again to see where it goes.' : e.code === '23503' ? 'This box or style was removed by someone. Tap "Start another style" and enter the style again.' : e.message + ' Tap Save item to try again.');
@@ -3608,6 +3646,7 @@ function fileIn(e){
 }
 
 document.addEventListener('change', e => { const id = e.target.dataset && e.target.dataset.mvn; if (!id || !mv) return; const l = mv.lines.find(x => x.id === id); l.n = Math.max(1, Math.min(l.max, parseInt(e.target.value, 10) || 1)); mvDraw(); });
+document.addEventListener('change', e => { const id = e.target.dataset && e.target.dataset.pkset; if (id) packSet(id, Math.max(0, parseInt(e.target.value, 10) || 0)); });
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-tab]');
@@ -3691,7 +3730,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.09';
+const APP_VERSION = '2026-11-24.10';
 let newVersion = false;
 async function checkVersion(){
   try {
