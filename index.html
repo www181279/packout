@@ -312,7 +312,7 @@ body.signing #view{max-width:440px;padding:0 20px}
 .fchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .fchips button{border:0;background:var(--ink);color:#fff;border-radius:20px;padding:5px 12px;font-size:14px}
 @media (max-width:430px){.fbtn .ft{display:none}.fbtn{padding:0 12px}}
-.bpick{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.bpick{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;max-height:156px;overflow-y:auto}
 .bpick button{min-height:44px;padding:0 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--paper);color:var(--ink);font:600 15px/1 var(--body);cursor:pointer}
 .bpick button[aria-pressed=true]{background:var(--ink);border-color:var(--ink);color:#fff}
 .bpick button:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
@@ -1046,6 +1046,13 @@ const PRESET_URL = '';   // e.g. 'https://abcd1234.supabase.co'
 const PRESET_KEY = '';   // the anon / publishable key
 const BUCKET = 'item-photos';
 const QUICK_BRANDS = ['Jordache', 'U.S. Polo Assn.'];   // one tap when the tag reader can't find the brand
+// Every brand used so far is a one-tap choice too, the most used first (same brand in any capitals counts once)
+function brandChoices(){
+  const n = new Map(), name = new Map();
+  QUICK_BRANDS.forEach(b => { const k = b.toLowerCase(); n.set(k, 0); name.set(k, b); });
+  data.items.forEach(i => { const b = String(i.brand || '').trim(); if (!b) return; const k = b.toLowerCase(); n.set(k, (n.get(k) || 0) + 1); if (!name.has(k)) name.set(k, b); });
+  return [...n.keys()].sort((a, b) => n.get(b) - n.get(a) || name.get(a).localeCompare(name.get(b))).map(k => name.get(k));
+}
 const GENDERS = ['Women','Men','Girls','Boys','Baby','Unisex'];
 const SEASONS = ['Spring','Summer','Fall','Winter','All year'];
 const TYPES = {
@@ -1628,7 +1635,7 @@ function packHTML(){
       <input id="k-type-other" type="text" autocomplete="off" placeholder="For example: Overalls" value="${typeOther && f.type !== '__other' ? esc(f.type) : ''}" ${typeOther ? '' : 'hidden'}>
       <label class="f" for="k-brand">Brand</label>
       <input id="k-brand" type="text" list="l-brand" autocomplete="off" enterkeyhint="done" value="${esc(f.brand)}">
-      <div class="bpick" role="group" aria-label="Quick brand">${QUICK_BRANDS.map(b => `<button type="button" data-act="use-brand" data-v="${esc(b)}" aria-pressed="${f.brand === b}">${esc(b)}</button>`).join('')}</div>
+      <div class="bpick" role="group" aria-label="Quick brand">${brandChoices().map(b => `<button type="button" data-act="use-brand" data-v="${esc(b)}" aria-pressed="${(f.brand || '').toLowerCase() === b.toLowerCase()}">${esc(b)}</button>`).join('')}</div>
       <datalist id="l-brand">${uniq('brand').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <label class="f">Gender</label>
       <div class="chips">${GENDERS.map(g => `<label><input type="radio" name="k-gender" value="${g}" ${f.gender === g ? 'checked' : ''}><span>${g}</span></label>`).join('')}</div>
@@ -3765,6 +3772,7 @@ function fileIn(e){
 
 document.addEventListener('change', e => { const id = e.target.dataset && e.target.dataset.mvn; if (!id || !mv) return; const l = mv.lines.find(x => x.id === id); l.n = Math.max(1, Math.min(l.max, parseInt(e.target.value, 10) || 1)); mvDraw(); });
 document.addEventListener('change', e => { const id = e.target.dataset && e.target.dataset.pkset; if (id) packSet(id, Math.max(0, parseInt(e.target.value, 10) || 0)); });
+document.addEventListener('input', e => { if (e.target.id !== 'k-brand') return; const v = e.target.value.trim().toLowerCase(); document.querySelectorAll('.bpick button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v.toLowerCase() === v)); });
 /* ---------- events ---------- */
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-tab]');
@@ -3848,7 +3856,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-25.03';
+const APP_VERSION = '2026-11-25.04';
 let newVersion = false;
 async function checkVersion(){
   try {
