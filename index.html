@@ -2580,7 +2580,7 @@ function manifestHTML(rows, { title, img, sheets }){
 /* ---------- printing: pallet breakdowns and box labels ---------- */
 const LETTER = 'size:letter;margin:.5in';
 const LABELS = { a5168: ['Avery 5168 (4 per sheet, 3.5 x 5 in)', 'size:letter;margin:0', 4, 0], l4: ['4 per Letter page', 'size:letter;margin:.5in', 4, 7], l2: ['2 per Letter page (large)', 'size:letter;margin:.5in', 2, 7], t46: ['4 x 6 inch label printer', 'size:4in 6in;margin:0', 1, 8] };
-let labelSize = store.get('labels') || 'a5168';
+let labelSize = store.get('labels2') || 'a5168';   // new key: everyone starts on the Avery 5168 design
 async function printHTML(html, page){
   await withBusy('Getting it ready to print', async () => {
     let st = $('#print-page'); if (!st) { st = document.createElement('style'); st.id = 'print-page'; document.head.appendChild(st); }
@@ -3413,7 +3413,7 @@ document.addEventListener('change', async e => {
   catch (er) { e.target.checked = !v; toast(isDenied(er) ? DENIED_MSG : 'Could not save the setting: ' + er.message, 'bad'); }
 });
 document.addEventListener('change', e => { if (e.target.name === 'x-scope' && $('#x-sum')) $('#x-sum').innerHTML = exportSummaryHTML(e.target.value); });
-document.addEventListener('change', e => { if (e.target.classList && e.target.classList.contains('p-label')) { labelSize = e.target.value; store.set('labels', labelSize); document.querySelectorAll('.p-label').forEach(x => { x.value = labelSize; }); } });
+document.addEventListener('change', e => { if (e.target.classList && e.target.classList.contains('p-label')) { labelSize = e.target.value; store.set('labels2', labelSize); document.querySelectorAll('.p-label').forEach(x => { x.value = labelSize; }); } });
 document.addEventListener('input', e => { if (e.target.id === 'bl-n' || e.target.id === 'bl-from') blankHint(); });
 document.addEventListener('input', e => { if (e.target.id === 'k-color') delete e.target.dataset.auto; if (e.target.matches && e.target.matches('.szq, .k-more')) updateTotals(); });
 document.addEventListener('input', e => { if (e.target.id === 'inv-q') { filt.q = e.target.value; invLimit = 150; renderInvList(); } });
@@ -3466,7 +3466,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.02';
+const APP_VERSION = '2026-11-24.03';
 let newVersion = false;
 async function checkVersion(){
   try {
