@@ -1581,6 +1581,7 @@ function packHTML(){
   const prev = data.items.filter(i => i.style_number === pack.style).slice(-1)[0] || store.get('lastForm') || {};
   let f = pack.form || { type: prev.item_type || prev.type || '', brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', sizes: [], more: [] };
   if (pack.tagRead && (!pack.tagRead.style || pack.tagRead.style === pack.style)) { f = mergeTag(f, pack.tagRead); pack.tagRead = null; pack.form = f; }   // a tag read on the first screen fills the form, even one kept from the last box
+  if (pack.stage === 'item') fillKnownTags(f);
   if (pack.stage === 'item' && (!pack.photo || pack.photoFirst) && (!pack.reuse || pack.reuse.auto)) autoReuse(f.color, [f.tag, ...(f.sizes || []).map(z => z.tag)]);
   const sizes = f.sizes || [];
   const typeOther = f.type === '__other' || (f.type && !ALL_TYPES.includes(f.type) && !data.items.some(i => i.item_type === f.type));
@@ -2419,6 +2420,21 @@ async function addGroupPhoto(e, key){
     await db.update('items', 'id=in.(' + ids.join(',') + ')', { photo_path: path });
   }, `Photo added to ${g.first.style_number} ${g.first.color} (${plural(ids.length, 'line')}). It is being polished.`);
   enqueuePolish([path]);
+}
+// A size of this style and color that was packed before already has its barcode: fill it in
+function knownTag(color, size){
+  if (!pack.style || !color || !size) return '';
+  const hit = data.items.find(i => i.style_number === pack.style && i.tag_number && normSize(i.size) === size && colorMatch(i.color, color));
+  return hit ? hit.tag_number : '';
+}
+function fillKnownTags(f){
+  if (!f || !f.color || !f.sizes) return;
+  if (f.sizes.length === 1) {
+    const size = f.sizes[0].size, a = pack.autoTag;
+    if (f.tag && a && f.tag === a.tag && a.size !== size) f.tag = '';          // the size changed: drop the barcode we filled for the old one
+    if (!f.tag) { f.tag = knownTag(f.color, size); if (f.tag) pack.autoTag = { tag: f.tag, size }; }
+  }
+  else f.sizes.forEach(z => { if (!z.tag) z.tag = knownTag(f.color, z.size); });
 }
 function seenColorsHTML(){
   const seen = new Map(); data.items.filter(i => i.style_number === pack.style && i.photo_path).sort((a, b) => (b.photo_pro ? 1 : 0) - (a.photo_pro ? 1 : 0))
@@ -3792,7 +3808,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.16';
+const APP_VERSION = '2026-11-24.17';
 let newVersion = false;
 async function checkVersion(){
   try {
