@@ -2421,7 +2421,9 @@ function mergeTag(f, t){
   if (t.brand) f.brand = t.brand;
   if (t.gender) f.gender = t.gender;
   if (t.color && pack.style) { const same = data.items.find(i => i.style_number === pack.style && colorMatch(i.color, t.color)); if (same) t = { ...t, color: same.color }; }
-  if (t.color && (!f.color || f.colorAuto)) { f.color = t.color; f.colorAuto = false; }
+  // the tag in hand is the truth: its color replaces one kept from the last box
+  if (t.color && f.color && !colorMatch(f.color, t.color)) pack.colorChanged = `Color changed from ${f.color} to ${t.color}, as on the tag.`;
+  if (t.color) { f.color = t.color; f.colorAuto = false; }
   if (t.color) pack.aiColor = true;
   pack.colorCode = t.color_code && t.color === t.color_code ? t.color_code.toUpperCase() : null;
   const size = t.size && normSize(t.size);
@@ -2430,7 +2432,7 @@ function mergeTag(f, t){
     if (f.sizes.length > 1) { const z = f.sizes.find(z => z.size === size); if (z && !z.tag) z.tag = t.upc; }
     else if (!f.tag) f.tag = t.upc;
   }
-  pack.tagNote = t.notes ? 'From the tag: ' + t.notes : '';
+  pack.tagNote = [pack.colorChanged, t.notes ? 'From the tag: ' + t.notes : ''].filter(Boolean).join(' '); pack.colorChanged = '';
   return f;
 }
 function tagFactsHTML(t){
@@ -3757,7 +3759,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.12';
+const APP_VERSION = '2026-11-24.13';
 let newVersion = false;
 async function checkVersion(){
   try {
