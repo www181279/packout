@@ -408,6 +408,7 @@ body.signing #view{max-width:440px;padding:0 20px}
 .seenc img{width:82px;height:82px;object-fit:cover;border-radius:7px;background:#E3E9EF}
 .seenc span{display:block;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .seenc:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
+.pick.pnew{border-color:var(--placard);background:#FFF8E1}
 .pkon{background:var(--ink);color:#fff;border-radius:14px;padding:12px 12px 10px;margin:0 0 10px}
 .pkon-t{display:flex;gap:10px;align-items:center}
 .pkon-t svg{width:26px;height:26px;flex:none;fill:none;stroke:var(--placard);stroke-width:1.8;stroke-linejoin:round}
@@ -1257,7 +1258,7 @@ function validatePack(){
   if (pack.last && !idx.box.get(pack.last.box)) { pack.last = null; store.del('last'); }
   if (pack.reuse && !data.items.some(i => i.photo_path === pack.reuse.path)) pack.reuse = null;
   const sr = (pack.stage === 'item' || pack.stage === 'box') && styleRow(pack.style);
-  if (sr && pack.pallet && sr.pallet_id !== pack.pallet && !palletFull(sr.pallet_id)) {   // the style was moved to another pallet (not: continued after its pallet filled up)
+  if (sr && pack.pallet && sr.pallet_id !== pack.pallet && !(pack.box && idx.box.get(pack.box) && idx.box.get(pack.box).pallet_id === pack.pallet) && !palletFull(sr.pallet_id)) {   // the style was moved to another pallet (not: continued after its pallet filled up)
     const b = pack.box && idx.box.get(pack.box);
     if (b && b.pallet_id === sr.pallet_id) { pack.pallet = sr.pallet_id; return 'bar'; }   // this box went with it: only the top bar changes
     Object.assign(pack, { stage: 'box', pallet: sr.pallet_id, box: null, known: true, owner: sr.created_by, form: null, photo: null, justSaved: false,
@@ -1516,7 +1517,7 @@ function trailHTML(){
     ${pack.pallet ? `<span class="p">${pCode(pack.pallet)}</span>` : ''}
     ${pack.box ? `<span>${bCode(pack.box)}</span>` : ''}
     ${pack.stage === 'item'
-      ? `<div class="acts"><button data-act="same-box">Next style</button><button data-act="new-box">Box full</button></div>`
+      ? `<div class="acts"><button data-act="same-box">Next style</button><button data-act="new-box">Box full</button><button data-act="overflow-pallet">New pallet</button></div>`
       : `<button class="linkbtn" data-act="pack-reset">Start another style</button>`}
   </div>`;
 }
@@ -1555,7 +1556,7 @@ function packHTML(){
 
   if (pack.stage === 'box') {
     const p = idx.pal.get(pack.pallet) || { id: pack.pallet, created_by: '', status: 'open' };
-    const full = palletFull(p.id), pals = full ? stylePallets(pack.style, p.id) : [p.id];
+    const full = palletFull(p.id), pals = stylePallets(pack.style, p.id);
     const boxes = data.boxes.filter(b => pals.includes(b.pallet_id) && b.status === 'open').sort((a, b) => (pack.last && a.id === pack.last.box ? -1 : 0) || b.id - a.id);
     const n = itemsOf('style_number', pack.style).length;
     const other = pack.known && pack.owner && pack.owner !== me.name;
@@ -1563,17 +1564,18 @@ function packHTML(){
       <div class="placard ${other ? 'stop' : ''}"><div class="stripes"></div><div class="in">
         <p>${other ? `Stop. ${esc(pack.owner)} already started style ${esc(pack.style)}.` : `Style ${esc(pack.style)} already has a pallet.`}</p>
         <div class="code">${pCode(p.id)}</div>
-        <p>${full ? `${pCode(p.id)} is full (all its box numbers are used). Keep going in a box below, or start a new pallet for the rest of this style.` : `Take these pieces to ${pCode(p.id)}. You can't start another pallet for this style.`}</p>
+        <p>${full ? `${pCode(p.id)} is full (all its box numbers are used). Keep going in a box below, or start a new pallet for the rest of this style.` : `Take these pieces to ${pCode(p.id)}, or start a new pallet for this style.`}</p>
       </div></div>` : `
       <div class="placard"><div class="in"><p>Style ${esc(pack.style)} now belongs to</p><div class="code">${pCode(p.id)}</div>
         <p>Write ${pCode(p.id)} on the pallet if it is new.</p></div></div>`;
     return `${trailHTML()}${head}${err}
     ${p.status === 'closed' ? `<div class="note">${pCode(p.id)} is marked closed. <button class="linkbtn" data-act="reopen-pallet" data-id="${p.id}">Reopen it</button> to add pieces.</div>` : ''}
-    <h2 style="font:600 17px var(--body);margin:16px 0 8px">${full ? 'Which box?' : `Which box on ${pCode(p.id)}?`}</h2>
+    <h2 style="font:600 17px var(--body);margin:16px 0 8px">${pals.length > 1 || full ? 'Which box?' : `Which box on ${pCode(p.id)}?`}</h2>
     ${boxes.map(b => { const its = itemsOf('box_id', b.id); return `
       <button class="pick" data-act="choose-box" data-id="${b.id}"><span class="tag box">${bCode(b.id)}</span>
-        <span><b>${plural(sumQty(its), 'piece')} inside</b><small>${full ? pCode(b.pallet_id) + ' · ' : ''}Started by ${esc(b.created_by)}</small></span></button>`; }).join('')}
-    ${full ? `<button class="pick new" data-act="overflow-pallet">Start a new pallet for ${esc(pack.style)}</button>` : `<button class="pick new" data-act="new-box">Start a new box on ${pCode(p.id)}</button>`}
+        <span><b>${plural(sumQty(its), 'piece')} inside</b><small>${pals.length > 1 ? pCode(b.pallet_id) + ' · ' : ''}Started by ${esc(b.created_by)}</small></span></button>`; }).join('')}
+    ${full ? '' : `<button class="pick new" data-act="new-box">Start a new box on ${pCode(p.id)}</button>`}
+    <button class="pick new pnew" data-act="overflow-pallet">Start a new pallet for ${esc(pack.style)}</button>
     ${n === 0 ? `<p class="small muted" style="margin-top:14px">Picked the wrong pallet? Nothing is packed for this style yet. <button class="linkbtn" data-act="release-style">Undo this pallet choice</button></p>`
       : !canManage() ? '' : `<p class="small muted" style="margin-top:14px">Pallet full, or a mistake in this style? <button class="linkbtn" data-act="open-style" data-style="${esc(pack.style)}">Move, edit or delete this style</button></p>`}`;
   }
@@ -2451,8 +2453,9 @@ function stylePallets(style, home){
 }
 function overflowAsk(){
   const home = (idx.style.get(pack.style) || {}).pallet_id || pack.pallet;
-  openSheet(`<div class="rsx"><h2>${pCode(pack.pallet)} is full</h2>
-    <p class="lead">All ${boxesPerPallet()} box numbers on ${pCode(pack.pallet)} are used. Start a new pallet and keep packing ${esc(pack.style)} there. Pieces already on ${pCode(home)} stay where they are.</p>
+  const full = palletFull(pack.pallet);
+  openSheet(`<div class="rsx"><h2>${full ? `${pCode(pack.pallet)} is full` : 'Start a new pallet?'}</h2>
+    <p class="lead">${full ? `All ${boxesPerPallet()} box numbers on ${pCode(pack.pallet)} are used. ` : ''}The app makes the next pallet with a new box on it, and you keep packing ${esc(pack.style)} there. Pieces already packed stay where they are.</p>
     <div class="rfoot"><button class="btn quiet" data-act="close-sheet">Not now</button><button class="btn" data-act="overflow-yes">Start a new pallet</button></div></div>`);
 }
 function seenColorsHTML(){
@@ -3843,7 +3846,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-25.01';
+const APP_VERSION = '2026-11-25.02';
 let newVersion = false;
 async function checkVersion(){
   try {

@@ -1150,3 +1150,16 @@ begin
   return new;
 end;
 $$;
+
+-- 17. A style can continue on a new pallet at any time (not only when its pallet is full).
+--     The style's pallet is where it started; each piece records the pallet its box is on.
+create or replace function public.items_enforce_pallet()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.pallet_id  := (select pallet_id from public.boxes where id = new.box_id);
+  new.updated_at := now();
+  return new;
+end;
+$$;
