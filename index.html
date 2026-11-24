@@ -1570,7 +1570,7 @@ function packHTML(){
   const prev = data.items.filter(i => i.style_number === pack.style).slice(-1)[0] || store.get('lastForm') || {};
   let f = pack.form || { type: prev.item_type || prev.type || '', brand: prev.brand || '', gender: prev.gender || '', season: prev.season || '', color: '', tag: '', sizes: [], more: [] };
   if (!pack.form && pack.tagRead) { f = mergeTag(f, pack.tagRead); pack.tagRead = null; pack.form = f; }
-  if (pack.stage === 'item' && (!pack.photo || pack.photoFirst) && (!pack.reuse || pack.reuse.auto)) autoReuse(f.color);
+  if (pack.stage === 'item' && (!pack.photo || pack.photoFirst) && (!pack.reuse || pack.reuse.auto)) autoReuse(f.color, [f.tag, ...(f.sizes || []).map(z => z.tag)]);
   const sizes = f.sizes || [];
   const typeOther = f.type === '__other' || (f.type && !ALL_TYPES.includes(f.type) && !data.items.some(i => i.item_type === f.type));
   const more = f.more || [];
@@ -2143,7 +2143,11 @@ async function openScanner(target){
         if (done || scanner !== sc) return; done = true;
         const val = String(text).trim();
         closeSheet(); if (navigator.vibrate) navigator.vibrate(60);
-        if (target === 'style') { const i = $('#k-style'); if (i) { i.value = val; act['check-style'](); } }
+        if (target === 'style') { const i = $('#k-style'); if (!i) return;
+          const hit = data.items.find(x => x.tag_number && digits(x.tag_number) === digits(val) && digits(val).length >= 6);
+          if (hit) { pack.tagRead = { style: hit.style_number, upc: digits(val), color: hit.color, size: hit.size }; i.value = hit.style_number; toast(`Found ${hit.style_number} ${hit.color}${hit.size ? ', size ' + hit.size : ''}.`, 'good'); }
+          else i.value = val;
+          act['check-style'](); }
         else { const i = target === 'tag' ? $('#k-tag') : document.getElementById(target); if (i) { i.value = val; toast('Tag ' + val, 'good'); } }
       }, () => {});
     if (scanner !== sc) return sc.stop().then(() => sc.clear()).catch(() => {});   // closed while starting
@@ -2378,9 +2382,14 @@ function sameColorAs(style, color){
   const seen = data.items.filter(i => i.style_number === style && colorKey(i.color) === k).map(i => i.color);
   return seen.length ? colorLabel(seen.concat(/\(/.test(color) && !seen.some(c => /\(/.test(c)) ? [color] : [])) : color;
 }
-function autoReuse(color){
-  if ((pack.photo && !pack.photoFirst) || !pack.style || !colorKey(color)) return false;
-  const k = colorKey(color), hit = data.items.filter(i => i.style_number === pack.style && i.photo_path && colorKey(i.color) === k)
+// "020 (Oatmeal Heather)", "020", "Oatmeal Heather" and "OATMEAL HEATHER" are the same color
+const colorParts = c => { const t = String(c || '').toLowerCase().replace(/\s+/g, ' ').trim(), m = t.match(/^(.*?)\s*\((.*)\)\s*$/); return m ? [m[1].trim(), m[2].trim()].filter(Boolean) : t ? [t] : []; };
+const colorMatch = (a, b) => { const A = colorParts(a), B = colorParts(b); return A.some(x => B.includes(x)); };
+const digits = v => String(v || '').replace(/\D/g, '');
+function autoReuse(color, upcs){
+  upcs = (upcs || []).map(digits).filter(u => u.length >= 6);
+  if ((pack.photo && !pack.photoFirst) || !pack.style || (!colorKey(color) && !upcs.length)) return false;
+  const hit = data.items.filter(i => i.style_number === pack.style && i.photo_path && ((colorKey(color) && colorMatch(i.color, color)) || (i.tag_number && upcs.includes(digits(i.tag_number)))))
     .sort((a, b) => (b.photo_pro ? 1 : 0) - (a.photo_pro ? 1 : 0))[0];
   if (!hit) { if (pack.reuse && pack.reuse.auto) pack.reuse = null; return false; }
   if (pack.reuse && pack.reuse.path === hit.photo_path) return true;
@@ -2392,9 +2401,11 @@ function mergeTag(f, t){
   f = { ...f, sizes: [...(f.sizes || [])], more: [...(f.more || [])] };
   const known = t.upc && data.items.find(i => i.tag_number && i.tag_number.replace(/\D/g, '') === t.upc);
   if (known) Object.assign(f, { type: known.item_type || f.type, brand: known.brand || f.brand, gender: known.gender || f.gender, season: known.season || f.season });
+  if (known && known.style_number === pack.style && (!t.color || colorMatch(known.color, t.color))) t = { ...t, color: known.color, size: t.size || known.size };
   if (t.item_type) f.type = t.item_type;
   if (t.brand) f.brand = t.brand;
   if (t.gender) f.gender = t.gender;
+  if (t.color && pack.style) { const same = data.items.find(i => i.style_number === pack.style && colorMatch(i.color, t.color)); if (same) t = { ...t, color: same.color }; }
   if (t.color && (!f.color || f.colorAuto)) { f.color = t.color; f.colorAuto = false; }
   if (t.color) pack.aiColor = true;
   pack.colorCode = t.color_code && t.color === t.color_code ? t.color_code.toUpperCase() : null;
@@ -3609,7 +3620,7 @@ function swClose(){ if (swOpen) { swSet(swOpen, 0, true); swOpen.parentElement.c
   addEventListener('scroll', () => { if (swOpen && !row) swClose(); }, { passive: true });
 })();
 document.addEventListener('change', e => {
-  if (e.target.id === 'k-color' && tab === 'pack' && pack.stage === 'item' && !pack.photo) { const had = pack.reuse && pack.reuse.path; autoReuse(e.target.value); if ((pack.reuse && pack.reuse.path) !== had) { pack.form = readForm(); const y = scrollY; render(); scrollTo(0, y); } } if (e.target.closest && e.target.closest('.dl')) delCount(); });
+  if (e.target.id === 'k-color' && tab === 'pack' && pack.stage === 'item' && !pack.photo) { const had = pack.reuse && pack.reuse.path; autoReuse(e.target.value, [($('#k-tag') || {}).value]); if ((pack.reuse && pack.reuse.path) !== had) { pack.form = readForm(); const y = scrollY; render(); scrollTo(0, y); } } if (e.target.closest && e.target.closest('.dl')) delCount(); });
 
 // Photos. The camera sends the page to the background; when it comes back the app may refresh. A file input
 // replaced during that refresh would lose the photo, so: no refreshes or updates while the camera is open, and
@@ -3730,7 +3741,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.10';
+const APP_VERSION = '2026-11-24.11';
 let newVersion = false;
 async function checkVersion(){
   try {
