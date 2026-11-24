@@ -392,6 +392,27 @@ body.signing #view{max-width:440px;padding:0 20px}
 .mvq>span{font-size:14px;color:var(--ink2)}
 .mvq .qty{margin:0;grid-template-columns:44px 64px 44px;gap:6px}.mvq .qty button{height:44px;font-size:22px}.mvq .qty input{height:44px;font-size:20px;padding:0;min-height:0}
 .mvallbtn{margin-top:8px}
+/* packs */
+.pkstrip{display:flex;gap:8px;overflow-x:auto;padding:2px 0 10px;margin-bottom:2px;scrollbar-width:none}
+.pkstrip::-webkit-scrollbar{display:none}
+.pkb{flex:none;display:flex;align-items:center;gap:10px;min-height:52px;max-width:260px;padding:8px 14px 8px 10px;border:1.5px solid var(--ink);border-radius:12px;background:var(--paper);color:var(--ink);text-align:left;font:inherit;cursor:pointer}
+.pkb svg{width:24px;height:24px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round}
+.pkb b{display:block;font:700 15px/1.15 var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pkb small{display:block;font:500 12.5px/1.3 var(--body);color:var(--ink2);white-space:nowrap}
+.pkb.pknew{border-style:dashed;border-color:#8C97A8;font-size:22px;font-weight:600}
+.pkb:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
+.pkx .rk{font:600 13px/1 var(--body);color:var(--ink2);margin:0 0 4px}.pkx h2{margin-bottom:6px!important}
+.pkq{max-width:260px;margin:6px 0 14px}
+.pkprev{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.pkprev span{display:inline-flex;align-items:center;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:4px 10px 4px 4px;font:700 17px/1 var(--sign)}
+.pkprev i{font:700 13px/1 var(--body);font-style:normal;background:var(--ink);color:#fff;border-radius:6px;padding:4px 6px}
+.pkrows{display:grid;gap:8px;margin-bottom:8px}
+.pkrow{display:grid;grid-template-columns:minmax(0,1fr) auto 40px;gap:8px;align-items:center}
+.pkrow .pk-sz{min-height:44px;margin:0;font-weight:600}
+.pkrow .qty{margin:0;grid-template-columns:44px 56px 44px;gap:6px}.pkrow .qty button{height:44px;font-size:22px}.pkrow .qty input{height:44px;font-size:19px;padding:0;min-height:0}
+.pkdel{width:40px;height:44px;border:0;background:none;color:#8C97A8;display:grid;place-items:center;cursor:pointer}
+.pkdel svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.pkdel:hover{color:#C62D2D}
 /* pallet page: what is in each box, grouped by style and color */
 .bgroups{display:grid;gap:8px;margin-top:12px}
 .bgrp{display:grid;grid-template-columns:52px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:8px 8px 8px 8px;background:var(--floor);border-radius:12px}
@@ -1248,7 +1269,7 @@ async function loadAll(opts = {}){
   if (!itemsCursor) itemsCursor = new Date(Date.now() - 60000).toISOString();
   data = { pallets, boxes, styles, items: all }; loaded = true;
   saveCache();
-  if (!settingsLoaded) { settingsLoaded = true; loadSettings(); }
+  if (!settingsLoaded || Date.now() - settingsLoaded > 60000) { settingsLoaded = Date.now(); loadSettings(); }   // packs and settings from other phones
   rebuildIdx();
   setTimeout(polishTick, 1500);
   setSync(true);
@@ -1559,6 +1580,7 @@ function packHTML(){
       <div id="k-colorhint" class="chint">${colorHintHTML()}</div>
       <datalist id="l-color">${uniq('color').map(v => `<option value="${esc(v)}">`).join('')}</datalist>
       <label class="f">Size <small>(tap every size of this color you are packing)</small></label>
+      ${packsStripHTML(sizes)}
       ${sizeChipsHTML(f, sizes)}
       ${sizes.length ? `<div class="szlist">${sizes.map((z, n) => `<div class="szrow" data-size="${esc(z.size)}">
         <div class="szhead"><span class="szname">${esc(z.size)}</span><span class="small muted">in ${bCode(pack.box)}</span></div>
@@ -1586,6 +1608,39 @@ function packHTML(){
     <button class="linkbtn restart" data-act="restart-style">Start over: delete style ${esc(pack.style)}</button>
     <div class="savebar">${err}<button class="btn" data-act="save-item">Save item</button></div>`;
 }
+/* ---------- prepacks: a fixed mix of sizes, like a polo pack of 1 S, 2 M, 2 L, 1 XL ---------- */
+const PACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/></svg>';
+const prepacks = () => Array.isArray(setting('bundles')) ? setting('bundles') : [];
+const packMix = b => b.sizes.map(z => `${z.size} ${z.qty}`).join(' · ');
+const packPieces = b => b.sizes.reduce((a, z) => a + z.qty, 0);
+function packsStripHTML(sizes){
+  const list = prepacks(); if (!list.length && !isOwner()) return '';
+  return `<div class="pkstrip" role="group" aria-label="Packs">${list.map(b => `<button type="button" class="pkb" data-act="pack-use" data-id="${esc(b.id)}">${PACK_ICON}<span><b>${esc(b.name)}</b><small>${esc(packMix(b))}</small></span></button>`).join('')}
+    ${isOwner() ? `<button type="button" class="pkb pknew" data-act="pack-new">+ <span><b>${sizes.length ? 'Save sizes as a pack' : 'New pack'}</b><small>${sizes.length ? sizes.map(z => `${z.size} ${z.qty}`).join(' · ') : 'Set the sizes in one pack'}</small></span></button>` : ''}</div>`;
+}
+function packUseSheet(id, n = 1){
+  const b = prepacks().find(x => x.id === id); if (!b) return;
+  openSheet(`<div class="rsx pkx"><p class="rk">Add packs</p><h2>${esc(b.name)}</h2><p class="lead">One pack: ${esc(packMix(b))} (${plural(packPieces(b), 'piece')})</p>
+    <label class="f" for="pk-n">How many packs</label>
+    <div class="qty pkq"><button type="button" data-act="pack-n" data-d="-1" aria-label="One less pack">&minus;</button><input id="pk-n" type="number" inputmode="numeric" min="1" value="${n}" data-pkid="${esc(b.id)}"><button type="button" data-act="pack-n" data-d="1" aria-label="One more pack">+</button></div>
+    <div class="pkprev">${b.sizes.map(z => `<span><i>${esc(z.size)}</i>${nf(z.qty * n)}</span>`).join('')}</div>
+    <p class="small muted">These are added to the sizes already on the form. You can still change any number before saving.</p>
+    <div class="rfoot"><button class="btn quiet" data-act="close-sheet">Cancel</button><button class="btn" data-act="pack-add" data-id="${esc(b.id)}">Add ${plural(n, 'pack')} (${nf(packPieces(b) * n)} pieces)</button></div></div>`);
+}
+function packEditSheet(edit){
+  const b = edit || { id: '', name: '', sizes: (readForm().sizes || []).map(z => ({ size: z.size, qty: +z.qty || 1 })) };
+  if (!b.sizes.length) b.sizes = [{ size: 'S', qty: 1 }, { size: 'M', qty: 2 }, { size: 'L', qty: 2 }, { size: 'XL', qty: 1 }];
+  const opts = [...new Set([...SIZES, ...SIZESETS.women.list, ...SIZESETS.kids.list, ...SIZESETS.baby.list])];
+  openSheet(`<div class="rsx pkx"><p class="rk">${edit ? 'Change pack' : 'New pack'}</p><h2>${edit ? esc(edit.name) : 'Sizes in one pack'}</h2>
+    <label class="f" for="pk-name">Name</label><input id="pk-name" type="text" autocomplete="off" placeholder="For example: U.S. Polo polo pack" value="${esc(b.name)}">
+    <p class="f" style="margin-top:14px">Sizes in one pack</p>
+    <div class="pkrows" id="pk-rows">${b.sizes.map((z, n) => pkRow(z, n, opts)).join('')}</div>
+    <button type="button" class="linkbtn small" data-act="pack-row-add">+ Add a size</button>
+    <datalist id="pk-sizes">${opts.map(o => `<option value="${esc(o)}">`).join('')}</datalist>
+    <div id="pk-err"></div>
+    <div class="rfoot"><button class="btn quiet" data-act="close-sheet">Cancel</button><button class="btn" data-act="pack-save" data-id="${esc(b.id)}">Save pack</button></div></div>`);
+}
+const pkRow = (z, n) => `<div class="pkrow"><input class="pk-sz" type="text" list="pk-sizes" autocomplete="off" autocapitalize="characters" value="${esc(z.size)}" aria-label="Size"><div class="qty"><button type="button" data-act="qty" data-for="pk-q${n}" data-d="-1" aria-label="One less">&minus;</button><input id="pk-q${n}" class="pk-q" type="number" inputmode="numeric" min="1" value="${z.qty}" aria-label="How many in one pack"><button type="button" data-act="qty" data-for="pk-q${n}" data-d="1" aria-label="One more">+</button></div><button type="button" class="pkdel" data-act="pack-row-del" aria-label="Remove this size">${ICON_DEL}</button></div>`;
 function sizeChipsHTML(f, sizes){
   const set = pack.sizeSet || sizeSetFor(f.type, f.gender), S = SIZESETS[set];
   const chip = z => `<button type="button" data-act="toggle-size" data-size="${esc(z)}" aria-pressed="${sizes.some(x => x.size === z)}">${esc(z)}</button>`;
@@ -2626,6 +2681,10 @@ function settingsHTML(){
         <div class="lfield"><code id="inv-url">…</code><button class="btn sm" data-act="copy-invite">Copy</button><button class="btn sm alt" data-act="join-code" aria-label="Show QR code">QR</button></div></div>
        <div class="slink"><div class="slh"><span class="sic">${ic('M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z')}</span><div class="stx"><b>View-only link</b><small>Sees pallets, boxes, inventory and exports. Can't change anything.</small></div></div>
         <div class="lfield"><code>${esc(viewLink())}</code><button class="btn sm" data-act="copy-view">Copy</button></div></div>`);
+    h += sec('s-packs', 'Packs', 'A fixed mix of sizes, so packers add whole packs with one tap.',
+      (prepacks().map(b => `<div class="srow"><span class="sic">${PACK_ICON}</span><div class="stx"><b>${esc(b.name)}</b><small>${esc(packMix(b))} · ${plural(packPieces(b), 'piece')} per pack</small></div>
+        <div class="sact"><button class="btn alt sm" data-act="pack-edit" data-id="${esc(b.id)}">Change</button><button class="btn quiet sm" data-act="pack-del" data-id="${esc(b.id)}">Delete</button></div></div>`).join('') || '<div class="srow"><div class="stx"><b>No packs yet</b><small>Add one here, or on the Pack screen after tapping the sizes.</small></div></div>')
+      + `<div class="srow"><div class="sact"><button class="btn sm" data-act="pack-new">+ New pack</button></div></div>`);
     h += sec('s-photos', 'Item photos', 'Each saved photo is cleaned up on its own. The garment is never changed, and the original is kept.',
       `<div class="srow"><span class="sic">${ic('M3 8h4l2-3h6l2 3h4v11H3zM12 16.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z')}</span><div class="stx"><b>Polished photos</b><small id="pol-count">${polishCountText()}</small>
         <span class="pbar"><i style="width:${all ? Math.round(done / all * 100) : 0}%"></i></span></div><div class="sact"><button class="btn alt sm" data-act="polish-all">Polish the rest</button></div></div>
@@ -3047,6 +3106,36 @@ const act = {
   'add-more'(){ const f = readForm(); f.more.push(''); pack.form = f; pack.err = ''; const p = pack.photo; render(); if (p) showPhoto(p); const i = document.querySelectorAll('.k-more'); if (i.length) i[i.length - 1].focus(); },
   'del-more'(el){ const f = readForm(); f.more.splice(+el.dataset.n, 1); pack.form = f; const p = pack.photo; render(); if (p) showPhoto(p); },
   qty(el){ const i = $('#' + el.dataset.for); if (!i) return; i.value = Math.max(1, (parseInt(i.value, 10) || 0) + (+el.dataset.d)); updateTotals(); },
+  'pack-use'(el){ pack.form = readForm(); packUseSheet(el.dataset.id); },
+  'pack-n'(el){ const i = $('#pk-n'); const n = Math.max(1, (parseInt(i.value, 10) || 1) + +el.dataset.d); packUseSheet(i.dataset.pkid, n); },
+  'pack-add'(el){
+    const b = prepacks().find(x => x.id === el.dataset.id), n = Math.max(1, parseInt($('#pk-n').value, 10) || 1); if (!b) return closeSheet();
+    const f = pack.form || readForm(); f.sizes = [...(f.sizes || [])];
+    b.sizes.forEach(z => { const has = f.sizes.find(x => x.size === z.size); if (has) has.qty = (+has.qty || 0) + z.qty * n; else f.sizes.push({ size: z.size, qty: z.qty * n, tag: '' }); });
+    f.sizes.sort((a, c) => bySize(a.size, c.size)); if (f.sizes.length > 1) { f.more = []; f.tag = ''; }
+    pack.form = f; closeSheet(); render(); const sl = $('.szlist'); if (sl) sl.scrollIntoView({ block: 'center' });
+    toast(`Added ${plural(n, 'pack')} of ${b.name}: ${b.sizes.map(z => `${z.size} ${z.qty * n}`).join(', ')}.`, 'good');
+  },
+  'pack-new'(){ if (!isOwner()) return; pack.form = readForm(); packEditSheet(null); },
+  'pack-edit'(el){ const b = prepacks().find(x => x.id === el.dataset.id); if (b) packEditSheet(JSON.parse(JSON.stringify(b))); },
+  'pack-row-add'(){ const r = $('#pk-rows'); const n = r.children.length + Date.now() % 1000; r.insertAdjacentHTML('beforeend', pkRow({ size: '', qty: 1 }, n)); r.lastElementChild.querySelector('input').focus(); },
+  'pack-row-del'(el){ el.closest('.pkrow').remove(); },
+  async 'pack-save'(el){
+    const name = $('#pk-name').value.trim();
+    const sizes = [...document.querySelectorAll('.pkrow')].map(r => ({ size: normSize(r.querySelector('.pk-sz').value), qty: parseInt(r.querySelector('.pk-q').value, 10) || 0 })).filter(z => z.size);
+    const err = m => { $('#pk-err').innerHTML = `<div class="err">${m}</div>`; };
+    if (!name) return err('Give the pack a name, like "Polo pack".');
+    if (!sizes.length || sizes.some(z => z.qty < 1)) return err('Add at least one size, each with 1 or more.');
+    if (new Set(sizes.map(z => z.size)).size !== sizes.length) return err('Each size can be listed once.');
+    sizes.sort((a, b) => bySize(a.size, b.size));
+    const list = prepacks().filter(b => b.id !== el.dataset.id).concat([{ id: el.dataset.id || uuid().slice(0, 8), name, sizes }]);
+    await withBusy('Saving pack', async () => { try { await saveSetting('bundles', list); closeSheet(); toast(`Saved the pack "${name}".`, 'good'); render(); } catch (e) { err(isDenied(e) ? 'Only Avigdor can save packs.' : e.message); } });
+  },
+  'pack-del'(el){ const b = prepacks().find(x => x.id === el.dataset.id); if (!b) return;
+    openSheet(`<div class="rsx dconf"><div class="dicon">${ICON_DEL}</div><h2>Delete "${esc(b.name)}"?</h2><p class="lead">Items already packed are not changed.</p>
+      <div class="rfoot"><button class="btn quiet" data-act="close-sheet">Keep it</button><button class="btn danger" data-act="pack-del-yes" data-id="${esc(b.id)}">Delete pack</button></div></div>`); },
+  async 'pack-del-yes'(el){ const list = prepacks().filter(b => b.id !== el.dataset.id);
+    await withBusy('Deleting pack', async () => { try { await saveSetting('bundles', list); closeSheet(); toast('Pack deleted.', 'good'); render(); } catch (e) { toast(e.message, 'bad'); } }); },
   'toggle-size'(el){
     const f = readForm(), z = el.dataset.size;
     if (f.sizes.length === 1 && f.tag) f.sizes[0].tag = f.tag;              // the single tag field belongs to that size
@@ -3602,7 +3691,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-24.08';
+const APP_VERSION = '2026-11-24.09';
 let newVersion = false;
 async function checkVersion(){
   try {
