@@ -408,6 +408,7 @@ body.signing #view{max-width:440px;padding:0 20px}
 .seenc img{width:82px;height:82px;object-fit:cover;border-radius:7px;background:#E3E9EF}
 .seenc span{display:block;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .seenc:focus-visible{outline:3px solid var(--placard);outline-offset:2px}
+.otherboxes{margin:4px 0 10px}.otherboxes summary{cursor:pointer;font:600 15.5px/1.3 var(--body);padding:12px 4px;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 .pick.pnew{border-color:var(--placard);background:#FFF8E1}
 .pkon{background:var(--ink);color:#fff;border-radius:14px;padding:12px 12px 10px;margin:0 0 10px}
 .pkon-t{display:flex;gap:10px;align-items:center}
@@ -1589,6 +1590,9 @@ function packHTML(){
     ${boxes.map(b => { const its = itemsOf('box_id', b.id); return `
       <button class="pick" data-act="choose-box" data-id="${b.id}"><span class="tag box">${bCode(b.id)}</span>
         <span><b>${mine && b.id === mine.id ? 'Your current box · ' : ''}${plural(sumQty(its), 'piece')} inside</b><small>${pals.length > 1 ? pCode(b.pallet_id) + ' · ' : ''}Started by ${esc(b.created_by)}</small></span></button>`; }).join('')}
+    ${(() => { const rest = data.boxes.filter(b => b.status === 'open' && !boxes.includes(b)).sort((a, b) => b.id - a.id);
+      return rest.length ? `<details class="otherboxes"${pack.showAll ? ' open' : ''}><summary>Another open box (${rest.length})</summary>${rest.map(b => `<button class="pick" data-act="choose-box" data-id="${b.id}"><span class="tag box">${bCode(b.id)}</span>
+        <span><b>${plural(sumQty(itemsOf('box_id', b.id)), 'piece')} inside</b><small>${pCode(b.pallet_id)} · Started by ${esc(b.created_by)}</small></span></button>`).join('')}</details>` : ''; })()}
     ${full ? '' : `<button class="pick new" data-act="new-box">Start a new box on ${pCode(p.id)}</button>`}
     <button class="pick new pnew" data-act="overflow-pallet">Start a new pallet for ${esc(pack.style)}</button>
     ${n === 0 ? `<p class="small muted" style="margin-top:14px">Picked the wrong pallet? Nothing is packed for this style yet. <button class="linkbtn" data-act="release-style">Undo this pallet choice</button></p>`
@@ -3865,7 +3869,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-25.06';
+const APP_VERSION = '2026-11-25.07';
 let newVersion = false;
 async function checkVersion(){
   try {
