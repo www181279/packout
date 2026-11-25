@@ -1282,7 +1282,7 @@ function validatePack(){
   return true;
 }
 function applyKeep(){
-  const k = pack.keep, b = k && idx.box.get(k.box);
+  const k = pack.keep || pack.last, b = k && idx.box.get(k.box);   // the box you are packing now, even after reopening the app
   if (!(k && b && b.status === 'open')) return;
   if (b.pallet_id === pack.pallet) return Object.assign(pack, { box: k.box, stage: 'item', form: null, err: '' });
   // a style already packed elsewhere goes into the box you are working in; its other pieces stay where they are
@@ -3869,7 +3869,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-25.07';
+const APP_VERSION = '2026-11-25.08';
 let newVersion = false;
 async function checkVersion(){
   try {
