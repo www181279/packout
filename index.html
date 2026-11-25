@@ -1257,7 +1257,7 @@ let tab = 'pack';
 let pack = newPack(store.get('last'), store.get('last'));   // keep filling the box this phone used last
 let palView = null, palMine = false;
 let filt = { q: '', pallet: '', box: '', item_type: '', size: '', brand: '', gender: '', season: '', color: '', by: '' }, invLimit = 150, invSort = 'new';
-function newPack(last, keep){ return { sizeSet: null, wlWaist: null, reuse: null, runPath: null, lastEntry: null, stage: 'style', style: '', pallet: null, box: null, known: false, owner: '', err: '', saved: null, photo: null, id: uuid(), last: last || null, keep: keep || null }; }
+function newPack(last, keep){ return { sizeSet: null, wlWaist: null, reuse: null, runPath: null, lastEntry: null, stage: 'style', style: '', pallet: null, box: null, known: false, owner: '', err: '', saved: null, photo: null, id: uuid(), last: last || null, keep: keep || null, crossPal: false, nextBox: false }; }
 // "keep" = the employee asked to put the next style into the same box
 // If the box or style this phone is working on was deleted (here or on another phone), start over cleanly.
 function validatePack(){
@@ -1266,7 +1266,7 @@ function validatePack(){
   if (pack.last && !idx.box.get(pack.last.box)) { pack.last = null; store.del('last'); }
   if (pack.reuse && !data.items.some(i => i.photo_path === pack.reuse.path)) pack.reuse = null;
   const sr = (pack.stage === 'item' || pack.stage === 'box') && styleRow(pack.style);
-  if (sr && pack.pallet && sr.pallet_id !== pack.pallet && !(pack.box && idx.box.get(pack.box) && idx.box.get(pack.box).pallet_id === pack.pallet) && !palletFull(sr.pallet_id)) {   // the style was moved to another pallet (not: continued after its pallet filled up)
+  if (sr && pack.pallet && !pack.crossPal && sr.pallet_id !== pack.pallet && !(pack.box && idx.box.get(pack.box) && idx.box.get(pack.box).pallet_id === pack.pallet) && !palletFull(sr.pallet_id)) {   // the style was moved to another pallet (not: continued after its pallet filled up)
     const b = pack.box && idx.box.get(pack.box);
     if (b && b.pallet_id === sr.pallet_id) { pack.pallet = sr.pallet_id; return 'bar'; }   // this box went with it: only the top bar changes
     Object.assign(pack, { stage: 'box', pallet: sr.pallet_id, box: null, known: true, owner: sr.created_by, form: null, photo: null, justSaved: false,
@@ -1283,7 +1283,14 @@ function validatePack(){
 }
 function applyKeep(){
   const k = pack.keep || pack.last, b = k && idx.box.get(k.box);   // the box you are packing now, even after reopening the app
-  if (!(k && b && b.status === 'open')) return;
+  if (!k) return;
+  if (!(b && b.status === 'open')) {   // that box was marked full: stay on its pallet and start the next box there
+    const lp = idx.pal.get(b ? b.pallet_id : k.pallet);
+    if (!lp || lp.status !== 'open' || palletFull(lp.id)) return;
+    if (lp.id === pack.pallet) return Object.assign(pack, { nextBox: true });
+    return Object.assign(pack, { pallet: lp.id, box: null, stage: 'box', form: null, err: '', crossPal: true, nextBox: true,
+      saved: pack.known ? `${b ? bCode(b.id) + ' is marked full. ' : ''}Start the next box on ${pCode(lp.id)}, the pallet you are packing. Earlier pieces of ${pack.style} are on ${pCode(pack.pallet)}.` : '' });
+  }
   if (b.pallet_id === pack.pallet) return Object.assign(pack, { box: k.box, stage: 'item', form: null, err: '' });
   // a style already packed elsewhere goes into the box you are working in; its other pieces stay where they are
   if (pack.known) Object.assign(pack, { pallet: b.pallet_id, box: k.box, stage: 'item', form: null, err: '',
@@ -1587,13 +1594,14 @@ function packHTML(){
     return `${trailHTML()}${head}${err}
     ${p.status === 'closed' ? `<div class="note">${pCode(p.id)} is marked closed. <button class="linkbtn" data-act="reopen-pallet" data-id="${p.id}">Reopen it</button> to add pieces.</div>` : ''}
     <h2 style="font:600 17px var(--body);margin:16px 0 8px">${pals.length > 1 || full ? 'Which box?' : `Which box on ${pCode(p.id)}?`}</h2>
+    ${pack.nextBox && !full ? `<button class="btn" data-act="new-box" style="margin-bottom:12px">Start ${bCode(nextBoxNo(p.id))} on ${pCode(p.id)}</button>` : ''}
     ${boxes.map(b => { const its = itemsOf('box_id', b.id); return `
       <button class="pick" data-act="choose-box" data-id="${b.id}"><span class="tag box">${bCode(b.id)}</span>
         <span><b>${mine && b.id === mine.id ? 'Your current box · ' : ''}${plural(sumQty(its), 'piece')} inside</b><small>${pals.length > 1 ? pCode(b.pallet_id) + ' · ' : ''}Started by ${esc(b.created_by)}</small></span></button>`; }).join('')}
     ${(() => { const rest = data.boxes.filter(b => b.status === 'open' && !boxes.includes(b)).sort((a, b) => b.id - a.id);
       return rest.length ? `<details class="otherboxes"${pack.showAll ? ' open' : ''}><summary>Another open box (${rest.length})</summary>${rest.map(b => `<button class="pick" data-act="choose-box" data-id="${b.id}"><span class="tag box">${bCode(b.id)}</span>
         <span><b>${plural(sumQty(itemsOf('box_id', b.id)), 'piece')} inside</b><small>${pCode(b.pallet_id)} · Started by ${esc(b.created_by)}</small></span></button>`).join('')}</details>` : ''; })()}
-    ${full ? '' : `<button class="pick new" data-act="new-box">Start a new box on ${pCode(p.id)}</button>`}
+    ${full || pack.nextBox ? '' : `<button class="pick new" data-act="new-box">Start a new box on ${pCode(p.id)}</button>`}
     <button class="pick new pnew" data-act="overflow-pallet">Start a new pallet for ${esc(pack.style)}</button>
     ${n === 0 ? `<p class="small muted" style="margin-top:14px">Picked the wrong pallet? Nothing is packed for this style yet. <button class="linkbtn" data-act="release-style">Undo this pallet choice</button></p>`
       : !canManage() ? '' : `<p class="small muted" style="margin-top:14px">Pallet full, or a mistake in this style? <button class="linkbtn" data-act="open-style" data-style="${esc(pack.style)}">Move, edit or delete this style</button></p>`}`;
@@ -2461,6 +2469,13 @@ function fillKnownTags(f){
   else f.sizes.forEach(z => { if (!z.tag) z.tag = knownTag(f.color, z.size); });
 }
 // A pallet is full when every box number in its range is used (same rule as the database)
+function nextBoxNo(pid){   // same rule as the database: highest number on the pallet + 1, gaps only when the range is used up
+  const per = boxesPerPallet(), used = new Set(data.boxes.map(b => b.id)), lo = (pid - 1) * per + 1, hi = pid * per;
+  const top = Math.max(lo - 1, ...data.boxes.map(b => b.id).filter(id => id >= lo && id <= hi));
+  if (top + 1 <= hi) return top + 1;
+  for (let k = lo; k <= hi; k++) if (!used.has(k)) return k;
+  return null;
+}
 function palletFull(pid){
   const per = boxesPerPallet(), used = new Set(data.boxes.map(b => b.id));
   for (let k = (pid - 1) * per + 1; k <= pid * per; k++) if (!used.has(k)) return false;
@@ -3181,8 +3196,10 @@ const act = {
         const [found] = await Promise.all([db.get('styles', 'select=*&style_number=' + eq(s)), loadAll()]);
         pack.err = ''; pack.tagStatus = '';
         const kb = pack.keep && idx.box.get(pack.keep.box);
+        const lk = pack.keep || pack.last, lb = lk && idx.box.get(lk.box), lp = lk && idx.pal.get(lb ? lb.pallet_id : lk.pallet);   // the pallet you are packing now
         if (found[0]) { Object.assign(pack, { stage: 'box', pallet: found[0].pallet_id, known: true, owner: found[0].created_by }); applyKeep(); }
         else if (kb && kb.status === 'open') return await claim(kb.pallet_id, 'keep');
+        else if (lp && lp.status === 'open' && !palletFull(lp.id)) return await claim(lp.id, 'keep');
         else pack.stage = 'pallet';
         render(); scrollTo(0, 0);
       } catch (e) { packFail(e); }
@@ -3224,7 +3241,7 @@ const act = {
       } catch (e) { packFail(e); }
     });
   },
-  async 'choose-box'(el){ pack.box = +el.dataset.id; const cb = idx.box.get(pack.box); if (cb) pack.pallet = cb.pallet_id; pack.last = { pallet: pack.pallet, box: pack.box }; store.set('last', pack.last); pack.stage = 'item'; pack.err = ''; pack.form = null; render(); scrollTo(0, 0); },
+  async 'choose-box'(el){ pack.box = +el.dataset.id; const cb = idx.box.get(pack.box); if (cb) pack.pallet = cb.pallet_id; pack.last = { pallet: pack.pallet, box: pack.box }; store.set('last', pack.last); pack.stage = 'item'; pack.err = ''; pack.form = null; pack.nextBox = false; render(); scrollTo(0, 0); },
   async 'new-box'(){
     if (pack.stage === 'item' && pack.box && !itemsOf('box_id', pack.box).length)
       return toast(`${bCode(pack.box)} is still empty. Save an item in it first.`, 'bad');
@@ -3236,7 +3253,7 @@ const act = {
         const b = await db.insert('boxes', { pallet_id: pack.pallet, created_by: me.name });
         data.boxes.push(b); idx.box.set(b.id, b);
         pack.last = { pallet: pack.pallet, box: b.id }; store.set('last', pack.last);
-        Object.assign(pack, { box: b.id, stage: 'item', err: '', form: wasItem, justSaved: false, saved: `${full ? bCode(full) + ' is marked full. ' : ''}New box: write ${bCode(b.id)} on it now.` });
+        Object.assign(pack, { box: b.id, stage: 'item', err: '', form: wasItem, justSaved: false, nextBox: false, saved: `${full ? bCode(full) + ' is marked full. ' : ''}New box: write ${bCode(b.id)} on it now.` });
         render(); scrollTo(0, 0); if (pack.photo) showPhoto(pack.photo);
       } catch (e) { if (/is full/i.test(e.message)) { pack.keepForm = wasItem; return overflowAsk(); } packFail(e); }
     });
@@ -3869,7 +3886,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-25.08';
+const APP_VERSION = '2026-11-25.09';
 let newVersion = false;
 async function checkVersion(){
   try {
