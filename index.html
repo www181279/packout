@@ -1282,7 +1282,11 @@ function validatePack(){
 }
 function applyKeep(){
   const k = pack.keep, b = k && idx.box.get(k.box);
-  if (k && b && b.status === 'open' && b.pallet_id === pack.pallet) Object.assign(pack, { box: k.box, stage: 'item', form: null, err: '' });
+  if (!(k && b && b.status === 'open')) return;
+  if (b.pallet_id === pack.pallet) return Object.assign(pack, { box: k.box, stage: 'item', form: null, err: '' });
+  // a style already packed elsewhere goes into the box you are working in; its other pieces stay where they are
+  if (pack.known) Object.assign(pack, { pallet: b.pallet_id, box: k.box, stage: 'item', form: null, err: '',
+    saved: `${pack.style} goes into ${bCode(k.box)} on ${pCode(b.pallet_id)}, the box you are packing. Earlier pieces are on ${pCode(pack.pallet)}.`, crossPal: true });
 }
 
 // Pallets, boxes and styles are small and always loaded whole. Items can be many thousands, so after the
@@ -1564,7 +1568,11 @@ function packHTML(){
   if (pack.stage === 'box') {
     const p = idx.pal.get(pack.pallet) || { id: pack.pallet, created_by: '', status: 'open' };
     const full = palletFull(p.id), pals = stylePallets(pack.style, p.id);
-    const boxes = data.boxes.filter(b => pals.includes(b.pallet_id) && b.status === 'open').sort((a, b) => (pack.last && a.id === pack.last.box ? -1 : 0) || b.id - a.id);
+    // the box this phone is packing right now is always offered first, even on another pallet
+    const cur = pack.last && idx.box.get(pack.last.box), mine = cur && cur.status === 'open' ? cur : null;
+    if (mine && !pals.includes(mine.pallet_id)) pals.push(mine.pallet_id);
+    const boxes = data.boxes.filter(b => pals.includes(b.pallet_id) && b.status === 'open' && (b.pallet_id !== (mine && mine.pallet_id) || b.pallet_id === p.id || b.id === mine.id || itemsOf('box_id', b.id).some(i => i.style_number === pack.style)))
+      .sort((a, b) => (mine && a.id === mine.id ? -1 : mine && b.id === mine.id ? 1 : 0) || b.id - a.id);
     const n = itemsOf('style_number', pack.style).length;
     const other = pack.known && pack.owner && pack.owner !== me.name;
     const head = pack.known ? `
@@ -1580,7 +1588,7 @@ function packHTML(){
     <h2 style="font:600 17px var(--body);margin:16px 0 8px">${pals.length > 1 || full ? 'Which box?' : `Which box on ${pCode(p.id)}?`}</h2>
     ${boxes.map(b => { const its = itemsOf('box_id', b.id); return `
       <button class="pick" data-act="choose-box" data-id="${b.id}"><span class="tag box">${bCode(b.id)}</span>
-        <span><b>${plural(sumQty(its), 'piece')} inside</b><small>${pals.length > 1 ? pCode(b.pallet_id) + ' · ' : ''}Started by ${esc(b.created_by)}</small></span></button>`; }).join('')}
+        <span><b>${mine && b.id === mine.id ? 'Your current box · ' : ''}${plural(sumQty(its), 'piece')} inside</b><small>${pals.length > 1 ? pCode(b.pallet_id) + ' · ' : ''}Started by ${esc(b.created_by)}</small></span></button>`; }).join('')}
     ${full ? '' : `<button class="pick new" data-act="new-box">Start a new box on ${pCode(p.id)}</button>`}
     <button class="pick new pnew" data-act="overflow-pallet">Start a new pallet for ${esc(pack.style)}</button>
     ${n === 0 ? `<p class="small muted" style="margin-top:14px">Picked the wrong pallet? Nothing is packed for this style yet. <button class="linkbtn" data-act="release-style">Undo this pallet choice</button></p>`
@@ -1598,7 +1606,7 @@ function packHTML(){
   const more = f.more || [];
   const uniq = k => [...new Set(data.items.map(i => i[k]).filter(Boolean))].sort();
   return `${trailHTML()}
-    ${pack.saved ? `<div class="saved">${esc(pack.saved)}${pack.runPath ? colorRunHTML(pack.runPath) : ''}${pack.justSaved && idx.box.get(pack.box)?.status === 'open' ? `
+    ${pack.saved ? `<div class="saved">${esc(pack.saved)}${pack.crossPal && !pack.justSaved ? ' <button class="linkbtn" data-act="pick-other-box">Use another box</button>' : ''}${pack.runPath ? colorRunHTML(pack.runPath) : ''}${pack.justSaved && idx.box.get(pack.box)?.status === 'open' ? `
       <div class="savedacts"><p class="snext">What's next?</p>
         <button class="nx main" data-act="same-color"><b>More sizes of this color</b><span>Same photo and color, same box</span></button>
         <button class="nx" data-act="next-color"><b>Next color</b><span>Take a photo of the new color</span></button>
@@ -3177,6 +3185,7 @@ const act = {
     });
   },
   async 'choose-pallet'(el){ await claim(+el.dataset.id); },
+  'pick-other-box'(){ const sr = styleRow(pack.style); Object.assign(pack, { stage: 'box', pallet: sr ? sr.pallet_id : pack.pallet, box: null, saved: '', crossPal: false }); render(); scrollTo(0, 0); },
   'overflow-pallet'(){ pack.keepForm = pack.stage === 'item' ? readForm() : null; overflowAsk(); },
   async 'overflow-yes'(){
     closeSheet();
@@ -3856,7 +3865,7 @@ setInterval(async () => {
 document.addEventListener('visibilitychange', () => { if (!document.hidden && cfg && me && !busyN) refresh(true).then(ok => ok && !sheetOpen() && softRender()); });
 
 /* ---------- updates: a phone picks up a new version of the app by itself, at a safe moment ---------- */
-const APP_VERSION = '2026-11-25.04';
+const APP_VERSION = '2026-11-25.06';
 let newVersion = false;
 async function checkVersion(){
   try {
